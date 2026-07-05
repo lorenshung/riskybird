@@ -83,13 +83,12 @@ riskybird v3 runs from a **1S LiPo** (4.2 V → ~3.0 V under load) and will host
 
 ## 4. Key values & calculations
 
-**Output (FB = 1.2 V):** V<sub>OUT</sub> = 1.2 × (1 + R<sub>top</sub>/R<sub>bot</sub>).
-→ For 3.3 V: **R<sub>top</sub> = 17.4 kΩ, R<sub>bot</sub> = 10.0 kΩ** (1%) ⇒ 3.29 V.
+**Output (FB = 0.795 V typ):** V<sub>OUT</sub> = 0.795 × (1 + R<sub>top</sub>/R<sub>bot</sub>). *(Corrected — an earlier draft wrongly assumed 1.2 V.)*
+→ For 3.3 V: R<sub>top</sub>/R<sub>bot</sub> ≈ 3.15 → **R<sub>top</sub> = 316 kΩ, R<sub>bot</sub> = 100 kΩ ⇒ 3.31 V** — **as built (R59/R60), confirmed correct.**
 
-**Input UVLO / 1S cutoff (RUN = 1.2 V, ~100 mV hyst):** sense VSYS_SW (≈ cell).
-→ **R = 17.4 kΩ / 10.0 kΩ** ⇒ rising ≈ 3.29 V, falling ≈ **3.0 V** (protects the cell; holds 3.3 V flat from 4.2 V down to ~3.0 V — *this is the cutoff fix*). LTC3119 supports independent falling-UVLO programming if a wider hysteresis is wanted.
+**Input UVLO / 1S cutoff (RUN pin):** sense VSYS_SW (≈ cell) with a VIN→RUN→GND divider; target rising ~3.05 V, falling ~**3.0 V** (protects the cell; holds 3.3 V flat from 4.2 V to the floor — *the cutoff fix*). ⚠️ **NOT YET BUILT:** as drawn, RUN has only a 100 kΩ pull-up (R58) to VIN and no bottom resistor → always-on, no cutoff. Add the bottom resistor, sizing with the **actual RUN threshold from the datasheet** (the earlier 1.2 V figure is unverified — same bad source as the FB error).
 
-**Switching freq (RT):** target ~1 MHz (balance of efficiency vs L/C size); R<sub>T</sub> per datasheet.
+**Switching freq (RT):** **as built 1.5 MHz** via R62 = 48.7 kΩ; inductor **L4 = 2.2 µH** (consistent with the higher frequency). Lighter inductor than the earlier ~1 MHz suggestion — good for the drone. **PWM/SYNC:** as built tied to GND = **Burst Mode**; tie **high** for fixed-frequency PWM if clean, predictable switching noise for the sensors matters more than light-load efficiency.
 **Current limit (PROG):** I<sub>PROG</sub> ≈ I<sub>SWD</sub>/25000; size R<sub>PROG</sub> for ≥3 A output (allow boost-mode inductor peak ~6–8 A).
 **Bootstrap:** 0.1 µF BST1↔SW1, 0.1 µF BST2↔SW2.
 **Caps:** C<sub>IN</sub> ≈ 2×22 µF + 0.1 µF; C<sub>OUT</sub> ≈ 2×47 µF (reuse existing +3V3 bulk C52/C53) + ceramics.
