@@ -37937,7 +37937,7 @@
 		)
 		(uuid "cea8adb3-b920-43bf-b792-7cde69a23f05")
 	)
-	(label "USP_DM_1"
+	(label "USB_DM_1"
 		(at 725.17 129.54 0)
 		(effects
 			(font
