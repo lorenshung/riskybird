@@ -511,6 +511,129 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Connector:TestPoint"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0.762)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "TP"
+				(at 0 6.858 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "TestPoint"
+				(at 0 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 5.08 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 5.08 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "test point"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "test point tp"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "Pin* Test*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "TestPoint_0_1"
+				(circle
+					(center 0 3.302)
+					(radius 0.762)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "TestPoint_1_1"
+				(pin passive line
+					(at 0 0 90)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Connector:USB_C_Receptacle_USB2.0_16P"
 			(pin_names
 				(offset 1.016)
@@ -4615,145 +4738,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "power:+3V3"
-			(power global)
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 0)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "#PWR"
-				(at 0 -3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "+3V3"
-				(at 0 3.556 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "Power symbol creates a global label with name \"+3V3\""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "global power"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "+3V3_0_1"
-				(polyline
-					(pts
-						(xy -0.762 1.27) (xy 0 2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 2.54) (xy 0.762 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 0) (xy 0 2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "+3V3_1_1"
-				(pin power_in line
-					(at 0 0 90)
-					(length 0)
-					(name ""
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "power:GND"
 			(power global)
 			(pin_numbers
@@ -4881,6 +4865,26 @@
 		)
 		(uuid "2131d6e6-849e-4fca-ad42-d52164a08bc0")
 	)
+	(text "JTAG\n"
+		(exclude_from_sim no)
+		(at 276.352 192.786 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "3cf6ddd4-56fb-4558-bab7-4f5ca7898ad7")
+	)
+	(text "UART\n"
+		(exclude_from_sim no)
+		(at 278.638 176.53 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "41fc4a04-57fe-4b05-a55c-9510e4ca98a7")
+	)
 	(text "ELF FTDI (1)\n"
 		(exclude_from_sim no)
 		(at 92.456 24.384 0)
@@ -4892,6 +4896,26 @@
 		)
 		(uuid "43486488-8ee2-4878-9bf6-0c89858ef3e4")
 	)
+	(text "Power Lines (FTDI & VTREF)"
+		(exclude_from_sim no)
+		(at 289.052 204.47 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "54c79d12-9501-44ee-a144-d0698b9d096e")
+	)
+	(text "Power Lines (FTDI & VTREF)"
+		(exclude_from_sim no)
+		(at 118.872 250.19 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "54cb7809-e877-4709-abcc-c0bc44f6e193")
+	)
 	(text "Bitstream FTDI (2)\n"
 		(exclude_from_sim no)
 		(at 302.26 19.304 0)
@@ -4902,6 +4926,36 @@
 			(justify left)
 		)
 		(uuid "5e09fe1a-fdab-4498-a3f1-9201f1383285")
+	)
+	(text "JTAG\n"
+		(exclude_from_sim no)
+		(at 107.442 237.236 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "6c3524cd-d11b-4260-b187-ed7cdd6a60bb")
+	)
+	(text "UART\n"
+		(exclude_from_sim no)
+		(at 109.728 220.98 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "9b80e9e6-93fa-4180-9283-6708c8a91b04")
+	)
+	(text "Ground"
+		(exclude_from_sim no)
+		(at 110.49 262.382 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "ebe73529-2b3c-4634-ac91-e4f0d9d36394")
 	)
 	(junction
 		(at 85.09 176.53)
@@ -5528,6 +5582,10 @@
 		(uuid "79b45b82-cab9-4217-a11e-d02737c79f51")
 	)
 	(no_connect
+		(at 336.55 88.9)
+		(uuid "7acca2f7-cac4-4215-ac18-c0e66b3bb875")
+	)
+	(no_connect
 		(at 127 81.28)
 		(uuid "7af729ae-f295-418c-8eab-3bf3c7c0bc70")
 	)
@@ -5578,6 +5636,10 @@
 	(no_connect
 		(at 336.55 50.8)
 		(uuid "acd616e8-07a1-472b-a219-be364fa90a2c")
+	)
+	(no_connect
+		(at 127 91.44)
+		(uuid "af470238-981d-4635-8ea6-fa2643e36e45")
 	)
 	(no_connect
 		(at 62.23 204.47)
@@ -8101,6 +8163,16 @@
 		)
 		(uuid "1e9e69a6-237e-4874-bd9e-5000384ec635")
 	)
+	(label "FTDI_3v3_1"
+		(at 33.02 34.29 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1ee43ecd-9c69-4b31-983f-ec81f7fc0cfa")
+	)
 	(label "VTREF_2"
 		(at 218.44 132.08 0)
 		(effects
@@ -8110,6 +8182,26 @@
 			(justify left bottom)
 		)
 		(uuid "1f1ef693-1516-4153-9261-e0edf4d58ede")
+	)
+	(label "FTDI_3v3_1"
+		(at 90.17 252.73 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1fba804b-b1dc-4a0f-8d90-8f89fb022fb2")
+	)
+	(label "TXD_1"
+		(at 71.12 222.25 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1fe4b78d-08eb-4921-b683-49762f4648be")
 	)
 	(label "TX_LED2"
 		(at 336.55 38.1 0)
@@ -8130,6 +8222,16 @@
 			(justify left bottom)
 		)
 		(uuid "22e03c0f-cca3-473c-886c-44401b8c9d30")
+	)
+	(label "TMS_1"
+		(at 90.17 233.68 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "284c6edf-f12c-43e6-9414-b6c00d2a88a6")
 	)
 	(label "JTAG_LED2"
 		(at 336.55 81.28 0)
@@ -8171,6 +8273,16 @@
 		)
 		(uuid "32b96af0-6d62-40b4-8bf8-eda15e239eca")
 	)
+	(label "RXD_1"
+		(at 90.17 222.25 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "33691d4a-920b-4eff-8f1a-5dad2f9716c5")
+	)
 	(label "USB_DM_2"
 		(at 392.43 176.53 0)
 		(effects
@@ -8210,6 +8322,16 @@
 			(justify left bottom)
 		)
 		(uuid "392875c8-2988-4fdf-bb83-5cd10bbb539b")
+	)
+	(label "TDI_2"
+		(at 240.03 199.39 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "3e3792ae-e575-46b1-bdd4-3a86968dd25c")
 	)
 	(label "JTAG_LED1"
 		(at 44.45 54.61 0)
@@ -8271,6 +8393,16 @@
 		)
 		(uuid "44269cbe-1b73-4255-b328-a830c5d25032")
 	)
+	(label "FTDI_3v3_1"
+		(at 22.86 34.29 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "4540e721-83f1-4da1-9e6a-7f9746beefd5")
+	)
 	(label "RXD_1"
 		(at 143.51 247.65 0)
 		(effects
@@ -8311,6 +8443,36 @@
 		)
 		(uuid "54b6bfa7-5816-4eb3-95d3-c41abefc65e7")
 	)
+	(label "FTDI_3v3_2"
+		(at 247.65 53.34 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "5ddd986c-6d5a-4a13-af32-a783d0837718")
+	)
+	(label "VTREF_2"
+		(at 241.3 207.01 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6c2a3f1e-a4ae-4a8c-9c05-f65db96914e4")
+	)
+	(label "FTDI_3v3_1"
+		(at 44.45 34.29 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6cf6d1d6-1fc3-43eb-8c4b-79b325f91454")
+	)
 	(label "NTRST_1"
 		(at 127 93.98 0)
 		(effects
@@ -8330,6 +8492,16 @@
 			(justify left bottom)
 		)
 		(uuid "6d98bc1b-74df-4d32-a30c-686bd55cda1b")
+	)
+	(label "VTREF_1"
+		(at 71.12 252.73 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "70d9e98e-adf3-4440-b9ba-85f847fa5f90")
 	)
 	(label "5V_1"
 		(at 109.22 176.53 0)
@@ -8351,6 +8523,16 @@
 		)
 		(uuid "7183d25c-5954-458d-b6d6-40d6f8404fd3")
 	)
+	(label "TDO_2"
+		(at 259.08 199.39 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "729c8672-4c78-448c-8c21-6d606746fc5c")
+	)
 	(label "NTRST_1"
 		(at 214.63 245.11 0)
 		(effects
@@ -8361,15 +8543,15 @@
 		)
 		(uuid "75d6a240-6977-4f11-bddb-eb9a35bb460f")
 	)
-	(label "NSRST_1"
-		(at 127 91.44 0)
+	(label "RXD_2"
+		(at 259.08 177.8 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "79980a4d-4c95-40d4-b5e4-bacd9b9a8b52")
+		(uuid "791f38d7-1e8c-49fd-b9f3-255feb6d6067")
 	)
 	(label "JTAG_LED2"
 		(at 259.08 73.66 0)
@@ -8380,6 +8562,16 @@
 			(justify left bottom)
 		)
 		(uuid "7e944da8-c29d-4abf-a2bb-7b899690fe69")
+	)
+	(label "FTDI_3v3_2"
+		(at 259.08 53.34 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "7ead86b8-e82d-4345-9804-b368a5bb27c4")
 	)
 	(label "FTDI_3v3_2"
 		(at 297.18 138.43 0)
@@ -8411,6 +8603,26 @@
 		)
 		(uuid "830724a2-f5d0-450f-82ed-190949952a9f")
 	)
+	(label "TCK_2"
+		(at 240.03 189.23 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "84e38609-583c-4b95-9e4d-5d89e5c53507")
+	)
+	(label "FTDI_3v3_2"
+		(at 260.35 207.01 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "86581070-32a6-4b0e-8139-2e5809d655d5")
+	)
 	(label "FTDI_3v3_2"
 		(at 269.24 26.67 0)
 		(effects
@@ -8431,6 +8643,16 @@
 		)
 		(uuid "91d1bc64-1333-4157-a018-464688c34c30")
 	)
+	(label "TDO_1"
+		(at 90.17 243.84 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "97f83a4b-3255-4db0-8b8d-163ef03e70b9")
+	)
 	(label "FTDI_OSCO_1"
 		(at 50.8 101.6 270)
 		(effects
@@ -8440,6 +8662,16 @@
 			(justify right bottom)
 		)
 		(uuid "995777fc-abd5-4d92-a8d7-842cd8c43d6c")
+	)
+	(label "FTDI_3v3_2"
+		(at 237.49 53.34 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "9a28cdee-6716-47f8-a355-63607b57102c")
 	)
 	(label "RX_LED2"
 		(at 237.49 73.66 0)
@@ -8490,6 +8722,16 @@
 			(justify left bottom)
 		)
 		(uuid "aa2744f9-135e-439c-981d-27a119d464d2")
+	)
+	(label "TMS_2"
+		(at 259.08 189.23 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "ac47d903-a7ac-4a16-a865-052977c1a417")
 	)
 	(label "TCK_1"
 		(at 127 114.3 0)
@@ -8591,6 +8833,16 @@
 		)
 		(uuid "c0acd92b-2b4f-4bb3-b2ac-bafcbe1ccab8")
 	)
+	(label "TXD_2"
+		(at 240.03 177.8 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "c6ddb230-a881-4450-a754-f0c0bdc91b1e")
+	)
 	(label "TDI_2"
 		(at 336.55 106.68 0)
 		(effects
@@ -8671,6 +8923,16 @@
 		)
 		(uuid "d64bf53a-39e4-4971-9eb4-4f4b0e5666c8")
 	)
+	(label "TCK_1"
+		(at 71.12 233.68 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "d71ff7ca-0e4f-4368-801d-73d54a420f01")
+	)
 	(label "5V_1"
 		(at 19.05 137.16 0)
 		(effects
@@ -8711,16 +8973,6 @@
 		)
 		(uuid "e5eba1a0-73a0-415a-ac40-2d5f31882af3")
 	)
-	(label "NTRST_2"
-		(at 336.55 88.9 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "e873faf7-0ad3-44a1-a06d-8b5c66f9a74e")
-	)
 	(label "TX_LED1"
 		(at 33.02 54.61 0)
 		(effects
@@ -8760,6 +9012,16 @@
 			(justify left bottom)
 		)
 		(uuid "ed7d91c0-87a7-4d33-8b06-a5b2cde75182")
+	)
+	(label "TDI_1"
+		(at 71.12 243.84 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "edffe753-8376-40a5-a3a0-41e66d86a4d0")
 	)
 	(label "VTREF_1"
 		(at 104.14 142.24 0)
@@ -8820,6 +9082,16 @@
 			(justify left bottom)
 		)
 		(uuid "f823b096-904d-4aca-bc8a-affee311aa90")
+	)
+	(label "FTDI_3v3_2"
+		(at 299.72 146.05 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "fb365d16-9f15-42de-b814-dfee30b4d10a")
 	)
 	(label "RX_LED1"
 		(at 22.86 54.61 0)
@@ -10190,6 +10462,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 71.12 252.73 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "1e677445-15b2-43de-988c-24548e9319e3")
+		(property "Reference" "TP16"
+			(at 73.66 248.1579 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 73.66 250.6979 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 76.2 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 76.2 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 71.12 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "df145f10-a4c3-47ca-bb8d-115a96f6f5a6")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP16")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "CSTNE12M0G550000R0:CSTNE12M0G550000R0")
 		(at 38.1 104.14 0)
 		(unit 1)
@@ -10412,8 +10763,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3V3")
-		(at 22.86 34.29 0)
+		(lib_id "Connector:TestPoint")
+		(at 241.3 207.01 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10422,20 +10773,9 @@
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "207d2c49-b8a8-4609-a187-2fe266f09685")
-		(property "Reference" "#PWR0207"
-			(at 22.86 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 25.4 33.0199 0)
+		(uuid "22bb27e1-18f6-42e4-83a9-37821bc20a0d")
+		(property "Reference" "TP27"
+			(at 243.84 202.4379 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10445,8 +10785,19 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
-			(at 22.86 34.29 0)
+		(property "Value" "TestPoint"
+			(at 243.84 204.9779 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 246.38 207.01 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10457,7 +10808,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 22.86 34.29 0)
+			(at 246.38 207.01 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10467,8 +10818,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 22.86 34.29 0)
+		(property "Description" "test point"
+			(at 241.3 207.01 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10479,12 +10830,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "db65dd52-878e-4b75-a62d-75d36522c6f0")
+			(uuid "cdcf7092-7bf4-42c0-a8c6-5d10aa847e68")
 		)
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "#PWR0207")
+					(reference "TP27")
 					(unit 1)
 				)
 			)
@@ -10980,8 +11331,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3V3")
-		(at 237.49 53.34 0)
+		(lib_id "Connector:TestPoint")
+		(at 240.03 189.23 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10990,20 +11341,9 @@
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "2b0c2114-b791-4b8f-a6d2-fb5745a80331")
-		(property "Reference" "#PWR0204"
-			(at 237.49 57.15 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 240.03 52.0699 0)
+		(uuid "2b44c7bb-8142-4b63-a28e-85c8886d0c97")
+		(property "Reference" "TP24"
+			(at 242.57 184.6579 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -11013,8 +11353,19 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
-			(at 237.49 53.34 0)
+		(property "Value" "TestPoint"
+			(at 242.57 187.1979 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 245.11 189.23 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11025,7 +11376,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 237.49 53.34 0)
+			(at 245.11 189.23 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11035,8 +11386,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 237.49 53.34 0)
+		(property "Description" "test point"
+			(at 240.03 189.23 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11047,12 +11398,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "6acf2f1b-bbf7-4573-8849-c4808976196d")
+			(uuid "0eab025a-5b80-45ba-b84a-dd5c9758343d")
 		)
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "#PWR0204")
+					(reference "TP24")
 					(unit 1)
 				)
 			)
@@ -12696,6 +13047,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 90.17 222.25 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "5b20fbdb-af9e-43ce-9a1c-540c2cf2b28b")
+		(property "Reference" "TP18"
+			(at 92.71 217.6779 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 92.71 220.2179 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 95.25 222.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 95.25 222.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 90.17 222.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "82076340-4c19-4c2e-98eb-a85d859565a7")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP18")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:Fuse")
 		(at 97.79 176.53 90)
 		(unit 1)
@@ -12769,85 +13199,6 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "F1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3V3")
-		(at 44.45 34.29 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "6379add4-23ac-4d96-8991-96bc8b05a7aa")
-		(property "Reference" "#PWR0209"
-			(at 44.45 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 46.99 33.0199 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 44.45 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 44.45 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 44.45 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "470347a2-a804-4e6c-8c2f-fc023d1388d3")
-		)
-		(instances
-			(project "riskybirdv3_connector"
-				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "#PWR0209")
 					(unit 1)
 				)
 			)
@@ -12933,85 +13284,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3V3")
-		(at 33.02 34.29 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "6600d8f3-b9dc-4e36-b402-075f44bbc527")
-		(property "Reference" "#PWR0208"
-			(at 33.02 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 35.56 33.0199 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 33.02 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 33.02 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 33.02 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a6c01abb-b886-47b8-9cf2-f8ba4d6421d4")
-		)
-		(instances
-			(project "riskybirdv3_connector"
-				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "#PWR0208")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:C_Small")
 		(at 248.92 85.09 0)
 		(unit 1)
@@ -13088,6 +13360,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "C72")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 90.17 233.68 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6767f4bd-8faf-477d-8415-e65641ee021b")
+		(property "Reference" "TP19"
+			(at 92.71 229.1079 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 92.71 231.6479 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 95.25 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 95.25 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 90.17 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "66e9e395-1523-468c-b451-9956118e079a")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP19")
 					(unit 1)
 				)
 			)
@@ -13385,85 +13736,6 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "D19")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3V3")
-		(at 247.65 53.34 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "6dc23d69-4699-47cf-a825-861d71e54520")
-		(property "Reference" "#PWR0205"
-			(at 247.65 57.15 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 250.19 52.0699 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 247.65 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 247.65 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 247.65 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "42865c31-ea5e-4608-b005-9a90fe002b8c")
-		)
-		(instances
-			(project "riskybirdv3_connector"
-				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "#PWR0205")
 					(unit 1)
 				)
 			)
@@ -14044,6 +14316,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 240.03 177.8 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "751a6613-a752-4e79-81c7-53e2628cc2c0")
+		(property "Reference" "TP23"
+			(at 242.57 173.2279 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 242.57 175.7679 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 245.11 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 245.11 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 240.03 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8ff44cb8-cf51-4e23-b9ff-a41952d702a1")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP23")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 46.99 214.63 0)
 		(unit 1)
@@ -14273,6 +14624,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "R2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 71.12 243.84 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7bbac5fc-5b41-4748-a991-23b0d264cd9e")
+		(property "Reference" "TP14"
+			(at 73.66 239.2679 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 73.66 241.8079 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 76.2 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 76.2 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 71.12 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1736b02e-f030-4e38-8bf6-bf6f78a9ad23")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP14")
 					(unit 1)
 				)
 			)
@@ -14667,6 +15097,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "#PWR0223")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 260.35 207.01 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "887c7d8f-404f-4c3b-abec-fe425086be28")
+		(property "Reference" "TP32"
+			(at 262.89 202.4379 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 262.89 204.9779 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 265.43 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 265.43 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 260.35 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7886f37f-4192-4bfc-880a-945772f7b65a")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP32")
 					(unit 1)
 				)
 			)
@@ -16565,8 +17074,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3V3")
-		(at 259.08 53.34 0)
+		(lib_id "Connector:TestPoint")
+		(at 259.08 177.8 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -16575,20 +17084,9 @@
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "be4ab7a3-c749-4002-9c89-4b451419f613")
-		(property "Reference" "#PWR0206"
-			(at 259.08 57.15 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 261.62 52.0699 0)
+		(uuid "bf0e68be-c841-4d38-bbbc-4e4687f6e272")
+		(property "Reference" "TP28"
+			(at 261.62 173.2279 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -16598,8 +17096,19 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
-			(at 259.08 53.34 0)
+		(property "Value" "TestPoint"
+			(at 261.62 175.7679 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 264.16 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16610,7 +17119,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 259.08 53.34 0)
+			(at 264.16 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16620,8 +17129,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 259.08 53.34 0)
+		(property "Description" "test point"
+			(at 259.08 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16632,12 +17141,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "67519b1c-2bff-4c13-bad3-1773f8c27235")
+			(uuid "3f4a4c7c-dd60-4859-b2e0-1488636caeca")
 		)
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "#PWR0206")
+					(reference "TP28")
 					(unit 1)
 				)
 			)
@@ -16720,6 +17229,84 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "R64")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 85.09 262.89 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c4c0f3ce-3a4e-47b1-908d-9951118a9b02")
+		(property "Reference" "#PWR016"
+			(at 85.09 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 85.09 267.97 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 85.09 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 85.09 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 85.09 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "84e8ea6a-f84f-4b7e-8ee0-9c2b4d99041d")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "#PWR016")
 					(unit 1)
 				)
 			)
@@ -16966,6 +17553,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "C83")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 90.17 252.73 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ca28a92a-4026-4162-886a-ce012c89bbcb")
+		(property "Reference" "TP22"
+			(at 92.71 248.1579 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 92.71 250.6979 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 95.25 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 95.25 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 90.17 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e7161abc-b642-462f-880c-ded5518d8c9b")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP22")
 					(unit 1)
 				)
 			)
@@ -17369,6 +18035,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 259.08 199.39 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d4852c2f-b3df-4452-bdec-cb62e648e985")
+		(property "Reference" "TP30"
+			(at 261.62 194.8179 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 261.62 197.3579 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 264.16 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 264.16 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 259.08 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "5db300e1-25e9-4c8d-8a5d-fae388906573")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP30")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "poka_yoke_uart:Poka Yoke UART")
 		(at 162.56 245.11 0)
 		(unit 1)
@@ -17531,6 +18276,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "C51")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 240.03 199.39 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d7ba21ff-9492-4a86-b92a-e89c95921d52")
+		(property "Reference" "TP25"
+			(at 242.57 194.8179 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 242.57 197.3579 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 245.11 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 245.11 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 240.03 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "210bffe3-da46-46b3-afd9-5c53d704556c")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP25")
 					(unit 1)
 				)
 			)
@@ -17861,6 +18685,164 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 259.08 189.23 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "dc3e567a-7930-4d7a-a1db-2abe37b52333")
+		(property "Reference" "TP29"
+			(at 261.62 184.6579 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 261.62 187.1979 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 264.16 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 264.16 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 259.08 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8bce606e-9a0d-4905-a0b6-c7f73483ce04")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP29")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 71.12 222.25 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "dc9646bd-a175-4c4d-b94c-8adec9e3a148")
+		(property "Reference" "TP12"
+			(at 73.66 217.6779 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 73.66 220.2179 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 76.2 222.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 76.2 222.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 71.12 222.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "475cced5-905e-4afa-a15f-831abb2436c3")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C_Small")
 		(at 341.63 137.16 0)
 		(unit 1)
@@ -18109,6 +19091,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "D15")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 85.09 262.89 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e498afef-763e-4e86-8ef9-7d584cf26e7d")
+		(property "Reference" "TP17"
+			(at 87.63 258.3179 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 87.63 260.8579 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 90.17 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 90.17 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 85.09 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "424e661c-3530-4fb1-bf5b-5fe810465d9c")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP17")
 					(unit 1)
 				)
 			)
@@ -18486,6 +19547,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 90.17 243.84 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ea4393d4-eea6-421c-b100-f6d682268bbd")
+		(property "Reference" "TP20"
+			(at 92.71 239.2679 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 92.71 241.8079 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 95.25 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 95.25 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 90.17 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "37d78982-5ce5-4317-9d62-c9a7f6d2fcd8")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP20")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 187.96 255.27 0)
 		(unit 1)
@@ -18558,6 +19698,85 @@
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
 					(reference "#PWR015")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 71.12 233.68 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ec30970f-10b4-4da7-8401-4b90a946be42")
+		(property "Reference" "TP13"
+			(at 73.66 229.1079 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 73.66 231.6479 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 76.2 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 76.2 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 71.12 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "801da04d-9ad7-482f-830b-633c9bdba4a1")
+		)
+		(instances
+			(project "riskybirdv3_connector"
+				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
+					(reference "TP13")
 					(unit 1)
 				)
 			)
