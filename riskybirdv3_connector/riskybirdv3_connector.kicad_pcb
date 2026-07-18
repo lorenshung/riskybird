@@ -3624,7 +3624,7 @@
 		(descr "USB 2.0 Type C Receptacle, GCT, 16P, top mounted, horizontal, 5A: https://gct.co/files/drawings/usb4105.pdf")
 		(tags "USB C Type-C Receptacle SMD USB 2.0 16P 16C USB4105-15-A USB4105-15-A-060 USB4105-15-A-120 USB4105-GF-A USB4105-GF-A-060 USB4105-GF-A-120")
 		(property "Reference" "J2"
-			(at 6.3 0.11 270)
+			(at -5.9 2.41 270)
 			(unlocked yes)
 			(layer "F.SilkS")
 			(uuid "9f2909ba-d319-4e98-aacc-3fe96c30ce3a")
@@ -4135,7 +4135,7 @@
 		(descr "USB 2.0 Type C Receptacle, GCT, 16P, top mounted, horizontal, 5A: https://gct.co/files/drawings/usb4105.pdf")
 		(tags "USB C Type-C Receptacle SMD USB 2.0 16P 16C USB4105-15-A USB4105-15-A-060 USB4105-15-A-120 USB4105-GF-A USB4105-GF-A-060 USB4105-GF-A-120")
 		(property "Reference" "J1"
-			(at -6.2 0.01 270)
+			(at 5.9 2.71 270)
 			(unlocked yes)
 			(layer "F.SilkS")
 			(uuid "74198356-a001-4b02-a563-b0e59849fe64")
@@ -16183,6 +16183,30 @@
 		)
 		(layer "Edge.Cuts")
 		(uuid "7326eaf6-4544-460f-a159-aed15bf0b3e1")
+	)
+	(gr_text "ELF"
+		(at 28.7 67.3 0)
+		(layer "F.SilkS")
+		(uuid "67f2fb56-9340-4514-a83e-2d8e5db5ddf3")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "Bitstream"
+		(at 28.7 101.1 0)
+		(layer "F.SilkS")
+		(uuid "f90bcfd2-2633-4ebd-81c2-555949c77711")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
 	)
 	(gr_text "GND"
 		(at 33.4 87.6 0)
