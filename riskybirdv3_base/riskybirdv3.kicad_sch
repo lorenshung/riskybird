@@ -28677,6 +28677,16 @@
 	)
 	(wire
 		(pts
+			(xy 35.56 295.91) (xy 38.1 295.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "74aeb772-0d1e-44b7-9f54-5981d1a7aade")
+	)
+	(wire
+		(pts
 			(xy 636.27 73.66) (xy 673.1 73.66)
 		)
 		(stroke
@@ -28834,6 +28844,16 @@
 			(type default)
 		)
 		(uuid "7866fb40-c10c-4605-9ebe-ccae9f1e7fca")
+	)
+	(wire
+		(pts
+			(xy 35.56 298.45) (xy 38.1 298.45)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7872e4a3-5e51-44f2-9067-6c9b25d75fe4")
 	)
 	(wire
 		(pts
@@ -30407,6 +30427,16 @@
 	)
 	(wire
 		(pts
+			(xy 38.1 298.45) (xy 38.1 300.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a12f60b5-f041-470b-bc69-72de79fd222f")
+	)
+	(wire
+		(pts
 			(xy 124.46 231.14) (xy 124.46 233.68)
 		)
 		(stroke
@@ -31147,6 +31177,16 @@
 	)
 	(wire
 		(pts
+			(xy 38.1 295.91) (xy 38.1 293.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b70fafb7-c0ef-4956-a31d-eb8ca5e4b370")
+	)
+	(wire
+		(pts
 			(xy 421.64 236.22) (xy 421.64 242.57)
 		)
 		(stroke
@@ -31264,6 +31304,16 @@
 			(type default)
 		)
 		(uuid "bab7ebdf-40cf-442d-a5fd-0493958c7727")
+	)
+	(wire
+		(pts
+			(xy 415.29 275.59) (xy 415.29 276.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "baf4d819-659d-4a5f-88d8-dd40f0a77588")
 	)
 	(wire
 		(pts
@@ -35416,6 +35466,87 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x02")
+		(at 30.48 295.91 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "021382f7-d525-4605-be4e-cb1a081c3b9e")
+		(property "Reference" "J12"
+			(at 31.75 292.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 35.56 300.99 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_PinHeader_2.00mm:PinHeader_1x02_P2.00mm_Vertical"
+			(at 30.48 295.91 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 30.48 295.91 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 30.48 295.91 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "85b3cc8b-8e31-4f38-8fcf-d8352ac7eb1f")
+		)
+		(pin "2"
+			(uuid "64b34390-4c5e-45da-a49f-dd88f9eff5ad")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "J12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 187.96 344.17 0)
 		(unit 1)
@@ -35861,6 +35992,39 @@
 		)
 		(property "Description" "Generic shielded connector, double row, 02x40, odd/even pin numbering scheme (row 1 odd numbers, row 2 even numbers), script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 710.692 176.022 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Samtec"
+			(at 690.88 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "LSHM-150-04.0-L-DV-A-S-K-TR"
+			(at 690.88 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5367357"
+			(at 690.88 85.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38517,6 +38681,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Molex"
+			(at 353.06 24.13 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "53048-0210"
+			(at 353.06 24.13 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C505099"
+			(at 353.06 24.13 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "c549ea1a-9fe4-4952-be58-a0ded80c2f4e")
 		)
@@ -38952,7 +39149,7 @@
 				)
 			)
 		)
-		(property "Value" ""
+		(property "Value" "BMP390"
 			(at 62.23 227.2598 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38986,6 +39183,39 @@
 		)
 		(property "Description" ""
 			(at 52.07 231.14 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Bosch"
+			(at 52.07 231.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "BMP390L"
+			(at 52.07 231.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2684802"
+			(at 52.07 231.14 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -39863,6 +40093,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Molex"
+			(at 328.93 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "53048-0210"
+			(at 328.93 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C505099"
+			(at 328.93 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "3d6fff23-fb70-4d9e-93b7-6591ba8df35d")
 		)
@@ -40716,6 +40979,83 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "C74")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+BATT")
+		(at 38.1 293.37 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "2f9bdd7e-cbde-4c09-ae18-48f055fe35ce")
+		(property "Reference" "#PWR031"
+			(at 38.1 297.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 38.1 288.29 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 38.1 293.37 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 38.1 293.37 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 38.1 293.37 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "da2878b6-f6dd-4401-8517-6d21aac71045")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "#PWR031")
 					(unit 1)
 				)
 			)
@@ -42474,6 +42814,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Omron"
+			(at 134.62 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "B3U-1000P"
+			(at 134.62 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C231329"
+			(at 134.62 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "22d0a524-28ea-4c18-bff8-d79cb84366b6")
 		)
@@ -42598,7 +42971,7 @@
 				)
 			)
 		)
-		(property "Footprint" "riskybird:5037762410"
+		(property "Footprint" "riskybird_lcsc:CONN-SMD_24P-P0.40_5055502420"
 			(at 414.02 255.27 0)
 			(hide yes)
 			(show_name no)
@@ -42621,6 +42994,39 @@
 			)
 		)
 		(property "Description" "Generic connectable mounting pin connector, double row, 02x12, odd/even pin numbering scheme (row 1 odd numbers, row 2 even numbers), script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 414.02 255.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Molex"
+			(at 414.02 255.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "505550-2420"
+			(at 414.02 255.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C3642262"
 			(at 414.02 255.27 0)
 			(hide yes)
 			(show_name no)
@@ -42853,6 +43259,39 @@
 		)
 		(property "Description" ""
 			(at 314.96 26.67 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Molex"
+			(at 314.96 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "53048-0210"
+			(at 314.96 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C505099"
+			(at 314.96 26.67 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -46393,6 +46832,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Samtec"
+			(at 885.19 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "LSHM-130-04.0-L-DV-A-S-K-TR"
+			(at 885.19 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C3645597"
+			(at 885.19 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "16"
 			(uuid "f6c7db06-5b33-41dc-833f-cfe7eac25fe0")
 		)
@@ -47440,6 +47912,39 @@
 		)
 		(property "Description" ""
 			(at -223.52 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Omron"
+			(at -223.52 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "B3U-1000P"
+			(at -223.52 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C231329"
+			(at -223.52 180.34 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -48653,6 +49158,82 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 38.1 300.99 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "6d98d747-4205-4967-9e48-70df55e3bcad")
+		(property "Reference" "#PWR067"
+			(at 38.1 307.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 38.227 305.3842 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 38.1 300.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 38.1 300.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 38.1 300.99 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "56d03d59-162c-4eea-9615-0a712457f79b")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "#PWR067")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C_Small")
 		(at 187.96 110.49 0)
 		(unit 1)
@@ -49133,7 +49714,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -49518,6 +50099,39 @@
 		)
 		(property "Description" ""
 			(at -78.74 181.61 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Espressif"
+			(at -78.74 226.695 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "ESP32-C6-MINI-1U-H4"
+			(at -78.74 226.695 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C20627095"
+			(at -78.74 226.695 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -51515,6 +52129,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Microchip"
+			(at 167.64 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MCP73831T-2ACI/OT"
+			(at 167.64 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C424093"
+			(at 167.64 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "fef5a4f1-7283-48ad-8984-65c0f119df1a")
 		)
@@ -51676,6 +52323,28 @@
 		)
 		(property "Description" "USB 2.0-only 16P Type-C Receptacle connector"
 			(at 97.79 241.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "TYPE-C-31-M-12"
+			(at 101.6 241.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C165948"
+			(at 101.6 241.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -53152,6 +53821,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Yageo"
+			(at 151.892 321.31 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201DR-0763K4L"
+			(at 151.892 321.31 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C851774"
+			(at 151.892 321.31 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "6dec34d3-838f-48bd-bd0d-34597f1fcc5d")
 		)
@@ -54005,6 +54707,39 @@
 			)
 		)
 		(property "Description" "Generic connector, double row, 02x10, odd/even pin numbering scheme (row 1 odd numbers, row 2 even numbers), script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 873.76 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Samtec"
+			(at 873.76 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "FTSH-110-01-L-DV-K-TR"
+			(at 873.76 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C20728453"
 			(at 873.76 147.32 0)
 			(hide yes)
 			(show_name no)
@@ -55212,6 +55947,39 @@
 		)
 		(property "Description" ""
 			(at 379.73 53.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Molex"
+			(at 379.73 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "53048-0210"
+			(at 379.73 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C505099"
+			(at 379.73 53.34 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -57466,6 +58234,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "XKB"
+			(at 96.52 335.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MSK12C02"
+			(at 96.52 335.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2681570"
+			(at 96.52 335.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "0bcdbf7f-259a-4d06-be2f-e4ad99ec51ec")
 		)
@@ -58895,6 +59696,39 @@
 		)
 		(property "Description" "Generic shielded connector, double row, 02x40, odd/even pin numbering scheme (row 1 odd numbers, row 2 even numbers), script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 809.752 176.022 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Samtec"
+			(at 789.94 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "LSHM-150-04.0-L-DV-A-S-K-TR"
+			(at 789.94 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5367357"
+			(at 789.94 85.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -63547,6 +64381,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Omron"
+			(at -223.52 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "B3U-1000P"
+			(at -223.52 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C231329"
+			(at -223.52 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "8745f7a6-1762-4e8d-a9c8-2d40e7d980dc")
 		)
@@ -64278,6 +65145,84 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "D4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 415.29 276.86 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f3d580db-8f81-4058-bbff-9911ba1da6e5")
+		(property "Reference" "#PWR095"
+			(at 415.29 283.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 415.29 281.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 415.29 276.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 415.29 276.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 415.29 276.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9c66bb15-28c1-4ad8-84e0-973fbfcc73f8")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "#PWR095")
 					(unit 1)
 				)
 			)
