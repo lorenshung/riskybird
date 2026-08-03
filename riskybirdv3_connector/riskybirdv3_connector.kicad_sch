@@ -9158,6 +9158,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 242.57 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 242.57 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 242.57 85.09 0)
 			(hide yes)
@@ -9248,6 +9270,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 31.75 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 31.75 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 31.75 81.28 0)
 			(hide yes)
 			(show_name no)
@@ -9358,6 +9402,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 125.73 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 125.73 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 125.73 142.24 0)
 			(hide yes)
@@ -9445,6 +9511,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 68.58 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0201WMF5101TEE"
+			(at 68.58 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270344"
 			(at 68.58 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -9633,6 +9721,28 @@
 				)
 			)
 		)
+		(property "MPN" "CL03A305MQ37RNZ"
+			(at 328.93 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C514591"
+			(at 328.93 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 328.93 137.16 0)
 			(hide yes)
@@ -9711,7 +9821,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "4.7u"
 			(at 55.88 144.7862 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9723,6 +9833,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 53.34 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM035R60J475ME15D"
+			(at 53.34 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C335103"
 			(at 53.34 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -9908,6 +10040,17 @@
 					(size 1.524 1.524)
 				)
 				(justify left)
+			)
+		)
+		(property "LCSC Part" "C27882"
+			(at 101.6 83.82 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
 			)
 		)
 		(property "Datasheet" "https://www.ftdichip.com/Support/Documents/DataSheets/ICs/DS_FT2232H.pdf"
@@ -10459,6 +10602,28 @@
 				)
 			)
 		)
+		(property "MPN" "AP2112K-3.3TRG1"
+			(at 38.1 135.255 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C23380830"
+			(at 38.1 135.255 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" "https://www.diodes.com/assets/Datasheets/AP2112.pdf"
 			(at 38.1 140.97 0)
 			(hide yes)
@@ -10558,6 +10723,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 369.57 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 369.57 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 369.57 124.46 0)
 			(hide yes)
 			(show_name no)
@@ -10760,6 +10947,28 @@
 				(justify bottom)
 			)
 		)
+		(property "MPN" "CSTNE12M0G550000R0"
+			(at 38.1 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C341520"
+			(at 38.1 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 38.1 104.14 0)
 			(hide yes)
@@ -10877,7 +11086,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1f175c75-d7aa-4949-aee8-27981dffdb13")
-		(property "Reference" "D14"
+		(property "Reference" "RX2"
 			(at 231.14 67.6275 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10887,7 +11096,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_Yellow"
 			(at 233.68 67.6275 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10898,6 +11107,28 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 237.49 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "SZYY0402Y"
+			(at 237.49 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C434450"
 			(at 237.49 66.04 0)
 			(hide yes)
 			(show_name no)
@@ -10961,7 +11192,7 @@
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "D14")
+					(reference "RX2")
 					(unit 1)
 					(variant
 						(name "LCSC Part #")
@@ -11109,6 +11340,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201WMF5101TEE"
+			(at 68.58 184.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270344"
+			(at 68.58 184.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 68.58 184.15 0)
 			(hide yes)
@@ -11199,6 +11452,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 44.45 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 44.45 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 44.45 81.28 0)
 			(hide yes)
 			(show_name no)
@@ -11309,6 +11584,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 69.85 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 69.85 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 69.85 68.58 0)
 			(hide yes)
@@ -11399,6 +11696,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 237.49 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 237.49 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 237.49 138.43 0)
 			(hide yes)
 			(show_name no)
@@ -11509,6 +11828,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 224.79 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 224.79 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 224.79 138.43 0)
 			(hide yes)
@@ -11599,6 +11940,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 138.43 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 138.43 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 138.43 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -11799,6 +12162,28 @@
 				)
 			)
 		)
+		(property "MPN" "BSMD1210-200-6V"
+			(at 384.81 163.068 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C914221"
+			(at 384.81 163.068 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 384.81 161.29 0)
 			(hide yes)
@@ -11897,6 +12282,28 @@
 				)
 			)
 		)
+		(property "MPN" "RC0201FR-0722RL"
+			(at 384.81 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C155743"
+			(at 384.81 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 384.81 176.53 0)
 			(hide yes)
@@ -11963,7 +12370,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3c184271-7d0c-4262-948f-80ce61b7058b")
-		(property "Reference" "D16"
+		(property "Reference" "JTAG2"
 			(at 252.73 67.6275 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11973,7 +12380,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_Red"
 			(at 255.27 67.6275 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11984,6 +12391,28 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 259.08 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "NCD0402R1"
+			(at 259.08 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C130719"
 			(at 259.08 66.04 0)
 			(hide yes)
 			(show_name no)
@@ -12047,7 +12476,7 @@
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "D16")
+					(reference "JTAG2")
 					(unit 1)
 					(variant
 						(name "LCSC Part #")
@@ -12095,6 +12524,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 298.45 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 298.45 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 298.45 148.59 0)
 			(hide yes)
 			(show_name no)
@@ -12360,6 +12811,28 @@
 				)
 			)
 		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 42.672 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
+			(at 42.672 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 44.45 39.37 0)
 			(hide yes)
@@ -12457,6 +12930,28 @@
 					(size 1.27 1.27)
 				)
 				(justify bottom)
+			)
+		)
+		(property "MPN" "CSTNE12M0G550000R0"
+			(at 256.54 107.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C341520"
+			(at 256.54 107.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
 			)
 		)
 		(property "Datasheet" ""
@@ -12608,6 +13103,28 @@
 				)
 			)
 		)
+		(property "MPN" "RC0201FR-0722RL"
+			(at 90.17 191.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C155743"
+			(at 90.17 191.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 90.17 191.77 0)
 			(hide yes)
@@ -12705,6 +13222,17 @@
 					(size 1.524 1.524)
 				)
 				(justify left)
+			)
+		)
+		(property "LCSC Part" "C27882"
+			(at 311.15 78.74 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
 			)
 		)
 		(property "Datasheet" "https://www.ftdichip.com/Support/Documents/DataSheets/ICs/DS_FT2232H.pdf"
@@ -13177,6 +13705,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201WMF5101TEE"
+			(at 363.22 168.91 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270344"
+			(at 363.22 168.91 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 363.22 168.91 0)
 			(hide yes)
@@ -13277,6 +13827,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201WMF1202TEE"
+			(at 356.87 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270363"
+			(at 356.87 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 356.87 129.54 0)
 			(hide yes)
@@ -13367,6 +13939,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 347.98 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 347.98 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 347.98 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -13545,6 +14139,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 361.95 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0201WMF1001TEE"
+			(at 361.95 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270365"
 			(at 361.95 129.54 0)
 			(hide yes)
 			(show_name no)
@@ -13745,6 +14361,28 @@
 				)
 			)
 		)
+		(property "MPN" "BSMD1210-200-6V"
+			(at 97.79 178.308 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C914221"
+			(at 97.79 178.308 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 97.79 176.53 0)
 			(hide yes)
@@ -13832,6 +14470,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 90.17 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-0722RL"
+			(at 90.17 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C155743"
 			(at 90.17 196.85 0)
 			(hide yes)
 			(show_name no)
@@ -13932,6 +14592,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 248.92 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 248.92 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 248.92 85.09 0)
 			(hide yes)
 			(show_name no)
@@ -14133,6 +14815,28 @@
 				)
 			)
 		)
+		(property "MPN" "USB4105-GF-A-060"
+			(at 345.44 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C3025063"
+			(at 345.44 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" "https://www.usb.org/sites/default/files/documents/usb_type-c.zip"
 			(at 345.44 176.53 0)
 			(hide yes)
@@ -14278,6 +14982,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 38.1 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 38.1 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 38.1 81.28 0)
 			(hide yes)
@@ -14344,7 +15070,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6c53c060-1b87-4dc2-b28b-f7f4409cc679")
-		(property "Reference" "D19"
+		(property "Reference" "JTAG1"
 			(at 38.1 48.5775 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14354,7 +15080,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_Red"
 			(at 40.64 48.5775 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14365,6 +15091,28 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 44.45 46.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "NCD0402R1"
+			(at 44.45 46.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C130719"
 			(at 44.45 46.99 0)
 			(hide yes)
 			(show_name no)
@@ -14428,7 +15176,7 @@
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "D19")
+					(reference "JTAG1")
 					(unit 1)
 					(variant
 						(name "LCSC Part #")
@@ -14476,6 +15224,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 335.28 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 335.28 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 335.28 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -14742,6 +15512,28 @@
 				)
 			)
 		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 235.712 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
+			(at 235.712 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 237.49 58.42 0)
 			(hide yes)
@@ -14820,7 +15612,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "2.2u"
 			(at 21.59 144.7862 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14832,6 +15624,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 19.05 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61A225ME47D"
+			(at 19.05 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C319184"
 			(at 19.05 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -14908,7 +15722,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "72671abb-43ab-4f27-8797-99a5b0ddd38e")
-		(property "Reference" "D17"
+		(property "Reference" "RX1"
 			(at 16.51 48.5775 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14918,7 +15732,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_Yellow"
 			(at 19.05 48.5775 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14929,6 +15743,28 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 22.86 46.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "SZYY0402Y"
+			(at 22.86 46.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C434450"
 			(at 22.86 46.99 0)
 			(hide yes)
 			(show_name no)
@@ -14992,7 +15828,7 @@
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "D17")
+					(reference "RX1")
 					(unit 1)
 					(variant
 						(name "LCSC Part #")
@@ -15028,7 +15864,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "2.2u"
 			(at 237.49 34.2962 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15040,6 +15876,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 234.95 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61A225ME47D"
+			(at 234.95 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C319184"
 			(at 234.95 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -15396,6 +16254,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201WMF5101TEE"
+			(at 363.22 166.37 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270344"
+			(at 363.22 166.37 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 363.22 166.37 0)
 			(hide yes)
@@ -15666,6 +16546,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201B103K250NT"
+			(at 375.92 163.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C285010"
+			(at 375.92 163.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 375.92 163.83 0)
 			(hide yes)
@@ -15831,6 +16733,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 384.81 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-0722RL"
+			(at 384.81 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C155743"
 			(at 384.81 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -16189,6 +17113,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 231.14 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 231.14 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 231.14 138.43 0)
 			(hide yes)
@@ -16445,6 +17391,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 63.5 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 63.5 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 63.5 68.58 0)
 			(hide yes)
@@ -16535,6 +17503,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 245.872 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 245.872 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
 			(at 245.872 58.42 90)
 			(hide yes)
 			(show_name no)
@@ -16645,6 +17635,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 261.62 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 261.62 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 261.62 85.09 0)
 			(hide yes)
@@ -16723,7 +17735,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "4.7u"
 			(at 238.76 86.3662 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16735,6 +17747,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 236.22 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM035R60J475ME15D"
+			(at 236.22 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C335103"
 			(at 236.22 85.09 0)
 			(hide yes)
 			(show_name no)
@@ -16833,6 +17867,28 @@
 			)
 		)
 		(property "Footprint" "riskybird_lcsc:CONN-SMD_FTSH-110-01-L-DV-K-TR"
+			(at 205.74 237.49 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "FTSH-110-01-L-DV-K-TR"
+			(at 205.74 237.49 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C20728453"
 			(at 205.74 237.49 0)
 			(hide yes)
 			(show_name no)
@@ -16975,7 +18031,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "4.7u"
 			(at 271.78 34.2962 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16987,6 +18043,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 269.24 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM035R60J475ME15D"
+			(at 269.24 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C335103"
 			(at 269.24 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -17408,6 +18486,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM035R60J475ME15D"
+			(at 50.8 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C335103"
+			(at 50.8 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 50.8 68.58 0)
 			(hide yes)
@@ -17508,6 +18608,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201B103K250NT"
+			(at 85.09 179.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C285010"
+			(at 85.09 179.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 85.09 179.07 0)
 			(hide yes)
@@ -17598,6 +18720,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 257.302 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 257.302 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
 			(at 257.302 58.42 90)
 			(hide yes)
 			(show_name no)
@@ -17942,6 +19086,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 50.8 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 50.8 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 50.8 81.28 0)
 			(hide yes)
@@ -18110,6 +19276,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 88.9 153.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 88.9 153.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 88.9 153.67 0)
 			(hide yes)
 			(show_name no)
@@ -18313,6 +19501,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201WMF1202TEE"
+			(at 147.32 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270363"
+			(at 147.32 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 147.32 134.62 0)
 			(hide yes)
@@ -18491,6 +19701,28 @@
 				)
 			)
 		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 21.082 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
+			(at 21.082 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 22.86 39.37 0)
 			(hide yes)
@@ -18591,6 +19823,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 132.08 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 132.08 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 132.08 142.24 0)
 			(hide yes)
@@ -18681,6 +19935,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 243.84 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 243.84 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 243.84 138.43 0)
 			(hide yes)
 			(show_name no)
@@ -19117,6 +20393,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 160.02 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 160.02 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 160.02 129.54 0)
 			(hide yes)
@@ -19195,7 +20493,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "4.7u"
 			(at 27.94 82.5562 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19207,6 +20505,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 25.4 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM035R60J475ME15D"
+			(at 25.4 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C335103"
 			(at 25.4 81.28 0)
 			(hide yes)
 			(show_name no)
@@ -19512,6 +20832,28 @@
 				)
 			)
 		)
+		(property "MPN" "CL03A305MQ37RNZ"
+			(at 119.38 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C514591"
+			(at 119.38 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 119.38 142.24 0)
 			(hide yes)
@@ -19705,6 +21047,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 255.27 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 255.27 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 255.27 85.09 0)
 			(hide yes)
@@ -19805,6 +21169,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM035R60J475ME15D"
+			(at 218.44 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C335103"
+			(at 218.44 138.43 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 218.44 138.43 0)
 			(hide yes)
@@ -19895,6 +21281,28 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+			(at 76.2 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 76.2 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
 			(at 76.2 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -20269,6 +21677,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 341.63 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 341.63 137.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 341.63 137.16 0)
 			(hide yes)
@@ -20369,6 +21799,28 @@
 				)
 			)
 		)
+		(property "MPN" "0201WMF1001TEE"
+			(at 152.4 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C270365"
+			(at 152.4 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 152.4 134.62 0)
 			(hide yes)
@@ -20435,7 +21887,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e393965a-0d05-4d16-bde2-78da1783391e")
-		(property "Reference" "D15"
+		(property "Reference" "TX2"
 			(at 241.3 67.6275 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20445,7 +21897,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_Green"
 			(at 243.84 67.6275 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20456,6 +21908,28 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 247.65 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "SZYY0402YG"
+			(at 247.65 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C434449"
 			(at 247.65 66.04 0)
 			(hide yes)
 			(show_name no)
@@ -20519,7 +21993,7 @@
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "D15")
+					(reference "TX2")
 					(unit 1)
 					(variant
 						(name "LCSC Part #")
@@ -20636,7 +22110,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e4c074ce-285e-4bcb-8cb6-30d18f797695")
-		(property "Reference" "D18"
+		(property "Reference" "TX1"
 			(at 26.67 48.5775 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20646,7 +22120,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_Green"
 			(at 29.21 48.5775 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20657,6 +22131,28 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 33.02 46.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "SZYY0402YG"
+			(at 33.02 46.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C434449"
 			(at 33.02 46.99 0)
 			(hide yes)
 			(show_name no)
@@ -20720,7 +22216,7 @@
 		(instances
 			(project "riskybirdv3_connector"
 				(path "/5504343e-a1df-41b1-a7b4-7fea25307b39"
-					(reference "D18")
+					(reference "TX1")
 					(unit 1)
 					(variant
 						(name "LCSC Part #")
@@ -20766,6 +22262,28 @@
 			)
 		)
 		(property "Footprint" "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal"
+			(at 50.8 191.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "USB4105-GF-A-060"
+			(at 50.8 191.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C3025063"
 			(at 50.8 191.77 0)
 			(hide yes)
 			(show_name no)
@@ -21443,6 +22961,28 @@
 				)
 			)
 		)
+		(property "MPN" "GRM033R61E104KE14D"
+			(at 57.15 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C76939"
+			(at 57.15 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Datasheet" ""
 			(at 57.15 68.58 0)
 			(hide yes)
@@ -21531,6 +23071,28 @@
 			)
 		)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
+			(at 254 24.765 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "AP2112K-3.3TRG1"
+			(at 254 24.765 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C23380830"
 			(at 254 24.765 0)
 			(hide yes)
 			(show_name no)
@@ -21640,6 +23202,28 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 31.242 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 31.242 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
 			(at 31.242 39.37 90)
 			(hide yes)
 			(show_name no)
