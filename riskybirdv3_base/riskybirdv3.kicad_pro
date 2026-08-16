@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 1.1,
-          "height": 1.65,
-          "width": 1.65
+          "drill": 2.0,
+          "height": 2.0,
+          "width": 2.0
         },
         "silk_line_width": 0.12,
         "silk_text_italic": false,
@@ -960,7 +960,7 @@
         "uuid": "b045bc91-b5c2-4b45-9ee6-c32404600013"
       }
     ],
-    "used_designators": "HM01B0_Conn1,C44,C47-48,C50,C67-77,Q6-9,U6,U8,U12-13,U15,J1,J7-8,J12,P1,BATT1,#PWR28-29,#PWR31,#PWR45,#PWR54,#PWR56,#PWR67,#PWR87-99,#PWR122-123,#PWR141-142,#PWR152-156,#PWR197-199,R5,R11,R21,R24,R26-29,R34,R37-39,R46-48,R67-71",
+    "used_designators": "HM01B0_Conn1,TP1-3,R5,R11,R21,R24,R26-29,R34,R37-39,R46-52,R67-80,FID1,NT1,2V9,C44-45,C47-50,C67-87,1V9-10,3V4-5,Q6-10,U6,U8,U12-13,U15-16,J1,J7-8,J12,L1,P1,BATT1,#PWR28-29,#PWR31,#PWR45,#PWR54,#PWR56,#PWR67,#PWR82,#PWR87-102,#PWR104-105,#PWR119,#PWR122-123,#PWR141-142,#PWR152-156,#PWR197-221",
     "variants": []
   },
   "sheets": [
