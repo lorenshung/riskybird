@@ -38167,7 +38167,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -38226,7 +38226,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C492404"
+		(property "LCSC Part" ""
 			(at 0 0 0)
 			(hide yes)
 			(show_name no)
@@ -52486,7 +52486,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -52547,7 +52547,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C492404"
+		(property "LCSC Part" ""
 			(at 0 0 0)
 			(hide yes)
 			(show_name no)
@@ -56804,7 +56804,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -56864,7 +56864,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C492404"
+		(property "LCSC Part" ""
 			(at 0 0 0)
 			(hide yes)
 			(show_name no)
@@ -69284,7 +69284,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -69345,7 +69345,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C492404"
+		(property "LCSC Part" ""
 			(at 0 0 0)
 			(hide yes)
 			(show_name no)
