@@ -21383,197 +21383,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "riskybird_lcsc:SRP1265A-2R2M"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "L"
-				(at 0 5.08 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "SRP1265A-2R2M"
-				(at 0 -5.08 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "riskybird_lcsc:IND-SMD_L13.5-W12.5"
-				(at 0 -7.62 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C2831487.pdf"
-				(at 0 -10.16 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "BOURNS"
-				(at 0 -12.7 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "SRP1265A-2R2M"
-				(at 0 -15.24 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C2831487"
-				(at 0 -17.78 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Power Inductors"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "SRP1265A-2R2M_0_1"
-				(arc
-					(start -4.29 0.02)
-					(mid -3.28 1.1)
-					(end -2.27 0.02)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(arc
-					(start -2.13 0.02)
-					(mid -1.12 1.1)
-					(end -0.11 0.02)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(arc
-					(start 0.02 0.02)
-					(mid 1.03 1.1)
-					(end 2.04 0.02)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(arc
-					(start 2.21 0.02)
-					(mid 3.22 1.1)
-					(end 4.23 0.02)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 0 0)
-					(length 1.27)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 0 180)
-					(length 1.27)
-					(name "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "riskybird_lcsc:TLV70015DCKT"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -23195,6 +23004,186 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "riskybird_lcsc:XAL7030-152MEC"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "L"
+				(at 0 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "XAL7030-152MEC"
+				(at 0 -5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "riskybird_lcsc:IND-SMD_L7.5-W7.5_XAL7030-152MEC"
+				(at 0 -7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://www.lcsc.com/datasheet/C5352784.pdf"
+				(at 0 -10.16 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Manufacturer" "Coilcraft(线艺)"
+				(at 0 -12.7 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "MPN" "XAL7030-152MEC"
+				(at 0 -15.24 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "LCSC Part" "C5352784"
+				(at 0 -17.78 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "XAL7030-152MEC_0_1"
+				(arc
+					(start -4.06 0.01)
+					(mid -3.035 1.02)
+					(end -2.03 -0.01)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start -2.03 0.01)
+					(mid -1.005 1.02)
+					(end 0 -0.01)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start 0 0.01)
+					(mid 1.025 1.02)
+					(end 2.03 -0.01)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start 2.03 0.01)
+					(mid 3.055 1.02)
+					(end 4.06 -0.01)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -5.08 0 0)
+					(length 1.27)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at 5.08 0 180)
+					(length 1.27)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 	)
 	(rectangle
 		(start 15.24 62.23)
@@ -24632,6 +24621,12 @@
 		(uuid "f160f3de-b531-4428-b896-3a90fc8377d2")
 	)
 	(junction
+		(at -39.37 137.16)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "f1b88a96-f47c-477f-b6d7-e2ca7815f79e")
+	)
+	(junction
 		(at 509.27 255.27)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -24686,10 +24681,6 @@
 	(no_connect
 		(at 673.1 109.22)
 		(uuid "0163d9f9-9288-480d-a36f-75a441f22e62")
-	)
-	(no_connect
-		(at 673.1 55.88)
-		(uuid "025e41f3-8e1a-408e-a3a9-6ec386f7523c")
 	)
 	(no_connect
 		(at 673.1 124.46)
@@ -24818,10 +24809,6 @@
 	(no_connect
 		(at 772.16 58.42)
 		(uuid "2e78f05a-2bc4-4b6e-bdc8-62aab3afa0f5")
-	)
-	(no_connect
-		(at 673.1 58.42)
-		(uuid "2fd714d1-b9d6-4040-887f-312db314abd9")
 	)
 	(no_connect
 		(at 867.41 58.42)
@@ -24956,10 +24943,6 @@
 		(uuid "806b4bd7-9e5b-46cf-b76a-2dc5798aec86")
 	)
 	(no_connect
-		(at 708.66 134.62)
-		(uuid "82463307-3cd6-4491-8596-a071a3475df0")
-	)
-	(no_connect
 		(at 772.16 81.28)
 		(uuid "897d7d2c-26a3-440d-9228-77cbe013a1cb")
 	)
@@ -24994,10 +24977,6 @@
 	(no_connect
 		(at 807.72 60.96)
 		(uuid "9a9e79da-ccfe-4d9b-abb9-609a747c4960")
-	)
-	(no_connect
-		(at 708.66 129.54)
-		(uuid "9f92327c-07bd-4ed5-84db-af9047940604")
 	)
 	(no_connect
 		(at 902.97 50.8)
@@ -25132,10 +25111,6 @@
 		(uuid "d9d9895a-9ef4-4659-8dbc-1fac3a6e993f")
 	)
 	(no_connect
-		(at 708.66 137.16)
-		(uuid "dc088d8e-5795-42ad-b0e1-5199962bc6d9")
-	)
-	(no_connect
 		(at 708.66 86.36)
 		(uuid "dcbd3d94-eb1e-4041-8333-53419f3b7d25")
 	)
@@ -25172,10 +25147,6 @@
 		(uuid "f460f498-8808-41bf-99ce-d1cfb2425182")
 	)
 	(no_connect
-		(at 708.66 116.84)
-		(uuid "f758938e-3cd0-42e8-ba1f-7ed9cbf84095")
-	)
-	(no_connect
 		(at 708.66 144.78)
 		(uuid "f7ce954e-67c9-4434-8dc3-38bf1b56ccc8")
 	)
@@ -25210,10 +25181,6 @@
 	(no_connect
 		(at 772.16 104.14)
 		(uuid "ff6c20b5-e708-44b7-ab44-c7703786b01a")
-	)
-	(no_connect
-		(at 708.66 132.08)
-		(uuid "ff8972fc-4659-4b69-ab1f-c83991660487")
 	)
 	(wire
 		(pts
@@ -25457,6 +25424,16 @@
 	)
 	(wire
 		(pts
+			(xy 660.4 55.88) (xy 673.1 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "06003bd3-f084-4ee1-8b0c-213ee8c68650")
+	)
+	(wire
+		(pts
 			(xy 340.36 30.48) (xy 346.71 30.48)
 		)
 		(stroke
@@ -25517,7 +25494,7 @@
 	)
 	(wire
 		(pts
-			(xy -50.8 176.53) (xy -35.56 176.53)
+			(xy -50.8 176.53) (xy -29.21 176.53)
 		)
 		(stroke
 			(width 0)
@@ -25784,6 +25761,16 @@
 			(type default)
 		)
 		(uuid "0dcda536-1654-4b42-85b2-c4628b6330e4")
+	)
+	(wire
+		(pts
+			(xy 734.06 139.7) (xy 740.41 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0e27956d-6366-460f-af77-f267e5e04afd")
 	)
 	(wire
 		(pts
@@ -26607,7 +26594,7 @@
 	)
 	(wire
 		(pts
-			(xy 25.4 171.45) (xy 21.59 171.45)
+			(xy 25.4 171.45) (xy 16.51 171.45)
 		)
 		(stroke
 			(width 0)
@@ -26684,6 +26671,16 @@
 			(type default)
 		)
 		(uuid "2645e908-68f5-4daa-a46b-82385cb1ca04")
+	)
+	(wire
+		(pts
+			(xy 708.66 129.54) (xy 726.44 129.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "268c60cf-94c6-41aa-b624-d4b4a1244b6e")
 	)
 	(wire
 		(pts
@@ -26787,16 +26784,6 @@
 	)
 	(wire
 		(pts
-			(xy 833.12 116.84) (xy 839.47 116.84)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2ab39007-7cc6-4549-86da-92943f703231")
-	)
-	(wire
-		(pts
 			(xy 473.71 241.3) (xy 473.71 255.27)
 		)
 		(stroke
@@ -26804,6 +26791,16 @@
 			(type default)
 		)
 		(uuid "2ac36439-babd-42f2-ace8-5c1b6c69bde7")
+	)
+	(wire
+		(pts
+			(xy 721.36 144.78) (xy 726.44 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2b05d91f-c8e6-4056-bfe2-aa962427c85d")
 	)
 	(wire
 		(pts
@@ -27477,6 +27474,16 @@
 	)
 	(wire
 		(pts
+			(xy 708.66 134.62) (xy 723.9 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3dba1fa1-40a3-4e04-b009-4bdd6084b8ea")
+	)
+	(wire
+		(pts
 			(xy 501.65 248.92) (xy 501.65 252.73)
 		)
 		(stroke
@@ -27877,6 +27884,16 @@
 	)
 	(wire
 		(pts
+			(xy 21.59 168.91) (xy 25.4 168.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "45594ca7-0656-46b0-9c60-2fbbe1fcec27")
+	)
+	(wire
+		(pts
 			(xy -50.8 196.85) (xy -45.72 196.85)
 		)
 		(stroke
@@ -28097,16 +28114,6 @@
 	)
 	(wire
 		(pts
-			(xy 820.42 127) (xy 825.5 127)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4b9e4fde-91ef-49fc-90db-2764db20441a")
-	)
-	(wire
-		(pts
 			(xy 255.27 347.98) (xy 255.27 345.44)
 		)
 		(stroke
@@ -28124,16 +28131,6 @@
 			(type default)
 		)
 		(uuid "4c687eea-3fbe-4072-a4d1-de6acd8bd129")
-	)
-	(wire
-		(pts
-			(xy 807.72 116.84) (xy 822.96 116.84)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4e5c298d-6819-4b9c-9e8b-f16532956f01")
 	)
 	(wire
 		(pts
@@ -28187,6 +28184,16 @@
 	)
 	(wire
 		(pts
+			(xy 21.59 161.29) (xy 21.59 168.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "500db1b4-f2fb-49af-929c-714f767b4a8c")
+	)
+	(wire
+		(pts
 			(xy 113.03 256.54) (xy 115.57 256.54)
 		)
 		(stroke
@@ -28227,7 +28234,7 @@
 	)
 	(wire
 		(pts
-			(xy 21.59 167.64) (xy 21.59 171.45)
+			(xy 16.51 166.37) (xy 16.51 171.45)
 		)
 		(stroke
 			(width 0)
@@ -28394,6 +28401,16 @@
 			(type default)
 		)
 		(uuid "56b2e2e0-f627-4b76-a784-a4f6907c50ac")
+	)
+	(wire
+		(pts
+			(xy 723.9 134.62) (xy 723.9 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "56d5afae-9e93-47b3-a123-56464b0d544e")
 	)
 	(wire
 		(pts
@@ -28677,7 +28694,7 @@
 	)
 	(wire
 		(pts
-			(xy -78.74 137.16) (xy -35.56 137.16)
+			(xy -78.74 137.16) (xy -39.37 137.16)
 		)
 		(stroke
 			(width 0)
@@ -29264,6 +29281,16 @@
 			(type default)
 		)
 		(uuid "6a5fc762-7acd-4de3-b54c-0bd7c4cb22e4")
+	)
+	(wire
+		(pts
+			(xy 708.66 137.16) (xy 721.36 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6a7342fd-fbbe-44bf-a589-814891a31203")
 	)
 	(wire
 		(pts
@@ -30067,16 +30094,6 @@
 	)
 	(wire
 		(pts
-			(xy 822.96 121.92) (xy 825.5 121.92)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7d594ec3-8fef-42b2-bc29-db4387cb3fe1")
-	)
-	(wire
-		(pts
 			(xy 309.88 24.13) (xy 308.61 24.13)
 		)
 		(stroke
@@ -30657,6 +30674,16 @@
 	)
 	(wire
 		(pts
+			(xy -39.37 137.16) (xy -29.21 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8e6eb18e-aa61-488e-b630-d226fb4fb8f7")
+	)
+	(wire
+		(pts
 			(xy 33.02 41.91) (xy 41.91 41.91)
 		)
 		(stroke
@@ -30674,6 +30701,16 @@
 			(type default)
 		)
 		(uuid "8eb0f241-5cfa-4877-bbf6-96afdb82688c")
+	)
+	(wire
+		(pts
+			(xy 734.06 144.78) (xy 740.41 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8f347d9e-b72b-48a6-8a08-8e97d67c165c")
 	)
 	(wire
 		(pts
@@ -30704,16 +30741,6 @@
 			(type default)
 		)
 		(uuid "8fc2bcec-6493-46c8-ab7d-475ded77dd4d")
-	)
-	(wire
-		(pts
-			(xy 820.42 119.38) (xy 820.42 127)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8fd1a58a-0885-4fb9-98af-ba74cb091cc3")
 	)
 	(wire
 		(pts
@@ -30827,7 +30854,7 @@
 	)
 	(wire
 		(pts
-			(xy -50.8 173.99) (xy -35.56 173.99)
+			(xy -50.8 173.99) (xy -39.37 173.99)
 		)
 		(stroke
 			(width 0)
@@ -31287,6 +31314,16 @@
 	)
 	(wire
 		(pts
+			(xy 734.06 129.54) (xy 740.41 129.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9d6f1bea-a882-41e0-a2c9-19109d3bcb0b")
+	)
+	(wire
+		(pts
 			(xy 868.68 142.24) (xy 858.52 142.24)
 		)
 		(stroke
@@ -31597,16 +31634,6 @@
 	)
 	(wire
 		(pts
-			(xy 822.96 116.84) (xy 822.96 121.92)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a33ac16c-36b6-4d7a-8b8d-582b1be669c5")
-	)
-	(wire
-		(pts
 			(xy 523.24 234.95) (xy 523.24 237.49)
 		)
 		(stroke
@@ -31697,16 +31724,6 @@
 	)
 	(wire
 		(pts
-			(xy 807.72 114.3) (xy 825.5 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a6a8ae3b-a3e0-45a7-988f-4cac669292b2")
-	)
-	(wire
-		(pts
 			(xy 421.64 262.89) (xy 431.8 262.89)
 		)
 		(stroke
@@ -31777,6 +31794,16 @@
 	)
 	(wire
 		(pts
+			(xy 708.66 132.08) (xy 726.44 132.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a895cb9c-8e07-455c-8f89-ae56c053e654")
+	)
+	(wire
+		(pts
 			(xy 214.63 135.89) (xy 214.63 134.62)
 		)
 		(stroke
@@ -31804,6 +31831,16 @@
 			(type default)
 		)
 		(uuid "a902feb5-203b-4241-8ce1-edf8556ef6de")
+	)
+	(wire
+		(pts
+			(xy 734.06 134.62) (xy 740.41 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a91ba664-6a65-487e-b39e-100755f2824a")
 	)
 	(wire
 		(pts
@@ -32017,6 +32054,16 @@
 	)
 	(wire
 		(pts
+			(xy 660.4 58.42) (xy 673.1 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ade3cceb-9143-41a0-a38e-2cd1271a26ed")
+	)
+	(wire
+		(pts
 			(xy 396.24 22.86) (xy 406.4 22.86)
 		)
 		(stroke
@@ -32147,7 +32194,7 @@
 	)
 	(wire
 		(pts
-			(xy -35.56 147.32) (xy -35.56 173.99)
+			(xy -39.37 146.05) (xy -39.37 173.99)
 		)
 		(stroke
 			(width 0)
@@ -32527,16 +32574,6 @@
 	)
 	(wire
 		(pts
-			(xy 833.12 127) (xy 839.47 127)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bcb01c23-98fc-4371-93a8-f126c8a622fd")
-	)
-	(wire
-		(pts
 			(xy 868.68 144.78) (xy 858.52 144.78)
 		)
 		(stroke
@@ -32717,16 +32754,6 @@
 	)
 	(wire
 		(pts
-			(xy 807.72 111.76) (xy 825.5 111.76)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c1f90831-d320-4a89-b0bf-02bae45ce8e0")
-	)
-	(wire
-		(pts
 			(xy 281.94 323.85) (xy 281.94 364.49)
 		)
 		(stroke
@@ -32784,6 +32811,16 @@
 			(type default)
 		)
 		(uuid "c3f3d453-fc68-4b3b-8413-4e4af14d70f5")
+	)
+	(wire
+		(pts
+			(xy -29.21 137.16) (xy -29.21 138.43)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c3f6b408-531b-4b2f-b495-6cf62f139e76")
 	)
 	(wire
 		(pts
@@ -33007,6 +33044,16 @@
 	)
 	(wire
 		(pts
+			(xy 721.36 137.16) (xy 721.36 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c71cc5eb-7329-4946-aad9-ceacf85e1d02")
+	)
+	(wire
+		(pts
 			(xy 321.31 354.33) (xy 308.61 354.33)
 		)
 		(stroke
@@ -33034,16 +33081,6 @@
 			(type default)
 		)
 		(uuid "c7c45941-2e13-4c60-8b18-b7a8da8d23d5")
-	)
-	(wire
-		(pts
-			(xy 833.12 111.76) (xy 839.47 111.76)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c7c8b4b2-164c-4e76-b96a-38cad22818f8")
 	)
 	(wire
 		(pts
@@ -33807,16 +33844,6 @@
 	)
 	(wire
 		(pts
-			(xy 825.5 114.3) (xy 825.5 116.84)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "de7da1e9-e3a7-4956-95ba-9456a0107cd1")
-	)
-	(wire
-		(pts
 			(xy 31.75 97.79) (xy 36.83 97.79)
 		)
 		(stroke
@@ -33927,7 +33954,7 @@
 	)
 	(wire
 		(pts
-			(xy -35.56 137.16) (xy -35.56 139.7)
+			(xy -39.37 137.16) (xy -39.37 138.43)
 		)
 		(stroke
 			(width 0)
@@ -34187,16 +34214,6 @@
 	)
 	(wire
 		(pts
-			(xy 833.12 121.92) (xy 839.47 121.92)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ee5a470c-9df2-4a51-9381-6db1938cf837")
-	)
-	(wire
-		(pts
 			(xy -74.93 341.63) (xy -64.77 341.63)
 		)
 		(stroke
@@ -34234,16 +34251,6 @@
 			(type default)
 		)
 		(uuid "efee4e16-a658-45e3-b258-4182221ff69b")
-	)
-	(wire
-		(pts
-			(xy 807.72 119.38) (xy 820.42 119.38)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f13cb701-1a16-4e88-9a0f-b3ed8794edde")
 	)
 	(wire
 		(pts
@@ -34324,6 +34331,16 @@
 			(type default)
 		)
 		(uuid "f45c084a-96b0-4f85-a667-0459da529cbb")
+	)
+	(wire
+		(pts
+			(xy 723.9 139.7) (xy 726.44 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f485203d-ec59-46e3-ae15-e184443038ba")
 	)
 	(wire
 		(pts
@@ -34414,6 +34431,16 @@
 			(type default)
 		)
 		(uuid "f6f45eff-d254-4929-b846-733971381e05")
+	)
+	(wire
+		(pts
+			(xy 21.59 144.78) (xy 21.59 146.05)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f72e5e5f-f457-45c3-9758-2d3a2a1308c3")
 	)
 	(wire
 		(pts
@@ -34567,6 +34594,16 @@
 	)
 	(wire
 		(pts
+			(xy -29.21 146.05) (xy -29.21 176.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fb378224-4ed9-4808-99c9-e9d4ffe36362")
+	)
+	(wire
+		(pts
 			(xy 0 334.01) (xy 0 336.55)
 		)
 		(stroke
@@ -34584,6 +34621,16 @@
 			(type default)
 		)
 		(uuid "fb3f5361-ca6a-40a4-970c-86f3f88e314e")
+	)
+	(wire
+		(pts
+			(xy 726.44 132.08) (xy 726.44 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fb4ab5b5-96bb-4e90-b603-84cbbfd56cbd")
 	)
 	(wire
 		(pts
@@ -34815,16 +34862,6 @@
 		)
 		(uuid "08f2a97c-3862-41bf-8dab-a3f64d002143")
 	)
-	(label "TSI_UART_TX"
-		(at 904.24 106.68 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "0cccd2e4-12b1-4dea-9cf7-a55c545dd9d7")
-	)
 	(label "NCS"
 		(at 264.16 125.73 0)
 		(effects
@@ -35025,6 +35062,16 @@
 		)
 		(uuid "254b1f69-dfc2-43b9-bf95-ce39f6288f22")
 	)
+	(label "MISO"
+		(at 736.6 134.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "254c4d19-bd4f-480f-b5d9-4e2e4eb19d2e")
+	)
 	(label "MOTOR2"
 		(at 732.79 78.74 0)
 		(effects
@@ -35155,16 +35202,6 @@
 		)
 		(uuid "376fad5b-27b7-4d15-a05e-fff7e5631906")
 	)
-	(label "TSI_UART_RX"
-		(at 854.71 106.68 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "37f070d6-3eb5-45b1-89db-261a0ab475f5")
-	)
 	(label "MOTOR4"
 		(at 720.09 160.02 0)
 		(effects
@@ -35256,7 +35293,7 @@
 		(uuid "416dfa34-45a8-4554-be05-a00d7370109d")
 	)
 	(label "RGB_CTRL"
-		(at -35.56 173.99 0)
+		(at -39.37 173.99 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -35306,7 +35343,7 @@
 		(uuid "4b44b000-9df8-483f-8b9f-741b8aa83941")
 	)
 	(label "GPIO9"
-		(at -35.56 176.53 0)
+		(at -29.21 176.53 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -35384,16 +35421,6 @@
 			(justify left bottom)
 		)
 		(uuid "553e2d47-ffc2-4e1d-8999-ee48c344b926")
-	)
-	(label "MOSI"
-		(at 835.66 127 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "58b8ab91-2268-464e-af22-9db193a473f7")
 	)
 	(label "TSI_UART_TX"
 		(at 867.41 157.48 180)
@@ -35474,6 +35501,16 @@
 			(justify left bottom)
 		)
 		(uuid "65f3cd4b-a5a0-446f-98c6-28b670be68a3")
+	)
+	(label "MOTION"
+		(at 708.66 116.84 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6887c21b-b524-499a-a2c5-af37a1d4714b")
 	)
 	(label "RV_TDO"
 		(at 867.41 147.32 180)
@@ -35575,6 +35612,16 @@
 		)
 		(uuid "730e76e9-c162-41ec-bfd1-338644ac2f2e")
 	)
+	(label "NCS"
+		(at 736.6 129.54 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "7431fd86-a144-4430-9e2c-a2ce35a987ae")
+	)
 	(label "SCLK"
 		(at 264.16 130.81 0)
 		(effects
@@ -35644,16 +35691,6 @@
 			(justify left bottom)
 		)
 		(uuid "8263869c-c925-4b1f-aa5f-2d4e03171b9e")
-	)
-	(label "MOTION"
-		(at 807.72 127 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "82f944ae-2d01-41e1-99e7-c13019098ac4")
 	)
 	(label "RV_TDI"
 		(at 723.9 93.98 0)
@@ -35774,6 +35811,16 @@
 			(justify left bottom)
 		)
 		(uuid "901c52cb-d351-4d9a-8425-fce0724fe7f5")
+	)
+	(label "TSI_UART_TX"
+		(at 660.4 58.42 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "902c87e9-bd0c-45de-8b0a-82bd8dfcb55d")
 	)
 	(label "D5"
 		(at 902.97 96.52 0)
@@ -35985,16 +36032,6 @@
 		)
 		(uuid "a299b869-d348-46b6-b76f-1eed8054bcc5")
 	)
-	(label "SCLK"
-		(at 835.66 121.92 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "a7a000e3-08b8-42a3-8b9e-92af2fb22357")
-	)
 	(label "FPGA_TCK"
 		(at 763.27 160.02 0)
 		(effects
@@ -36065,6 +36102,16 @@
 		)
 		(uuid "b203aaf0-9ddd-4bc3-813e-0d98b208f632")
 	)
+	(label "MOSI"
+		(at 736.6 139.7 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "b3a50815-5286-4d19-881c-b3eace813588")
+	)
 	(label "U0TXD"
 		(at -46.99 153.67 0)
 		(effects
@@ -36074,6 +36121,16 @@
 			(justify left bottom)
 		)
 		(uuid "b44f39e9-5b4b-49b3-88eb-e1d1d5d40f2d")
+	)
+	(label "TSI_UART_RX"
+		(at 660.4 55.88 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "b5abe68c-2f6f-4c3a-8b65-c2286edf5470")
 	)
 	(label "SCL"
 		(at 124.46 87.63 0)
@@ -36124,16 +36181,6 @@
 			(justify left bottom)
 		)
 		(uuid "c11311ea-7501-4e58-9c9b-289836eb3125")
-	)
-	(label "NCS"
-		(at 835.66 111.76 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "c37847a7-0817-47e7-8de4-70d11f65e8f0")
 	)
 	(label "TSI_UART_RX"
 		(at 892.81 160.02 180)
@@ -36235,6 +36282,16 @@
 		)
 		(uuid "d2a3ba02-6e50-4237-bc9c-fdeccc726f0a")
 	)
+	(label "SCLK"
+		(at 736.6 144.78 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "d6936495-272d-4b28-97d5-a94e1da4ab41")
+	)
 	(label "TOF_Int"
 		(at 39.37 92.71 0)
 		(effects
@@ -36314,16 +36371,6 @@
 			(justify left bottom)
 		)
 		(uuid "e8c364e2-b8a8-46b9-811f-987d1dc9482b")
-	)
-	(label "MISO"
-		(at 835.66 116.84 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "e91add9a-c18c-4e20-a819-28378197913a")
 	)
 	(label "U0RXD"
 		(at -46.99 156.21 0)
@@ -36761,6 +36808,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C2891732"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 375.92 69.85 0)
 			(hide yes)
@@ -36971,8 +37029,8 @@
 		)
 	)
 	(symbol
-		(lib_id "riskybird_lcsc:SRP1265A-2R2M")
-		(at 344.17 323.85 0)
+		(lib_id "Device:R")
+		(at -29.21 142.24 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -36980,30 +37038,31 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "02b262ac-c9f0-448c-90e6-e90d46423b5a")
-		(property "Reference" "L1"
-			(at 344.14 317.5 0)
+		(uuid "021608a5-fd92-4ea5-8193-75f72875bae3")
+		(property "Reference" "R58"
+			(at -27.432 141.0716 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Value" "SRP1265A-2R2M"
-			(at 344.14 320.04 0)
+		(property "Value" "10k"
+			(at -27.432 143.383 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Footprint" "riskybird_lcsc:IND-SMD_L13.5-W12.5"
-			(at 344.17 331.47 0)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at -30.988 142.24 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37013,8 +37072,8 @@
 				)
 			)
 		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C2831487.pdf"
-			(at 344.17 334.01 0)
+		(property "Datasheet" ""
+			(at -29.21 142.24 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37025,7 +37084,17 @@
 			)
 		)
 		(property "Description" ""
-			(at 344.17 323.85 0)
+			(at -29.21 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0201WMF1002TEE"
+			(at -30.988 142.24 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37035,8 +37104,8 @@
 				)
 			)
 		)
-		(property "Manufacturer" "BOURNS"
-			(at 344.17 336.55 0)
+		(property "LCSC Part" "C473048"
+			(at -30.988 142.24 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37045,39 +37114,17 @@
 					(size 1.27 1.27)
 				)
 			)
-		)
-		(property "MPN" "SRP1265A-2R2M"
-			(at 344.17 339.09 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C2831487"
-			(at 344.17 341.63 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "a0e3ab0a-27e4-4ca2-a01c-0036687c44b7")
 		)
 		(pin "1"
-			(uuid "89acd465-2e72-480a-9a4e-f7f2c97deb18")
+			(uuid "491543f8-ebd3-4239-b9fd-f343d234b3a3")
+		)
+		(pin "2"
+			(uuid "582a2cee-6be4-434d-8795-9b541582c339")
 		)
 		(instances
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
-					(reference "L1")
+					(reference "R58")
 					(unit 1)
 				)
 			)
@@ -37477,6 +37524,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C59461"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 268.2748 361.95 0)
 			(hide yes)
@@ -38044,6 +38102,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C140782"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 386.08 26.67 0)
 			(hide yes)
@@ -38124,6 +38193,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C492404"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 116.84 106.68 0)
 			(hide yes)
@@ -38260,7 +38340,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at -35.56 143.51 0)
+		(at -39.37 142.24 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -38270,7 +38350,7 @@
 		(dnp no)
 		(uuid "092e2636-e584-4916-9aca-eb60bbffbb28")
 		(property "Reference" "R55"
-			(at -33.782 142.3416 0)
+			(at -37.592 141.0716 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38281,7 +38361,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at -33.782 144.653 0)
+			(at -37.592 143.383 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38292,7 +38372,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
-			(at -37.338 143.51 90)
+			(at -41.148 142.24 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38303,7 +38383,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at -35.56 143.51 0)
+			(at -39.37 142.24 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38314,7 +38394,7 @@
 			)
 		)
 		(property "Description" ""
-			(at -35.56 143.51 0)
+			(at -39.37 142.24 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38324,7 +38404,7 @@
 			)
 		)
 		(property "MPN" "0201WMF1002TEE"
-			(at -37.338 143.51 90)
+			(at -41.148 142.24 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38335,7 +38415,7 @@
 			)
 		)
 		(property "LCSC Part" "C473048"
-			(at -37.338 143.51 90)
+			(at -41.148 142.24 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39211,108 +39291,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 829.31 121.92 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "0f8b2d4f-f489-4be1-8e82-4f363712a551")
-		(property "Reference" "R29"
-			(at 830.58 119.38 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "47R"
-			(at 834.644 119.38 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
-			(at 829.31 123.698 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 829.31 121.92 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 829.31 121.92 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "RC0201FR-0747RL"
-			(at 829.31 123.698 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C273279"
-			(at 829.31 123.698 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "3c078a06-1846-4699-8b76-841e515fc290")
-		)
-		(pin "2"
-			(uuid "8ef41b6a-a95f-48d8-be4e-fee4d7f648f1")
-		)
-		(instances
-			(project "riskybirdv3"
-				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
-					(reference "R29")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:VDD")
 		(at -78.74 134.62 0)
 		(unit 1)
@@ -39384,108 +39362,6 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "#PWR0126")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 829.31 127 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "1095ae64-f950-4899-92f1-1862904ca0e0")
-		(property "Reference" "R34"
-			(at 830.58 124.46 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "47R"
-			(at 834.644 124.46 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
-			(at 829.31 128.778 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 829.31 127 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 829.31 127 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "RC0201FR-0747RL"
-			(at 829.31 128.778 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C273279"
-			(at 829.31 128.778 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "702f0038-0c4b-4ff0-ae7b-467fbe848173")
-		)
-		(pin "2"
-			(uuid "06c7ad7a-b92f-43d4-b457-59f617eb4e9d")
-		)
-		(instances
-			(project "riskybirdv3"
-				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
-					(reference "R34")
 					(unit 1)
 				)
 			)
@@ -40221,6 +40097,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 458.7748 238.76 0)
 			(hide yes)
@@ -40746,6 +40633,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C86299"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 311.785 55.88 0)
 			(hide yes)
@@ -40982,6 +40880,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C59461"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 199.39 110.49 0)
 			(hide yes)
@@ -42099,6 +42008,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C2867992"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_DFN_QFN:WQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm"
 			(at 25.4 156.21 0)
 			(hide yes)
@@ -43062,6 +42982,17 @@
 				(justify right)
 			)
 		)
+			(property "LCSC Part" "C25503345"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 185.42 232.41 0)
 			(hide yes)
@@ -43246,6 +43177,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 472.7448 257.81 0)
 			(hide yes)
@@ -43404,6 +43346,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C2941042"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-6"
 			(at -46.355 367.03 0)
 			(hide yes)
@@ -43911,6 +43864,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C140782"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 416.56 26.67 0)
 			(hide yes)
@@ -44095,6 +44059,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C140782"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 406.4 26.67 0)
 			(hide yes)
@@ -44786,6 +44761,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3V3")
+		(at 21.59 144.78 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "3faf3264-851f-4fdd-a4e4-baa261b86cd2")
+		(property "Reference" "#PWR07"
+			(at 21.59 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 24.13 143.5099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 21.59 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 21.59 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3V3\""
+			(at 21.59 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a45230b4-091c-4467-816c-24bdfb8cf95d")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "#PWR07")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:Q_NMOS_GSD")
 		(at 344.17 43.18 0)
 		(unit 1)
@@ -44819,6 +44873,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C2891732"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 349.25 40.64 0)
 			(hide yes)
@@ -45298,7 +45363,7 @@
 	)
 	(symbol
 		(lib_id "power:+3V3")
-		(at 21.59 167.64 0)
+		(at 16.51 166.37 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -45306,10 +45371,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "42179737-a40d-4302-9453-ac9d8288704b")
 		(property "Reference" "#PWR0135"
-			(at 21.59 171.45 0)
+			(at 16.51 170.18 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45320,7 +45384,7 @@
 			)
 		)
 		(property "Value" "+3V3"
-			(at 21.59 162.56 0)
+			(at 16.51 161.29 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -45330,7 +45394,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 21.59 167.64 0)
+			(at 16.51 166.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45341,7 +45405,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 21.59 167.64 0)
+			(at 16.51 166.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45352,7 +45416,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 21.59 167.64 0)
+			(at 16.51 166.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45550,108 +45614,6 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "HM01B0")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 829.31 116.84 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "424790e7-e365-4e5c-a3e6-aca9abe30d3e")
-		(property "Reference" "R28"
-			(at 830.58 114.3 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "47R"
-			(at 834.644 114.3 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
-			(at 829.31 118.618 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 829.31 116.84 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 829.31 116.84 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "RC0201FR-0747RL"
-			(at 829.31 118.618 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C273279"
-			(at 829.31 118.618 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "431bef52-60a8-4f57-954c-85838cf5be1b")
-		)
-		(pin "2"
-			(uuid "7f7d98b4-c921-42f5-877a-fa68279e483e")
-		)
-		(instances
-			(project "riskybirdv3"
-				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
-					(reference "R28")
 					(unit 1)
 				)
 			)
@@ -46331,6 +46293,108 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "R15")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 730.25 139.7 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "45ad7851-43c9-432c-85e0-19271215e82a")
+		(property "Reference" "R29"
+			(at 731.52 137.16 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "47R"
+			(at 735.584 137.16 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 730.25 141.478 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 730.25 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 730.25 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-0747RL"
+			(at 730.25 141.478 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C273279"
+			(at 730.25 141.478 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "d77f6ab9-f3f7-4dba-8ccc-3d12431da80c")
+		)
+		(pin "2"
+			(uuid "abc4c814-b2f2-4ad0-a065-cfe2951c50ef")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "R29")
 					(unit 1)
 				)
 			)
@@ -47460,6 +47524,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C33196"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_SO:VSSOP-8_2.3x2mm_P0.5mm"
 			(at 525.78 264.16 0)
 			(hide yes)
@@ -47794,6 +47869,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C2891732"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 311.15 39.37 0)
 			(hide yes)
@@ -47877,6 +47963,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at -162.8648 189.23 0)
 			(hide yes)
@@ -48501,6 +48598,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C86299"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 362.585 54.61 0)
 			(hide yes)
@@ -48991,6 +49099,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 181.3052 361.95 0)
 			(hide yes)
@@ -49537,6 +49656,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C965793"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 26.67 35.56 0)
 			(hide yes)
@@ -49670,6 +49800,107 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "#PWR0107")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED")
+		(at 21.59 157.48 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "5bd2a4dd-8c74-478b-8e09-8b120ae3979e")
+		(property "Reference" "D8"
+			(at 14.986 159.004 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "LED"
+			(at 17.78 159.0675 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+			(property "LCSC Part" "C965793"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
+			(at 21.59 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 21.59 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Light emitting diode"
+			(at 21.59 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" "1=K 2=A"
+			(at 21.59 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "78811abe-6ae2-40e9-a78b-045938f14cfc")
+		)
+		(pin "2"
+			(uuid "0260b199-74ce-43d4-8810-fa29aa9321e0")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "D8")
 					(unit 1)
 				)
 			)
@@ -50177,6 +50408,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C5219211"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-363_SC-70-6"
 			(at -62.23 321.31 0)
 			(hide yes)
@@ -50608,6 +50850,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at -82.8548 358.14 0)
 			(hide yes)
@@ -51650,6 +51903,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C2891732"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 325.12 69.85 0)
 			(hide yes)
@@ -52171,6 +52435,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C492404"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 153.67 106.68 0)
 			(hide yes)
@@ -52825,6 +53100,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C59461"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 187.96 110.49 0)
 			(hide yes)
@@ -53124,7 +53410,7 @@
 				)
 			)
 		)
-		(property "Value" "100p"
+		(property "Value" "82p"
 			(at 391.668 375.666 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -53499,6 +53785,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C2827693"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-666"
 			(at 125.476 238.379 0)
 			(hide yes)
@@ -53675,6 +53972,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 273.3548 334.01 0)
 			(hide yes)
@@ -53744,7 +54052,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "2.6k"
+		(property "Value" "3.65k"
 			(at 398.018 375.793 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -54200,6 +54508,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 362.2548 257.81 0)
 			(hide yes)
@@ -54511,6 +54830,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C1525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 482.2952 248.92 0)
 			(hide yes)
@@ -55279,6 +55609,119 @@
 		)
 	)
 	(symbol
+		(lib_id "riskybird_lcsc:XAL7030-152MEC")
+		(at 344.17 323.85 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "806d48f3-9cc1-4fb7-b843-457d099cbb50")
+		(property "Reference" "L2"
+			(at 344.17 317.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "XAL7030-152MEC"
+			(at 344.17 320.04 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "riskybird_lcsc:IND-SMD_L7.5-W7.5_XAL7030-152MEC"
+			(at 344.17 331.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C5352784.pdf"
+			(at 344.17 334.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 344.17 323.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Coilcraft(线艺)"
+			(at 344.17 336.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "XAL7030-152MEC"
+			(at 344.17 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5352784"
+			(at 344.17 341.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "19526120-81e4-4796-b2e9-733e99c3af65")
+		)
+		(pin "1"
+			(uuid "ee2ffe0c-2c46-4109-a168-20a6076610d9")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "L2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 908.05 45.72 0)
 		(unit 1)
@@ -55651,6 +56094,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C86299"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 297.815 25.4 0)
 			(hide yes)
@@ -56298,6 +56752,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C492404"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 116.84 87.63 0)
 			(hide yes)
@@ -56677,7 +57142,7 @@
 				)
 			)
 		)
-		(property "Value" "8.2n"
+		(property "Value" "5.6n"
 			(at 400.558 384.556 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -58245,6 +58710,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C133796"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-353_SC-70-5"
 			(at 58.42 367.03 0)
 			(hide yes)
@@ -58692,6 +59168,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at -93.0148 330.2 0)
 			(hide yes)
@@ -59916,6 +60403,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C528968"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
 			(at 381.3048 346.71 0)
 			(hide yes)
@@ -59995,6 +60493,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C22356394"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
 			(at 181.61 107.95 0)
 			(hide yes)
@@ -60038,6 +60547,108 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "R25")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 730.25 129.54 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a238d86e-db04-488d-99f7-803f6e5b6260")
+		(property "Reference" "R27"
+			(at 731.52 127 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "47R"
+			(at 735.584 127 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 730.25 131.318 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 730.25 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 730.25 129.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-0747RL"
+			(at 730.25 131.318 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C273279"
+			(at 730.25 131.318 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "464f435f-531f-4c9e-8f35-f47c59291ccd")
+		)
+		(pin "2"
+			(uuid "532879c3-87e5-48a0-aa6f-4da51470055f")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "R27")
 					(unit 1)
 				)
 			)
@@ -61273,6 +61884,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C59461"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 259.3848 361.95 0)
 			(hide yes)
@@ -62007,6 +62629,108 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "#PWR052")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 730.25 134.62 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "b2d40997-521d-4fd8-84ff-e565c2ccfe0a")
+		(property "Reference" "R28"
+			(at 731.52 132.08 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "47R"
+			(at 735.584 132.08 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 730.25 136.398 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 730.25 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 730.25 134.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-0747RL"
+			(at 730.25 136.398 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C273279"
+			(at 730.25 136.398 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "945bcaa6-b029-4b01-ac61-4a5578b6225b")
+		)
+		(pin "2"
+			(uuid "eafdcf85-3a7a-4b2c-ad81-cd640f419892")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "R28")
 					(unit 1)
 				)
 			)
@@ -63720,6 +64444,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C194919"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_LGA:Bosch_LGA-16_4.5x3mm_P0.5mm_LayoutBorder7x1y_ClockwisePinNumbering"
 			(at 212.09 54.61 0)
 			(hide yes)
@@ -64132,6 +64867,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C86299"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 335.915 25.4 0)
 			(hide yes)
@@ -64443,6 +65189,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C8545"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 158.75 179.705 0)
 			(hide yes)
@@ -65331,6 +66088,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C15525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 195.58 128.27 0)
 			(hide yes)
@@ -65374,108 +66142,6 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "C14")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 829.31 111.76 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "cd4b0020-c4fb-43ab-9913-77bb450644aa")
-		(property "Reference" "R27"
-			(at 830.58 109.22 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "47R"
-			(at 834.644 109.22 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
-			(at 829.31 113.538 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 829.31 111.76 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 829.31 111.76 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "RC0201FR-0747RL"
-			(at 829.31 113.538 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C273279"
-			(at 829.31 113.538 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "10d214ed-5fc8-4198-b0d7-bda2c1ba953b")
-		)
-		(pin "2"
-			(uuid "bd02b10b-643b-44c8-a80f-a8e5f4123b20")
-		)
-		(instances
-			(project "riskybirdv3"
-				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
-					(reference "R27")
 					(unit 1)
 				)
 			)
@@ -68074,7 +68740,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "28.7k"
+		(property "Value" "19.6k"
 			(at 319.278 387.223 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -68444,6 +69110,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C190004"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Sensor_Distance:ST_VL53L1x"
 			(at 79.375 111.76 0)
 			(hide yes)
@@ -68556,6 +69233,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C492404"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 153.67 87.63 0)
 			(hide yes)
@@ -69386,6 +70074,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C140782"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 396.24 26.67 0)
 			(hide yes)
@@ -69547,6 +70246,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C8545"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 52.07 43.815 0)
 			(hide yes)
@@ -70479,6 +71189,108 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 730.25 144.78 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "ed90792e-6ff6-4c45-aa0e-450bdc604bcd")
+		(property "Reference" "R34"
+			(at 731.52 142.24 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "47R"
+			(at 735.584 142.24 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 730.25 146.558 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 730.25 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 730.25 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-0747RL"
+			(at 730.25 146.558 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C273279"
+			(at 730.25 146.558 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "b4b82cd3-b22c-44ec-a15d-6abbd5d665d5")
+		)
+		(pin "2"
+			(uuid "2e382e3a-0454-49d2-a65f-faddb12145b8")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "R34")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C")
 		(at 548.64 245.11 0)
 		(unit 1)
@@ -70511,6 +71323,17 @@
 				(justify left)
 			)
 		)
+			(property "LCSC Part" "C1525"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 549.6052 248.92 0)
 			(hide yes)
@@ -71194,6 +72017,17 @@
 				)
 			)
 		)
+			(property "LCSC Part" "C965793"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 49.53 31.75 0)
 			(hide yes)
@@ -72154,6 +72988,110 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "C84")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 21.59 149.86 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "fc185bee-d46a-48fe-b496-fd438e85fd74")
+		(property "Reference" "R35"
+			(at 24.13 148.5899 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "150"
+			(at 24.13 151.1299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 19.812 149.86 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 21.59 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 21.59 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RC0201FR-07150RL"
+			(at 19.812 149.86 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C295773"
+			(at 19.812 149.86 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "53f97146-5f5c-4513-9dee-8df09950e8da")
+		)
+		(pin "2"
+			(uuid "93d36d65-aaa6-4148-8ef1-76c45bf394fe")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "R35")
 					(unit 1)
 				)
 			)
