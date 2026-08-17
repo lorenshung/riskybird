@@ -36808,17 +36808,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C2891732"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 375.92 69.85 0)
 			(hide yes)
@@ -36843,6 +36832,17 @@
 		)
 		(property "Description" ""
 			(at 370.84 72.39 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2891732"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -37513,7 +37513,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "22u"
+		(property "Value" "22u/16V"
 			(at 275.59 363.22 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37524,17 +37524,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C59461"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 268.2748 361.95 0)
 			(hide yes)
@@ -37559,6 +37548,17 @@
 		)
 		(property "Description" ""
 			(at 269.24 365.76 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C6119868"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38102,17 +38102,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C140782"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 386.08 26.67 0)
 			(hide yes)
@@ -38137,6 +38126,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 386.08 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C140782"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38193,17 +38193,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C492404"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 116.84 106.68 0)
 			(hide yes)
@@ -38228,6 +38217,17 @@
 		)
 		(property "Description" "Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 116.84 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C492404"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40097,17 +40097,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 458.7748 238.76 0)
 			(hide yes)
@@ -40132,6 +40121,17 @@
 		)
 		(property "Description" ""
 			(at 459.74 242.57 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40633,17 +40633,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C86299"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 311.785 55.88 0)
 			(hide yes)
@@ -40668,6 +40657,17 @@
 		)
 		(property "Description" ""
 			(at 316.23 55.88 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C86299"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40880,17 +40880,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C59461"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 199.39 110.49 0)
 			(hide yes)
@@ -40915,6 +40904,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 199.39 110.49 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C59461"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41613,6 +41613,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 148.59 53.34 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "208515d3-ed45-4c57-befb-a0a11f8128d9")
+		(property "Reference" "TP4"
+			(at 151.13 48.7679 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 151.13 51.3079 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 153.67 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 153.67 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 148.59 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "f5da0d66-32e8-4614-a250-4f7b4e251abd")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "TP4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C_Small")
 		(at 91.44 91.44 0)
 		(unit 1)
@@ -42008,17 +42087,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C2867992"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_DFN_QFN:WQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm"
 			(at 25.4 156.21 0)
 			(hide yes)
@@ -42045,6 +42113,17 @@
 		)
 		(property "Description" ""
 			(at 25.4 156.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2867992"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42982,17 +43061,6 @@
 				(justify right)
 			)
 		)
-			(property "LCSC Part" "C25503345"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 185.42 232.41 0)
 			(hide yes)
@@ -43017,6 +43085,17 @@
 		)
 		(property "Description" ""
 			(at 185.42 232.41 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C25503345"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43177,17 +43256,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 472.7448 257.81 0)
 			(hide yes)
@@ -43212,6 +43280,17 @@
 		)
 		(property "Description" ""
 			(at 473.71 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43346,17 +43425,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C2941042"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-6"
 			(at -46.355 367.03 0)
 			(hide yes)
@@ -43381,6 +43449,17 @@
 		)
 		(property "Description" "Low Iq reverse battery protection ideal diode controller, SOT-23-6"
 			(at -36.83 358.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2941042"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43864,17 +43943,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C140782"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 416.56 26.67 0)
 			(hide yes)
@@ -43899,6 +43967,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 416.56 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C140782"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44059,17 +44138,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C140782"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 406.4 26.67 0)
 			(hide yes)
@@ -44094,6 +44162,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 406.4 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C140782"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44873,17 +44952,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C2891732"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 349.25 40.64 0)
 			(hide yes)
@@ -44908,6 +44976,17 @@
 		)
 		(property "Description" ""
 			(at 344.17 43.18 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2891732"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -45684,7 +45763,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "0201WMF4022TEE"
 			(at 290.322 383.54 90)
 			(hide yes)
 			(show_name no)
@@ -45695,7 +45774,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C423536"
 			(at 290.322 383.54 90)
 			(hide yes)
 			(show_name no)
@@ -47218,7 +47297,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "0201WMF2802TEE"
 			(at 290.322 393.7 90)
 			(hide yes)
 			(show_name no)
@@ -47229,7 +47308,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C473489"
 			(at 290.322 393.7 90)
 			(hide yes)
 			(show_name no)
@@ -47524,17 +47603,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C33196"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_SO:VSSOP-8_2.3x2mm_P0.5mm"
 			(at 525.78 264.16 0)
 			(hide yes)
@@ -47559,6 +47627,17 @@
 		)
 		(property "Description" "Dual bidirectional I2C Bus and SMBus voltage level translator, VSSOP-8, Discontinued"
 			(at 525.78 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C33196"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -47869,17 +47948,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C2891732"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 311.15 39.37 0)
 			(hide yes)
@@ -47904,6 +47972,17 @@
 		)
 		(property "Description" ""
 			(at 306.07 41.91 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2891732"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -47963,17 +48042,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at -162.8648 189.23 0)
 			(hide yes)
@@ -47998,6 +48066,17 @@
 		)
 		(property "Description" ""
 			(at -163.83 185.42 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -48598,17 +48677,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C86299"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 362.585 54.61 0)
 			(hide yes)
@@ -48633,6 +48701,17 @@
 		)
 		(property "Description" ""
 			(at 367.03 54.61 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C86299"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49088,7 +49167,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "10u/16V"
 			(at 183.261 359.283 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49099,18 +49178,7 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 181.3052 361.95 0)
 			(hide yes)
 			(show_name no)
@@ -49134,6 +49202,17 @@
 		)
 		(property "Description" ""
 			(at 180.34 358.14 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C962136"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49656,17 +49735,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C965793"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 26.67 35.56 0)
 			(hide yes)
@@ -49691,6 +49759,17 @@
 		)
 		(property "Description" "Light emitting diode"
 			(at 26.67 35.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C965793"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49836,17 +49915,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C965793"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 21.59 157.48 0)
 			(hide yes)
@@ -49871,6 +49939,17 @@
 		)
 		(property "Description" "Light emitting diode"
 			(at 21.59 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C965793"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50408,17 +50487,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C5219211"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-363_SC-70-6"
 			(at -62.23 321.31 0)
 			(hide yes)
@@ -50443,6 +50511,17 @@
 		)
 		(property "Description" "Ideal Diode With Input Polarity Protection 1.5 - 5.5V  Input Voltage, 1.5A Output Current, Ron 141 mOhm, SC-70-6"
 			(at -62.23 340.614 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5219211"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50850,17 +50929,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at -82.8548 358.14 0)
 			(hide yes)
@@ -50885,6 +50953,17 @@
 		)
 		(property "Description" ""
 			(at -83.82 354.33 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -51162,7 +51241,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "56.2k"
+		(property "Value" "57.6k"
 			(at 406.908 373.253 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -51205,7 +51284,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "RC-01W5762FT"
 			(at 403.352 372.11 90)
 			(hide yes)
 			(show_name no)
@@ -51216,7 +51295,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C320974"
 			(at 403.352 372.11 90)
 			(hide yes)
 			(show_name no)
@@ -51459,7 +51538,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "RC0201FR-0727KL"
 			(at 376.682 379.73 90)
 			(hide yes)
 			(show_name no)
@@ -51470,7 +51549,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C273283"
 			(at 376.682 379.73 90)
 			(hide yes)
 			(show_name no)
@@ -51903,17 +51982,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C2891732"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 325.12 69.85 0)
 			(hide yes)
@@ -51938,6 +52006,17 @@
 		)
 		(property "Description" ""
 			(at 320.04 72.39 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2891732"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -52435,17 +52514,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C492404"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 153.67 106.68 0)
 			(hide yes)
@@ -52470,6 +52538,17 @@
 		)
 		(property "Description" "Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 153.67 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C492404"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -53100,17 +53179,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C59461"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 187.96 110.49 0)
 			(hide yes)
@@ -53135,6 +53203,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 187.96 110.49 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C59461"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -53453,7 +53532,7 @@
 				)
 			)
 		)
-		(property "MPN" "CL03A105MQ3CSNH"
+		(property "MPN" "GRM0335C1H820JA01D"
 			(at 387.35 373.38 0)
 			(hide yes)
 			(show_name no)
@@ -53464,7 +53543,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C53067"
+		(property "LCSC Part" "C161439"
 			(at 387.35 373.38 0)
 			(hide yes)
 			(show_name no)
@@ -53785,17 +53864,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C2827693"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-666"
 			(at 125.476 238.379 0)
 			(hide yes)
@@ -53823,6 +53891,17 @@
 		)
 		(property "Description" "Very low capacitance ESD protection diode, 2 data-line, SOT-666"
 			(at 124.46 245.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2827693"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -53961,7 +54040,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "4.7u/25V"
 			(at 280.67 335.28 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -53972,17 +54051,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 273.3548 334.01 0)
 			(hide yes)
@@ -54007,6 +54075,17 @@
 		)
 		(property "Description" ""
 			(at 274.32 337.82 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C2858031"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -54095,7 +54174,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "RTT013651FTH"
 			(at 394.462 374.65 90)
 			(hide yes)
 			(show_name no)
@@ -54106,7 +54185,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C166220"
 			(at 394.462 374.65 90)
 			(hide yes)
 			(show_name no)
@@ -54508,17 +54587,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 362.2548 257.81 0)
 			(hide yes)
@@ -54543,6 +54611,17 @@
 		)
 		(property "Description" ""
 			(at 363.22 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -54830,17 +54909,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C1525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 482.2952 248.92 0)
 			(hide yes)
@@ -54865,6 +54933,17 @@
 		)
 		(property "Description" ""
 			(at 481.33 245.11 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C1525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -56094,17 +56173,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C86299"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 297.815 25.4 0)
 			(hide yes)
@@ -56129,6 +56197,17 @@
 		)
 		(property "Description" ""
 			(at 302.26 25.4 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C86299"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -56752,17 +56831,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C492404"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 116.84 87.63 0)
 			(hide yes)
@@ -56787,6 +56855,17 @@
 		)
 		(property "Description" "Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 116.84 87.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C492404"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -57185,7 +57264,7 @@
 				)
 			)
 		)
-		(property "MPN" "CL03A105MQ3CSNH"
+		(property "MPN" "0201B562K500NT"
 			(at 396.24 382.27 0)
 			(hide yes)
 			(show_name no)
@@ -57196,7 +57275,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C53067"
+		(property "LCSC Part" "C3037635"
 			(at 396.24 382.27 0)
 			(hide yes)
 			(show_name no)
@@ -57469,7 +57548,7 @@
 				)
 			)
 		)
-		(property "Value" "4.7uF"
+		(property "Value" "1u"
 			(at 318.77 352.298 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -57682,7 +57761,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "NetTie:NetTie-2_SMD_Pad0.5mm"
 			(at 342.9 389.89 0)
 			(hide yes)
 			(show_name no)
@@ -58710,17 +58789,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C133796"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-353_SC-70-5"
 			(at 58.42 367.03 0)
 			(hide yes)
@@ -58746,6 +58814,17 @@
 		)
 		(property "Description" ""
 			(at 58.42 367.03 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C133796"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59168,17 +59247,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at -93.0148 330.2 0)
 			(hide yes)
@@ -59203,6 +59271,17 @@
 		)
 		(property "Description" ""
 			(at -93.98 326.39 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -60403,17 +60482,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C528968"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
 			(at 381.3048 346.71 0)
 			(hide yes)
@@ -60438,6 +60506,17 @@
 		)
 		(property "Description" ""
 			(at 382.27 350.52 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C528968"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -60493,17 +60572,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C22356394"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
 			(at 181.61 107.95 0)
 			(hide yes)
@@ -60528,6 +60596,17 @@
 		)
 		(property "Description" "Resistor, small symbol"
 			(at 181.61 107.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C22356394"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -61873,7 +61952,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "22u"
+		(property "Value" "22u/16V"
 			(at 266.7 363.22 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -61884,17 +61963,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C59461"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 259.3848 361.95 0)
 			(hide yes)
@@ -61919,6 +61987,17 @@
 		)
 		(property "Description" ""
 			(at 260.35 365.76 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C6119868"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -62801,7 +62880,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" ""
 			(at 192.278 355.6 90)
 			(hide yes)
 			(show_name no)
@@ -62812,7 +62891,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C473653"
 			(at 192.278 355.6 90)
 			(hide yes)
 			(show_name no)
@@ -63240,7 +63319,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "0201WMF4022TEE"
 			(at 192.278 379.73 90)
 			(hide yes)
 			(show_name no)
@@ -63251,7 +63330,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C423536"
 			(at 192.278 379.73 90)
 			(hide yes)
 			(show_name no)
@@ -64375,7 +64454,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "RC0201FR-0727KL"
 			(at 309.372 369.57 90)
 			(hide yes)
 			(show_name no)
@@ -64386,7 +64465,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C273283"
 			(at 309.372 369.57 90)
 			(hide yes)
 			(show_name no)
@@ -64444,17 +64523,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C194919"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_LGA:Bosch_LGA-16_4.5x3mm_P0.5mm_LayoutBorder7x1y_ClockwisePinNumbering"
 			(at 212.09 54.61 0)
 			(hide yes)
@@ -64488,6 +64556,17 @@
 					(size 1.27 1.27)
 				)
 				(justify bottom)
+			)
+		)
+		(property "LCSC Part" "C194919"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
 			)
 		)
 		(property "MF" "Bosch Sensortec"
@@ -64867,17 +64946,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C86299"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Diode_SMD:D_SOD-323_HandSoldering"
 			(at 335.915 25.4 0)
 			(hide yes)
@@ -64902,6 +64970,17 @@
 		)
 		(property "Description" ""
 			(at 340.36 25.4 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C86299"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -65189,17 +65268,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C8545"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 158.75 179.705 0)
 			(hide yes)
@@ -65227,6 +65295,17 @@
 		)
 		(property "Description" "0.115A Id, 60V Vds, N-Channel MOSFET, SOT-23"
 			(at 153.67 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C8545"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -66088,17 +66167,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C15525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 195.58 128.27 0)
 			(hide yes)
@@ -66123,6 +66191,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 195.58 128.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C15525"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -66290,7 +66369,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "RC0201FR-07121RL"
 			(at 203.708 345.44 90)
 			(hide yes)
 			(show_name no)
@@ -66301,7 +66380,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C474519"
 			(at 203.708 345.44 90)
 			(hide yes)
 			(show_name no)
@@ -68783,7 +68862,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" "0201WMF1962TEE"
 			(at 315.722 386.08 90)
 			(hide yes)
 			(show_name no)
@@ -68794,7 +68873,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C423675"
 			(at 315.722 386.08 90)
 			(hide yes)
 			(show_name no)
@@ -69110,17 +69189,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C190004"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Sensor_Distance:ST_VL53L1x"
 			(at 79.375 111.76 0)
 			(hide yes)
@@ -69145,6 +69213,17 @@
 		)
 		(property "Description" "4m distance ranging ToF sensor, Optical LGA12"
 			(at 62.23 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C190004"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -69233,17 +69312,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C492404"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 			(at 153.67 87.63 0)
 			(hide yes)
@@ -69268,6 +69336,17 @@
 		)
 		(property "Description" "Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 153.67 87.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C492404"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -69366,7 +69445,7 @@
 				)
 			)
 		)
-		(property "MPN" "GRM033R60J104KE19D"
+		(property "MPN" "GRM0335C1H151FA01D"
 			(at 201.6252 383.54 0)
 			(hide yes)
 			(show_name no)
@@ -69377,7 +69456,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C76928"
+		(property "LCSC Part" "C384963"
 			(at 201.6252 383.54 0)
 			(hide yes)
 			(show_name no)
@@ -70074,17 +70153,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C140782"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 396.24 26.67 0)
 			(hide yes)
@@ -70109,6 +70177,17 @@
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 396.24 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C140782"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -70246,17 +70325,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C8545"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 52.07 43.815 0)
 			(hide yes)
@@ -70293,6 +70361,17 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C8545"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "5c1a8b90-501f-48eb-9e99-7ad306250741")
 		)
@@ -70306,6 +70385,85 @@
 			(project "riskybirdv3"
 				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
 					(reference "Q7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 148.59 53.34 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e9b8c1cb-2cbf-4bde-93eb-6a38e852c713")
+		(property "Reference" "#PWR0120"
+			(at 148.59 59.69 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 148.5901 57.15 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 148.59 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 148.59 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 148.59 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "5b8710d2-f096-435d-89e7-341232f571c1")
+		)
+		(instances
+			(project "riskybirdv3"
+				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
+					(reference "#PWR0120")
 					(unit 1)
 				)
 			)
@@ -71323,17 +71481,6 @@
 				(justify left)
 			)
 		)
-			(property "LCSC Part" "C1525"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 549.6052 248.92 0)
 			(hide yes)
@@ -71358,6 +71505,17 @@
 		)
 		(property "Description" ""
 			(at 548.64 245.11 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C1525"
+			(at 0 0 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -72017,17 +72175,6 @@
 				)
 			)
 		)
-			(property "LCSC Part" "C965793"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
 		(property "Footprint" "LED_SMD:LED_0402_1005Metric"
 			(at 49.53 31.75 0)
 			(hide yes)
@@ -72052,6 +72199,17 @@
 		)
 		(property "Description" "Light emitting diode"
 			(at 49.53 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C965793"
+			(at 0 0 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -72309,7 +72467,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF1003TEE"
+		(property "MPN" ""
 			(at 211.328 345.44 90)
 			(hide yes)
 			(show_name no)
@@ -72320,7 +72478,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270364"
+		(property "LCSC Part" "C423470"
 			(at 211.328 345.44 90)
 			(hide yes)
 			(show_name no)
@@ -72956,7 +73114,7 @@
 				)
 			)
 		)
-		(property "MPN" "GRM033R60J104KE19D"
+		(property "MPN" "EMK063B7223KP-F"
 			(at 220.6752 354.33 0)
 			(hide yes)
 			(show_name no)
@@ -72967,7 +73125,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C76928"
+		(property "LCSC Part" "C2880350"
 			(at 220.6752 354.33 0)
 			(hide yes)
 			(show_name no)
