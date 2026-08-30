@@ -1,0 +1,73 @@
+(version 1)
+# JLCPCB — ACTUAL manufacturing minimums (2/4-layer, 1oz), not the conservative
+# "recommended" values. Source: https://jlcpcb.com/capabilities/pcb-capabilities
+# Verified 2026-07. Recommended-but-not-required margins noted in comments.
+
+(rule "Track width (min)"
+	(constraint track_width (min 0.09mm))
+)
+
+# Copper-to-copper (trace/pad/via, different nets). JLC min ~0.09-0.1mm.
+(rule "Copper clearance"
+	(condition "A.Net != B.Net")
+	(constraint clearance (min 0.1mm))
+)
+
+# Annular ring: 0.075mm is JLC's hard minimum (0.15mm is only *recommended*).
+(rule "Annular ring width (via and PTH)"
+	(layer outer)
+	(condition "A.isPlated()")
+	(constraint annular_width (min 0.075mm))
+)
+
+# Hole diameters. PTH min 0.2mm (standard tier; 0.15mm needs advanced/$$).
+(rule "Hole diameter (PTH)"
+	(constraint hole_size (min 0.2mm) (max 6.3mm))
+)
+(rule "Hole diameter (NPTH)"
+	(condition "!A.isPlated()")
+	(constraint hole_size (min 0.5mm))
+)
+
+# Hole-to-hole (edge-to-edge). JLC: via-to-via 0.2mm, pad-involving 0.45mm — by
+# hole TYPE, not net (drilling constraint, not electrical).
+(rule "Hole to hole - via to via"
+	(condition "A.Type == 'via' && B.Type == 'via'")
+	(constraint hole_to_hole (min 0.2mm))
+)
+(rule "Hole to hole - involving a PTH pad"
+	(condition "A.Type == 'pad' || B.Type == 'pad'")
+	(constraint hole_to_hole (min 0.45mm))
+)
+
+# Track to hole (perimeter). JLC: via-hole 0.2mm, PTH-pad-hole 0.28mm.
+(rule "Track to via hole"
+	(condition "A.Type == 'via' && B.Type == 'track' && A.Net != B.Net")
+	(constraint hole_clearance (min 0.2mm))
+)
+(rule "Track to PTH pad hole"
+	(condition "A.Type == 'pad' && A.isPlated() && B.Type == 'track' && A.Net != B.Net")
+	(constraint hole_clearance (min 0.28mm))
+)
+(rule "Track to NPTH hole"
+	(condition "!A.isPlated() && B.Type == 'track' && A.Net != B.Net")
+	(constraint hole_clearance (min 0.254mm))
+)
+
+# Copper to routed board edge: 0.2mm capability (JLC *recommends* 0.3mm).
+(rule "Copper to board edge"
+	(constraint edge_clearance (min 0.2mm))
+)
+
+# Silkscreen
+(rule "Silkscreen text"
+	(layer "?.Silkscreen")
+	(condition "A.Type == 'Text' || A.Type == 'Text Box'")
+	(constraint text_thickness (min 0.125mm))
+	(constraint text_height (min 0.5mm))
+)
+(rule "Pad to Silkscreen"
+	(layer outer)
+	(condition "A.Type == 'pad' && B.Layer == '?.Silkscreen'")
+	(constraint silk_clearance (min 0.15mm))
+)
