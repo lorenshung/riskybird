@@ -43,6 +43,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("input", help="console log file, or - for stdin")
     ap.add_argument("-o", "--out", default="camera_frame", help="output basename (default camera_frame)")
+    ap.add_argument("-m", "--median", type=int, default=0, metavar="N",
+                    help="apply an NxN median filter (e.g. 3) to knock out fixed-pattern checkerboard noise")
+    ap.add_argument("-s", "--stretch", action="store_true",
+                    help="contrast-stretch to the 2nd..98th percentile (for underexposed frames)")
+    ap.add_argument("-u", "--upscale", type=int, default=1, metavar="N", help="upscale the PNG Nx")
     args = ap.parse_args()
 
     text = sys.stdin.read() if args.input == "-" else open(args.input, "r", errors="replace").read()
@@ -61,10 +66,21 @@ def main():
     print(f"wrote {pgm}  ({w}x{hh})")
 
     try:
-        from PIL import Image
+        from PIL import Image, ImageFilter
         im = Image.frombytes("L", (w, hh), b"".join(rows))
+        if args.median and args.median >= 2:
+            im = im.filter(ImageFilter.MedianFilter(size=args.median | 1))  # size must be odd
+        if args.stretch:
+            import numpy as np
+            a = np.asarray(im).astype("float32")
+            lo, hi = np.percentile(a, 2), np.percentile(a, 98)
+            im = Image.fromarray(np.clip((a - lo) * 255 / max(hi - lo, 1), 0, 255).astype("uint8"))
+        if args.upscale > 1:
+            im = im.resize((w * args.upscale, hh * args.upscale), Image.LANCZOS)
         im.save(f"{args.out}.png")
-        print(f"wrote {args.out}.png")
+        print(f"wrote {args.out}.png"
+              + (f"  (median{args.median})" if args.median else "")
+              + ("  (stretched)" if args.stretch else ""))
     except Exception as e:  # noqa: BLE001
         print(f"(PNG skipped: {e}; the .pgm is viewable directly)")
 
