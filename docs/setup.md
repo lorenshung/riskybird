@@ -221,6 +221,15 @@ Memory region         Used Size  Region Size  %age Used
 An ELF at `build/zephyr/arty200t/hello_world/default/zephyr/zephyr.elf` is the
 end of step 2. Nothing so far has needed hardware.
 
+That `1 GB` region is itself the proof that step 2c worked: it comes from the
+`RocketArty200TDroneFullDDRConfig` devicetree, so the build read the collected
+DTS. A scratchpad config would report 32 KB here.
+
+**Verified** on 2026-09-05 exactly as written above, with `backends/chipyard`
+absent and the devicetree supplied through `RB_DTS_DIR` -- `rb doctor` reported
+every Zephyr line `ok`, Chipyard and its conda environment `MISSING`, and the
+build produced a 409 KB ELF.
+
 ---
 
 ## Step 3 -- (not written yet)
