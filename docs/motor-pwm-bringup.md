@@ -535,11 +535,29 @@ real rather than theoretical -- the raw comparator sits **100% high at reset**,
 before any instruction runs, so an uninverted path is full throttle from
 configuration.
 
-**Does not establish that the harness inversion is present in the built
-design.** The testbench *models* the inversion (`pin() { return gpio ^ 1; }`)
-because `WithArty200TPWM` applies it outside `PWMTimer`, in the harness. So this
-proves "if the harness inverts, the pin is low", not "the harness inverts".
+**Does not by itself establish that the harness inversion is in the built
+design.** The testbench *models* it (`pin() { return gpio ^ 1; }`), because
+`WithArty200TPWM` applies the inversion outside `PWMTimer`. So the suite alone
+proves "if the harness inverts, the pin is low".
 
-That remains open and needs a meter on J1_31 / J1_36 / J1_99 / J1_100 with the
-motors unplugged. See the note in `flight-on-fpga.md`. Until then, treat a
-freshly configured drone shell as capable of driving the motor pins.
+**It does invert -- confirmed separately.** The generated pre-synthesis Verilog
+states it outright:
+
+```console
+$ grep 'assign motor' gen-collateral/Arty200THarness.sv
+assign motor1 = ~_chiptop0_pwm_0_gpio_1;
+assign motor2 = ~_chiptop0_pwm_0_gpio_2;
+assign motor3 = ~_chiptop0_pwm_0_gpio_3;
+assign motor4 = ~_chiptop0_pwm_1_gpio_1;
+```
+
+4/4 inverted in `RocketArty200TDroneFullDDRConfig`, `...DmaConfig` and
+`RocketArty200TMotorSpadConfig`, with no uninverted motor assignment in any
+elaborated config. Together with the raw comparator sitting 100% high at reset,
+**the motor pins are driven low from configuration.**
+
+> Read `gen-collateral/*.sv` for questions like this, **not** `obj/*.v`.
+> Synthesis folds the inverter into a LUT along with the comparator logic, so
+> the post-synthesis netlist cannot be read directly for intent -- an earlier
+> attempt to do exactly that (`LUT4 INIT=16'h6A55`) reached the opposite,
+> wrong conclusion.

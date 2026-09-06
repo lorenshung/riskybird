@@ -461,5 +461,10 @@ Both env vars must be on the `rb debug` line — it rebuilds.
 - **The IMU remap is inherited from the ESP and unverified here** — that is what Phase 1a is for.
 - **Phase 3 (wireless) has no code yet.** Rocket runs the flight controller and the ESP has to
   become a UART-attached modem; the ESP-side firmware and the framing protocol do not exist.
-- **The motor-pin idle level is still unmeasured** (`pwmcfg=0xf0000000` at reset). Settle it with
-  a meter before Phase 4.
+- **The motor-pin idle level is resolved: the pins idle LOW.** `pwmcfg=0xf0000000`
+  at reset means the raw comparators are all asserted, but every motor output is
+  inverted in the generated Verilog (`assign motorN = ~_chiptop0_pwm_*_gpio_*`,
+  4/4 in every motor-bearing config), so the pins are driven low from
+  configuration. See `motor-pwm-bringup.md`. Note this does **not** explain the
+  two motors that spun on 2026-09-04; that cause is still unknown, so keep
+  propellers off regardless.
