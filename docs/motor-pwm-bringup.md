@@ -155,7 +155,7 @@ positions, the comparator stride, the `pwminvert` bits, which comparator is
 which motor, and which pin each one reaches.
 
 ```console
-$ python3 -m unittest tests.test_pwm -q
+$ python3 -m unittest tests.test_pwm -q     # needs setup.md step 2 first
 Ran 22 tests in 2.7s
 
 OK

@@ -1,5 +1,18 @@
 # Verification record — 2026-07-24 through 2026-07-26
 
+> **Running the suite.** `python3 -m unittest discover -s tests` needs the
+> backends installed -- it exercises environment construction, the board and
+> workload registries, and the Chipyard hook, all of which resolve real paths.
+> On a bare checkout most of it fails for that reason alone; run it after
+> setup.md step 2, and after step 4 for the Chipyard-dependent modules.
+>
+> On the `setup` branch, with both backends present, `test_rb`, `test_soc`,
+> `test_timing`, `test_pwm`, `test_dse` and `test_rose` pass. `test_xpurt` and
+> `test_area` need profile data and Vivado reports that live on `main`, and one
+> `test_fingerprint` case wants a FireSim descriptor that is not carried here.
+> The counts quoted on this page were measured on `main`.
+
+
 The 2026-07-24 sections retain the original OSPI-only evidence. The
 2026-07-25 section records the expanded ESP and DroneLogic workload contract.
 

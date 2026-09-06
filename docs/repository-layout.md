@@ -1,5 +1,13 @@
 # Repository layout and flow boundaries
 
+> **Scope note for the `setup` branch.** This page describes the full
+> repository. The `setup` branch carries the supported surface only, so several
+> directories it names -- `benchmarks/`, `dse/`, `experiments/`, and the
+> `backends/RoSE` and `backends/XPU-RT` submodules -- are on `main` and not
+> here. The Chipyard, Zephyr, workload, hardware and tooling layout below is
+> accurate for both.
+
+
 ```text
 riskybird-dev/
 ├── rb                         single user entry point
