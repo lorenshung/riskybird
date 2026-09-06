@@ -693,6 +693,13 @@ backends/chipyard/fpga/generated-src/<generated-name>/obj/<Harness>.bit
 
 which is exactly where `rb program` looks first.
 
+> **Verified** 2026-09-06 by building `RocketArty200TDroneFullDDRDmaConfig` --
+> a config that had never been synthesised, so nothing could no-op -- exactly as
+> written above. `write_bitstream completed successfully`, timing met
+> (`WNS=0.153  TNS=0.000  WHS=0.055  THS=0.000`), 9,730,764 bytes, which is the
+> fixed bitstream size for this part. Elapsed roughly an hour, dominated by
+> routing.
+
 > **A config that "fails" the contract check has still built.** `NoCores*Config`
 > elaborates cleanly and then reports *"elaborated successfully, but the
 > generated DTS is not a deployable RiskyBird target"* -- it has no cores and no
