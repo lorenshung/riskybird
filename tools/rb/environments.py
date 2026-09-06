@@ -32,7 +32,37 @@ def select_zephyr_prefix(envs_dir: Path = ZEPHYR_ENVS_DIR) -> Path:
 
 ZEPHYR_PREFIX = select_zephyr_prefix()
 ZEPHYR_BASE = ZEPHYR_BACKEND / "zephyr_ws" / "zephyr"
-ZEPHYR_SDK = ZEPHYR_BACKEND / "tools-manual" / "zephyr-sdk-1.0.0-beta1"
+# The version this project pins. Kept as the preferred name so a machine with
+# several SDKs installed picks the intended one.
+ZEPHYR_SDK_PINNED = "zephyr-sdk-1.0.0-beta1"
+
+
+def select_zephyr_sdk(manual: Path = ZEPHYR_BACKEND / "tools-manual") -> Path:
+    """Locate an installed Zephyr SDK, preferring the pinned version.
+
+    Hardcoding the version made the SDK path unreachable for anyone who had to
+    install a different one -- and on macOS that is everyone: the pinned
+    v1.0.0-beta1 release publishes a ZERO-BYTE macos-aarch64 tarball, so an
+    Apple Silicon host has to use v1.0.0 or later, which ships a real 83 MB
+    build. rb would then report the SDK missing while it sat right there.
+
+    Prefers the pinned name, else the newest zephyr-sdk-* directory present,
+    else returns the pinned path so `rb doctor` still reports what it expected.
+    """
+    pinned = manual / ZEPHYR_SDK_PINNED
+    if pinned.is_dir():
+        return pinned
+    if manual.is_dir():
+        found = sorted(
+            (d for d in manual.iterdir() if d.is_dir() and d.name.startswith("zephyr-sdk-")),
+            key=lambda d: d.name,
+        )
+        if found:
+            return found[-1]
+    return pinned
+
+
+ZEPHYR_SDK = select_zephyr_sdk()
 def select_host_sysroot(sdk: Path = ZEPHYR_SDK) -> Path:
     """Locate the SDK's host-tools sysroot for THIS machine.
 
