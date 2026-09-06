@@ -1,0 +1,13 @@
+out/
+target/
+generated/
+.claude/
+*.sv
+*.fir
+*.anno.json
+.idea/
+.bsp/
+.metals/
+.bloop/
+*.vcd
+*.fst

@@ -8,3 +8,6 @@ __pycache__/
 
 # Zephyr/CMake build trees, one per target+workload+mode.
 build/
+
+# mill build output for hardware/ospi
+hardware/ospi/out/
