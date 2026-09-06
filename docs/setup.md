@@ -701,6 +701,13 @@ resolve a specific shell on a machine that never built it.
 Commit and push those two directories to their side repositories, and a Mac
 picks them up through steps 2d and 3c.
 
+**Verified**: cloning both published side repositories and pointing `RB_DTS_DIR`
+and `RB_BITSTREAM_DIR` at them, with no Chipyard installed, `rb build` produced
+a correct ELF for `RocketArty200TDroneFullDDRConfig` -- the 1 GB memory region
+proves it read the published devicetree -- and `rb` resolved the published
+bitstream for `rb program`. That is the whole cross-machine path, exercised on
+Linux; only macOS itself is untested.
+
 Only *synthesised* configs produce bitstreams. A config that was elaborated but
 never built appears in the DTS collection and not the bitstream one -- which is
 precisely the situation step 3c warns about for `arty200t`'s default config.
