@@ -1,0 +1,11 @@
+# arty200t / RocketArty200TDroneDDRConfig / TE0712 drone carrier, J1 ribbon
+# 2026-09-03T20:27:39-07:00  loaded over JTAG (7-1.1), console on ttyUSB6 @115200
+# built RB_EXTRA_CFLAGS=-DDDR_STRESS_MIB=960; gdb compare-sections: 12 matched, 0 mismatched
+
+DDR stress: 960 MiB at 0x82000000, 125829120 x 64-bit words
+  address-in-address      54352 ms  37041 KB/s (rw)  errors: 0
+  0x55/0xAA alternating   74661 ms  26965 KB/s (rw)  errors: 0
+  inverted address        62372 ms  32278 KB/s (rw)  errors: 0
+  LFSR pseudorandom      107553 ms  18718 KB/s (rw)  errors: 0
+
+DDR stress PASSED -- 0 total errors over 960 MiB x 4 passes

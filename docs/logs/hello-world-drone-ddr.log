@@ -1,0 +1,47 @@
+# arty200t / RocketArty200TDroneDDRConfig / TE0712 drone carrier, J1 ribbon
+# 2026-09-03T20:10:42-07:00  loaded over JTAG (7-1.1), console on ttyUSB6 @115200
+# first program run out of DDR3 on this carrier; 12 sections matched
+hello world from RiskyBird
+board   chipyard_riscv64
+arch    riscv, 64-bit
+tick 0  uptime 6 ms
+tick 1  uptime 259 ms
+tick 2  uptime 511 ms
+tick 3  uptime 763 ms
+tick 4  uptime 1015 ms
+tick 5  uptime 1267 ms
+tick 6  uptime 1519 ms
+tick 7  uptime 1771 ms
+tick 8  uptime 2023 ms
+tick 9  uptime 2275 ms
+tick 10  uptime 2527 ms
+tick 11  uptime 2779 ms
+tick 12  uptime 3031 ms
+tick 13  uptime 3283 ms
+tick 14  uptime 3535 ms
+tick 15  uptime 3787 ms
+tick 16  uptime 4039 ms
+tick 17  uptime 4291 ms
+tick 18  uptime 4543 ms
+tick 19  uptime 4795 ms
+tick 20  uptime 5047 ms
+tick 21  uptime 5299 ms
+tick 22  uptime 5551 ms
+tick 23  uptime 5803 ms
+tick 24  uptime 6055 ms
+tick 25  uptime 6307 ms
+tick 26  uptime 6559 ms
+tick 27  uptime 6811 ms
+tick 28  uptime 7063 ms
+tick 29  uptime 7315 ms
+tick 30  uptime 7567 ms
+tick 31  uptime 7819 ms
+tick 32  uptime 8071 ms
+tick 33  uptime 8323 ms
+tick 34  uptime 8575 ms
+tick 35  uptime 8827 ms
+tick 36  uptime 9079 ms
+tick 37  uptime 9331 ms
+tick 38  uptime 9583 ms
+tick 39  uptime 9835 ms
+hello world complete after 40 ticks
