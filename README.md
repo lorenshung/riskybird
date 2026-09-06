@@ -47,7 +47,7 @@ side needs the other's toolchain.
 | [`motor-pwm-bringup.md`](docs/motor-pwm-bringup.md) | motor PWM |
 | [`flight-on-fpga.md`](docs/flight-on-fpga.md) | porting the flight controller onto Rocket; phase plan and what is verified |
 | [`te0712-ftdi-carrier-ddr-bringup.md`](docs/te0712-ftdi-carrier-ddr-bringup.md) | the same DDR3 work on the FTDI carrier |
-| [`verification.md`](docs/verification.md) | what "verified" means here |
+| [`verification.md`](docs/verification.md) | what "verified" means here, and which tests pass where |
 | [`repository-layout.md`](docs/repository-layout.md) | orientation |
 
 Docs distinguish **verified** (run here, output quoted) from **recorded**,

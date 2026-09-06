@@ -77,37 +77,55 @@ reading.
 > command fails. (`lorenshung/zephyr-chipyard-sw`, fetched in step 2a, is public
 > and uses HTTPS.)
 
-### Put `rb` on your PATH
+### Set up your shell
 
 **Do this now.** Every command on this page from here on is written as `rb`, so
-without this they fail with `rb: command not found` -- and this page is meant to
-be copy-pasted.
+without it they fail with `rb: command not found`.
 
 ```console
-export PATH="$PWD:$PATH"
+source ./rb-env.sh
 ```
 
-Confirm it took, before anything depends on it:
+That is the whole of it. `rb-env.sh` applies everything this page would
+otherwise ask you to export one at a time, is safe to source repeatedly, sets
+nothing you have already set, and warns you about both of step 2's environment
+hazards before you meet them:
+
+```console
+$ source ./rb-env.sh
+rb-env: cmake resolves to /ecad/tools/xilinx/Vitis/2023.1/tps/lnx64/cmake-3.3.2/bin/cmake
+rb-env: that one is likely broken; putting /usr/bin first
+rb-env: conda environment 'base' is active.
+rb-env: run 'conda deactivate' before setup.md step 2b.
+rb-env: rb on PATH
+```
+
+Confirm it took:
 
 ```console
 $ rb --version
 rb 0.1.0
 ```
 
-If that says `rb: command not found`, the export did not apply to this shell --
-re-run it from the repository root. Put the same line in your shell profile so
-later sessions have it too.
+**Source it in every shell that runs `rb`** -- including each command if you are
+driving this from a script, a Makefile, CI or an agent, since those get a fresh
+environment every time. For an interactive shell you can put it in your profile
+instead.
 
-`./rb` also works, but only when your working directory is the repository root.
+<details><summary>Doing it by hand instead</summary>
 
-> **Driving this from a script, a Makefile, CI or an agent?** Those get a fresh
-> environment for every command, so "export it once and put it in your shell
-> profile" does not apply. Source `rb-env.sh` at the top of each invocation
-> instead -- it applies everything this page tells you to export, is safe to
-> source repeatedly, and warns about the two environment hazards in step 2:
-> ```console
-> source ./rb-env.sh
-> ```
+Everything `rb-env.sh` does is a few exports, if you would rather see them:
+
+```console
+export PATH="$PWD:$PATH"                 # rb itself
+export RB_DTS_DIR=~/riskybird-dts        # step 2d, once you have it
+export RB_BITSTREAM_DIR=~/riskybird-bitstreams   # step 3c, once you have it
+```
+
+plus the `PATH=/usr/bin:$PATH` cmake fix and the `conda deactivate` in step 2.
+`./rb` also works in place of `rb`, but only from the repository root.
+
+</details>
 
 **Do not use `--recursive`.** The backends carry their own nested submodules -- recursing pulls
 several gigabytes, including three separate copies of Chipyard, none of which the bench tier
@@ -691,6 +709,19 @@ exit.
 Console output appears on channel B of the *debug* adapter, so one cable carries
 both JTAG and the console.
 
+### Checking the tooling itself
+
+Optional, and it needs step 2 finished -- the suite resolves real backend paths:
+
+```console
+python3 -m unittest discover -s tests
+```
+
+Some modules are expected to fail on this branch: `test_xpurt` and `test_area`
+want profile data and Vivado reports carried on `main`, and one
+`test_fingerprint` case wants a FireSim descriptor. `verification.md` lists
+exactly which pass where -- check there before treating a failure as yours.
+
 ### Where to go next
 
 The install is done; these are the pages that use it.
@@ -741,7 +772,7 @@ Measured on the machine these figures come from:
 | --- | --- |
 | `backends/chipyard` after 4b, before any build | **~11 GB** (of which ~6 GB is its conda environment) |
 | each config you **elaborate** | ~45 MB under `fpga/generated-src/` |
-| each config you **build** | ~425 MB under `fpga/generated-src/` |
+| each config you **build** | ~450-650 MB under `fpga/generated-src/`, depending on the design |
 
 So budget ~11 GB for the silicon tier on top of step 2's ~16 GB, and expect
 `generated-src/` to grow with every config you touch -- it is a per-config
@@ -763,7 +794,12 @@ after 4b `rb doctor` can reach a fully-`ok` scorecard and exit 0. Check it:
 $ rb env status
 chipyard  ok      .../backends/chipyard/.conda-env
 zephyr    ok      .../tools/miniforge3/envs/zephyr
+rose      MISSING .../.rb/envs/rose
 ```
+
+`rose` is the experimental co-simulation environment and stays `MISSING` unless
+you want it. Wait for 4b to exit before trusting this: it is a probe of the
+prefix, not of whether the install finished.
 
 ### 4c. Vivado
 
@@ -797,7 +833,13 @@ in Vivado, so do it first on a config you have not built before:
 rb chipyard elaborate --board arty200t --config RocketArty200TDroneFullDDRConfig
 ```
 
-It writes the `.dts` that step 2d distributes. Then the bitstream:
+It writes the `.dts` that step 2d distributes.
+
+> A successful elaboration prints
+> `make: [common.mk:283 ...top.mems.conf] Error 1 (ignored)`. That line is
+> expected -- the `(ignored)` is the point -- and does not mean the run failed.
+
+Then the bitstream:
 
 ```console
 rb chipyard build --board arty200t --config RocketArty200TDroneFullDDRConfig

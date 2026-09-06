@@ -25,7 +25,7 @@ riskybird-dev/
 │   └── fpga-configs/          reference archive of imported area work
 ├── dse/                       FPGA design-space exploration: docs, descriptors, scripts
 ├── integration/               stable contracts between workloads and backend drivers
-├── tests/                     host-only unit tests, no backend environment needed
+├── `tests/` unit tests for the tooling. They resolve real backend paths, so most of the suite needs the backends installed -- see `verification.md` for which modules pass where.
 ├── hardware/
 │   ├── zephyr/                target wiring, DTS bindings, and FPGA Kconfig
 │   ├── openocd/               FT-LINK and one-hart Rocket debug targets

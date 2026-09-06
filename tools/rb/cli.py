@@ -485,7 +485,10 @@ def cmd_env(args: argparse.Namespace) -> int:
             ("zephyr", ZEPHYR_PREFIX),
             ("rose", rose.ROSE_ENV),
         ):
-            print(f"{name:9} {_yes_no(prefix.is_dir()):7} {prefix}")
+            # `bin` rather than bare existence: 4b creates the prefix early and
+            # populates it for minutes afterwards, so is_dir() reported ok on a
+            # half-finished install. Same fix the doctor table carries.
+            print(f"{name:9} {_yes_no(_populated(prefix, 'bin')):7} {prefix}")
         return 0
 
     if args.env_action == "shell":
@@ -632,10 +635,23 @@ def openfpgaloader_probe_selector(location: str) -> list[str]:
 def program_fpga(board: Board, tool: str = "auto", usb_location: str = "") -> None:
     bitstream = board.bitstream
     if not bitstream.is_file():
+        # Mirror the missing-DTS error: name BOTH places that were searched and
+        # BOTH ways to satisfy them. Telling a bench-tier host to run
+        # `rb chipyard build` is telling it to do the one thing it cannot --
+        # Vivado has no macOS release, and that host is expected to consume a
+        # bitstream built elsewhere.
         raise RbError(
-            f"bitstream is missing: {bitstream}\n"
-            f"Run: rb chipyard build --board {board.name} "
-            f"--config {board.config}"
+            f"no bitstream for {board.name} ({board.config})\n"
+            f"  looked in: {board.generated_dir / 'obj' / (board.harness + '.bit')}\n"
+            f"  and:       {board.collected_bitstream}\n"
+            "Either build it here (needs Chipyard and Vivado, Linux only):\n"
+            f"  rb chipyard build --board {board.name} --config {board.config}\n"
+            "or collect one from a machine that has: a bitstream is a plain "
+            "file, so programming a\nboard needs it but not the toolchain that "
+            "produced it. Point RB_BITSTREAM_DIR at a\ndirectory laid out as "
+            "<board>/<board>.<Config>.bit.\n"
+            "Note a config can be elaborated without being synthesised; only a "
+            "synthesised one\nhas a bitstream."
         )
     selected = tool
     if selected == "auto":
