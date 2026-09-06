@@ -1,0 +1,44 @@
+/* Five VL53L5CX devices on the shared FPGA I2C bus, at their reassigned addresses. */
+
+&i2c0 {
+	vl53l5cx0: distance-sensor@31 {
+		compatible = "st,vl53l5cx";
+		reg = <0x31>;
+		status = "okay";
+	};
+
+	vl53l5cx1: distance-sensor@32 {
+		compatible = "st,vl53l5cx";
+		reg = <0x32>;
+		status = "okay";
+	};
+
+	vl53l5cx2: distance-sensor@33 {
+		compatible = "st,vl53l5cx";
+		reg = <0x33>;
+		status = "okay";
+	};
+
+	vl53l5cx3: distance-sensor@34 {
+		compatible = "st,vl53l5cx";
+		reg = <0x34>;
+		status = "okay";
+	};
+
+	/* The fifth sensor is wired straight to the bus with no XSHUT line. */
+	vl53l5cx4: distance-sensor@35 {
+		compatible = "st,vl53l5cx";
+		reg = <0x35>;
+		status = "okay";
+	};
+};
+
+/ {
+	aliases {
+		tof0 = &vl53l5cx0;
+		tof1 = &vl53l5cx1;
+		tof2 = &vl53l5cx2;
+		tof3 = &vl53l5cx3;
+		tof4 = &vl53l5cx4;
+	};
+};

@@ -1,0 +1,9 @@
+# Backends are initialised per tier, never with --recursive: each carries its
+# own nested submodules, and recursing pulls several gigabytes including three
+# separate copies of Chipyard. Initialise only what the tier you want needs.
+#
+#   bench tier    git submodule update --init backends/zephyr-chipyard-sw
+#   silicon tier  ... plus backends/chipyard   (Linux only; needs Vivado)
+[submodule "backends/zephyr-chipyard-sw"]
+	path = backends/zephyr-chipyard-sw
+	url = https://github.com/lorenshung/zephyr-chipyard-sw.git

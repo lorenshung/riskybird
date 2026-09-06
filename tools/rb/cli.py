@@ -211,8 +211,16 @@ def validate_hardware_contract(
     if not path.is_file():
         if require_dts:
             raise RbError(
-                f"Chipyard DTS is missing for {board.name}: {path}\n"
-                f"Run: rb chipyard elaborate --board {board.name}"
+                f"elaborated DTS is missing for {board.name} "
+                f"({board.config})\n"
+                f"  looked in: {path}\n"
+                f"  and:       {board.collected_dts}\n"
+                "Either elaborate it here (needs Chipyard and a Linux host):\n"
+                f"  rb chipyard elaborate --board {board.name}\n"
+                "or collect one from a machine that has: the DTS is a plain "
+                "file, so building a\nworkload needs it but not the toolchain "
+                "that produced it. Point RB_DTS_DIR at a\ndirectory laid out "
+                "as <board>/<board>.<Config>.dts."
             )
         return ["generated DTS not present"]
 

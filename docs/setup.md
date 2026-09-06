@@ -129,6 +129,101 @@ You can skip this until you have hardware attached.
 
 ---
 
-## Step 2 -- (not written yet)
+## Step 2 -- the Zephyr backend, ending in a built ELF
 
-The Zephyr backend and SDK, ending in a built `hello_world` ELF.
+Adds the toolchain. After this step `rb build` produces a real ELF, with no FPGA
+attached and -- on the bench tier -- no Chipyard installed.
+
+### 2a. Initialise only the backend you need
+
+```console
+git submodule update --init backends/zephyr-chipyard-sw
+```
+
+Again, **not `--recursive`**. The backend initialises its own nested submodules
+during its setup; recursing here pulls a large set it deliberately skips.
+
+The bench tier does not initialise `backends/chipyard` at all. An uninitialised
+submodule is just an empty directory -- nothing is deleted and nothing is
+special-cased.
+
+### 2b. Install the toolchain
+
+Follow the backend's own README, which owns this process. The SDK installer
+picks the right prebuilt tarball for your host automatically:
+
+```console
+cd backends/zephyr-chipyard-sw
+./scripts/install_toolchain_sdk.sh
+```
+
+| host | tarball |
+| --- | --- |
+| Linux x86_64 | `zephyr-sdk-1.0.0-beta1_linux-x86_64_minimal.tar.xz` |
+| **macOS Apple Silicon** | `zephyr-sdk-1.0.0-beta1_macos-aarch64_minimal.tar.xz` |
+| macOS Intel | `zephyr-sdk-1.0.0-beta1_macos-x86_64_minimal.tar.xz` |
+
+Set `RB_SDK_HOST` to override for a host the installer does not know. Getting
+this wrong is worth avoiding: the Linux tarball extracts perfectly well on
+macOS and then every tool fails with *"bad CPU type in executable"*, which reads
+like a corrupt download rather than the wrong package.
+
+`rb` finds the SDK's host tools by looking inside the SDK, so no path needs
+editing after this.
+
+### 2c. Supply an elaborated devicetree
+
+**This is the step that lets a Mac build at all**, and it has no equivalent in a
+Linux silicon-tier install.
+
+`rb` reads the elaborated DTS to derive a shell's PLIC sources, the periphery it
+carries and its memory map. Chipyard produces that file -- but consulting it
+needs only the file, not the toolchain. So a host that cannot elaborate can use
+one collected from a host that can:
+
+```console
+git clone git@github.com:lorenshung/dts.git ~/riskybird-dts
+export RB_DTS_DIR=~/riskybird-dts
+```
+
+The layout matches the bitstream and ELF side-repositories:
+`<board>/<board>.<Config>.dts`. `rb` prefers a local Chipyard elaboration when
+one exists, so on a machine with Chipyard this is ignored entirely.
+
+Regenerate it from a machine that has Chipyard with `tools/collect-dts.py`.
+
+### Verify
+
+`rb doctor` should now report the Zephyr lines `ok` and the hardware contracts
+resolved. The contract lines are the ones that prove step 2c worked -- they are
+read out of the DTS:
+
+```console
+$ rb doctor
+Zephyr backend    ok      .../backends/zephyr-chipyard-sw
+Zephyr SDK        ok      .../tools-manual/zephyr-sdk-1.0.0-beta1
+RISC-V compiler   ok      .../riscv64-zephyr-elf-gcc
+hardware contracts
+  arty200t     ok      config RocketArty200TOspiConfig, RAM 0x80000000+0x40000000, UART 0x10020000 irq 2, I2C 0x10040000 irq 1
+```
+
+Chipyard and Vivado stay `MISSING` on the bench tier. That is correct.
+
+Then build something:
+
+```console
+$ rb build hello_world --target arty200t --config RocketArty200TDroneFullDDRConfig
+...
+Memory region         Used Size  Region Size  %age Used
+             RAM:       19424 B         1 GB      0.00%
+```
+
+An ELF at `build/zephyr/arty200t/hello_world/default/zephyr/zephyr.elf` is the
+end of step 2. Nothing so far has needed hardware.
+
+---
+
+## Step 3 -- (not written yet)
+
+Programming the FPGA and opening a console: openFPGALoader, OpenOCD, and the
+FTDI adapters.

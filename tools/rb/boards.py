@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -80,7 +81,35 @@ class Board:
 
     @property
     def generated_dts(self) -> Path:
-        return self.generated_dir / f"{self.generated_name}.dts"
+        """The elaborated devicetree for this board+config.
+
+        Chipyard's own output is the source of truth, but building a workload
+        does not require Chipyard -- only the DTS it produced. `rb` reads it to
+        derive PLIC sources, the periphery a shell elaborated, and the memory
+        map, none of which need a toolchain to consult.
+
+        That distinction is what lets the bench tier exist at all: Vivado has no
+        macOS release, so a Mac cannot elaborate, but it can build workloads and
+        program the board against a DTS collected elsewhere. Prefer the local
+        Chipyard output when it is present, otherwise fall back to a plain
+        directory of collected DTS files laid out like the bitstream and ELF
+        side-repositories -- <board>/<board>.<Config>.dts.
+
+        Set RB_DTS_DIR to point that fallback somewhere other than <root>/dts.
+        """
+        generated = self.generated_dir / f"{self.generated_name}.dts"
+        if generated.is_file():
+            return generated
+        collected = self.collected_dts
+        if collected.is_file():
+            return collected
+        return generated
+
+    @property
+    def collected_dts(self) -> Path:
+        """Where a DTS collected from another machine is looked for."""
+        root = Path(os.environ.get("RB_DTS_DIR", ROOT / "dts"))
+        return root / self.name / f"{self.name}.{self.config}.dts"
 
     @property
     def bitstream(self) -> Path:
