@@ -591,6 +591,52 @@ rb program --board arty200t --config <Config> --usb-location <bitstream-location
 rb console --port /dev/ttyUSB5 --baudrate 115200
 ```
 
+### The hardware acceptance check
+
+Everything above can be verified with no board. This is the sequence that closes
+the remaining gap, in order, each step meaningful on its own. Run it the first
+time a board is attached.
+
+```console
+# 0. Which adapter is which. Locations change on every replug -- read, don't remember.
+rb probe-ftdi --idcode
+#    expect: one 0x13636093 (xc7a200t config TAP -> bitstream link)
+#            one 0x00000001 (Rocket debug TAP -> ELF + console). All-ones before
+#            the part is configured is correct, not a fault.
+
+# 1. Does the shell configure at all? The single most diagnostic read on this board.
+rb program --board arty200t --config RocketArty200TDroneFullDDRConfig \
+    --usb-location <bitstream-loc>
+#    If a MIG shell stalls, read the config STATUS register before suspecting
+#    the cable: EOS=0 is an input-voltage problem. See
+#    te0712-drone-carrier-ddr-bringup.md.
+
+# 2. Does anything run? hello_world touches only the console, so it separates
+#    "the board is alive" from "my workload is wrong".
+rb debug hello_world --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --program --program-usb-location <bitstream-loc> --usb-location <debug-loc>
+#    expect on the console: "hello world from RiskyBird", then ticks 250 ms apart.
+
+# 3. Is the DDR3 real? Only this proves the MIG, not just that it configured.
+rb debug ddr_stress --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --program --program-usb-location <bitstream-loc> --usb-location <debug-loc>
+
+# 4. Are the sensors alive?
+rb debug sensor_check --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --program --program-usb-location <bitstream-loc> --usb-location <debug-loc>
+
+# 5. Take a picture -- the end-to-end proof that a workload drives real hardware.
+rb debug camera_photo --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --program --program-usb-location <bitstream-loc> --usb-location <debug-loc> \
+    --gdb-script hardware/ospi/capture-frame.gdb
+#    writes camera-frame.png next to you. See hm01b0-camera-bringup.md.
+```
+
+Steps 0-5 need **no battery and no propellers**. Anything that drives a motor
+does: see `motor-pwm-bringup.md` and `flight-on-fpga.md`, and note that the full
+drone shell drives the motor pins from configuration onward, before any code
+runs.
+
 > **Status of this section: recorded, not verified.** Tool discovery, bitstream
 > resolution and adapter probing have been exercised on this checkout. The
 > `rb program` and `rb console` commands are transcribed from a working bench
