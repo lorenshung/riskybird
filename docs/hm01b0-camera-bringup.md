@@ -471,6 +471,39 @@ satisfied and every further pixel is surplus -- the flag describes data nobody
 wanted, not data that was lost. It is only fatal when the drained count also
 came up short.
 
+### The capture core is verified in simulation
+
+The RTL behind all of this has its own test suite, and it needs no hardware:
+
+```console
+$ cd hardware/ospi && ./mill ospi.test
+Total number of tests run: 26
+Suites: completed 6, aborted 0
+Tests: succeeded 26, failed 0, canceled 0, ignored 0, pending 0
+```
+
+Roughly nine seconds. It covers pixel ordering and the SOF/EOL/EOF markers,
+non-square geometry and how it is reported, sticky overflow when the consumer
+stalls and clearing it afterwards, back-to-back frames emitting exactly one EOF
+and re-arming, frame counting while disabled, and the frame buffer's
+backpressure and flush.
+
+**And the tests cover the RTL that actually ships.** The capture core exists
+twice -- this standalone mill project and a copy inside the Chipyard fork, which
+is the one that elaborates into a bitstream. All six files are byte-identical
+(`CaptureFrontend`, `CapturePort`, `FrameBuffer`, `HM01B0Capture`, `Params`,
+`AsyncFifo`), so a green suite here is a statement about the shipped design.
+Two copies can drift, though, so re-check that before trusting the suite after
+either side changes:
+
+```console
+diff -r hardware/ospi/src/ospi \
+        backends/chipyard/generators/chipyard/src/main/scala/ospi
+```
+
+So if a capture misbehaves on hardware, the core's logic is not the first thing
+to suspect -- look at MCLK, the DVP wiring and the sensor's configuration.
+
 ### If a capture comes back empty
 
 Run it again before concluding anything. Captures on this bench are
