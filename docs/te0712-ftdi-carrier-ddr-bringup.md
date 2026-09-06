@@ -45,7 +45,7 @@ configs pass `false`. That drops the client and its binder together.
 
 The consequence is that **`rb load` does not work on these bitstreams.** It
 drives `pyuartsi` over the TSI port, which is not present. Programs go in over
-JTAG instead, which is the same choice `docs/ku040-ftdi-bringup.md` records for
+JTAG instead, which is the same choice the KU040 bring-up notes on `main` record for
 the KU040, where the UART-TSI pins are likewise not wired to anything.
 
 ## Pins
@@ -333,7 +333,7 @@ Identical rule-for-rule and count-for-count on both parts.
 | 4 | `BUFC-1` | Input buffer connections in the MIG. |
 | 1 | `IOSR-1` | IOB set/reset sharing. |
 | 1 | `REQP-1709` | Clock output buffering. |
-| 1 | `CFGBVS-1` | Neither `CFGBVS` nor `CONFIG_VOLTAGE` is set on the design. The block that would set them is **commented out** in `fpga/fpga-shells/xilinx/arty_a7_100/constraints/arty-config.xdc`, so this is inherited from the shell, not introduced here. It affects bank 0 I/O voltage support only. Also unresolved on the KU040; see `docs/ku040-ftdi-bringup.md`. |
+| 1 | `CFGBVS-1` | Neither `CFGBVS` nor `CONFIG_VOLTAGE` is set on the design. The block that would set them is **commented out** in `fpga/fpga-shells/xilinx/arty_a7_100/constraints/arty-config.xdc`, so this is inherited from the shell, not introduced here. It affects bank 0 I/O voltage support only. Also unresolved on the KU040; see the KU040 bring-up notes on `main`. |
 ## Measured on hardware
 
 **The DDR3 works.** `RocketArty200TFtdiDDRConfig` was run on the 200T module on

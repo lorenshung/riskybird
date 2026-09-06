@@ -33,7 +33,8 @@ The flight stack (`samples/rose_flight_controller`, 4,522 lines):
 | Logging | on-board flash ring buffer, dumped as CSV over USB |
 | Telemetry | WiFi SoftAP + UDP unicast, ~50 Hz, laptop/mobile ground station |
 
-`docs/FLIGHT_BUILD.md` in that sample records the exact flight build. Two things in it matter
+`backends/zephyr-chipyard-sw/samples/rose_flight_controller/docs/FLIGHT_BUILD.md`
+(inside the sample, not this repository's `docs/`) records the exact flight build. Two things in it matter
 more than the rest:
 
 - **`ROSE_AUTOFLIGHT` and `ROSE_FLIGHTLOG` are not CMake knobs.** Passing them as bare `-D`
@@ -84,7 +85,7 @@ part of the stack here. Ask the branch author to push that commit.
 
 ### Unit hazard, carried forward
 
-`docs/rose-flight-controller.md` records that upstream changed VL53L1X `SENSOR_CHAN_DISTANCE`
+The RoSE integration notes on `main` record that upstream changed VL53L1X `SENSOR_CHAN_DISTANCE`
 from millimetres to **metres**, and their own commit `f515f2f8682` fixes a VL53L5CX print that
 assumed the opposite. Any new consumer must state its unit assumption explicitly.
 
