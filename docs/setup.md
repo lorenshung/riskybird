@@ -559,6 +559,31 @@ rb console --port /dev/ttyUSB5 --baudrate 115200
 > and have **not** been re-run here, because no board was attached when this was
 > written. Steps 1 and 2 have been run from a clean clone; step 3 has not.
 
+
+### Where to go next
+
+The install is done; these are the pages that use it.
+
+| Want to | Read |
+| --- | --- |
+| Make first contact with the drone bench | [`drone-initial-bringup.md`](drone-initial-bringup.md) -- adapters, console, and what a dead JTAG link actually looks like |
+| Understand a board that will not configure | [`te0712-drone-carrier-ddr-bringup.md`](te0712-drone-carrier-ddr-bringup.md) -- **read this before concluding a board is broken** |
+| Take a picture | [`hm01b0-camera-bringup.md`](hm01b0-camera-bringup.md) |
+| Drive motors | [`motor-pwm-bringup.md`](motor-pwm-bringup.md) -- propellers off, battery connected |
+| Run the flight controller | [`flight-on-fpga.md`](flight-on-fpga.md) |
+
+Two things that will otherwise cost you a bench session:
+
+- **A MIG shell that stalls at `EOS=0` is usually an input-voltage problem, not
+  a broken board or a broken cable.** The DDR3 rails need headroom above 3.3 V.
+  The DDR page has the measurements.
+- **Motors are powered from the battery, not from USB-C.** A motor test on USB
+  alone does nothing useful, and the full drone shell drives the motor pins from
+  the moment it is configured -- before any code runs.
+
+Start with `hello_world`. It touches nothing but the console, so it separates
+"the board is alive" from "my workload is wrong".
+
 ---
 
 ## Step 4 -- build a bitstream (silicon tier, Linux only)
