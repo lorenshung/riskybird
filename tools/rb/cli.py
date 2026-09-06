@@ -559,8 +559,23 @@ def _configured_board(args: argparse.Namespace) -> Board:
 def cmd_chipyard(args: argparse.Namespace) -> int:
     board = _configured_board(args)
     if args.chipyard_action == "path":
+        # stdout stays the bare path so this remains scriptable, but a
+        # non-zero exit with an empty stderr is indistinguishable from a
+        # broken install -- the path printed is simply where the bitstream
+        # WOULD be. Say which of the two situations this is.
         print(board.bitstream)
-        return 0 if board.bitstream.is_file() else 1
+        if board.bitstream.is_file():
+            return 0
+        print(
+            f"note: no bitstream at that path for {board.config}.\n"
+            "      A config can be elaborated without being synthesised; only\n"
+            "      a synthesised one has a bitstream. Build it with:\n"
+            f"        rb chipyard build --board {board.name} "
+            f"--config {board.config}\n"
+            "      or supply one via RB_BITSTREAM_DIR / <root>/bitstreams.",
+            file=sys.stderr,
+        )
+        return 1
     if args.chipyard_action == "elaborate":
         chipyard_build(board, "verilog")
         ospi_config = "Ospi" in board.config
@@ -749,8 +764,21 @@ def zephyr_build(
                 f"{workload.name} mode {mode} requires at least "
                 f"{minimum_ram // 1024} KiB addressable RAM on FPGA targets; "
                 f"{board.name}/{board.config} currently exposes "
-                f"{available_ram // 1024} KiB. Use mode address or select "
-                "a configuration with external memory."
+                f"{available_ram // 1024} KiB.\n"
+                + (
+                    # Only suggest a mode this workload actually has. The
+                    # message used to name "address" unconditionally, which is
+                    # a mode of vl35l5cx_test and not of most workloads that
+                    # hit this check.
+                    f"Try a smaller mode ({', '.join(smaller)}) or select "
+                    "a configuration with external memory."
+                    if (smaller := [
+                        m for m in workload.modes
+                        if m != mode and workload.minimum_ram(m) <= available_ram
+                    ])
+                    else "Select a configuration with external memory: this "
+                    "workload has no mode that fits."
+                )
             )
         if (
             workload.name in DRONE_FPGA_WORKLOADS
