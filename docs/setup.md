@@ -159,13 +159,22 @@ west              MISSING
 RISC-V compiler   MISSING .../riscv64-zephyr-elf-gcc
 Espresso          MISSING
 Vivado            ok      /ecad/tools/xilinx/Vivado/2023.1/bin/vivado
-OpenOCD           MISSING .../hosttools/.../usr/bin/openocd
+OpenOCD           ok      /usr/bin/openocd
 GDB               MISSING .../riscv64-zephyr-elf-gdb
+Vivado version            vivado v2023.1 (64-bit)
+OpenOCD version           Open On-Chip Debugger 0.12.0
 hardware contracts
+  arty100t     pending generated DTS not present
   arty200t     pending generated DTS not present
+  ku040        pending generated DTS not present
 serial devices
   ...
 ```
+
+Two of those lines depend on your machine rather than on this step. `Vivado`
+and `OpenOCD` report `ok` if you happen to have them installed system-wide and
+`MISSING` if you do not; neither matters yet. The `version` lines print only for
+whatever was found.
 
 Each later step turns one of those lines green. What matters here is only that the command runs,
 prints your repository path, and does not raise.
@@ -219,11 +228,15 @@ attached and -- on the bench tier -- no Chipyard installed.
 downloads. The bulk lands in `backends/zephyr-chipyard-sw`: ~4 GB SDK, ~7 GB
 conda environment, ~3 GB Zephyr workspace.
 
+Steps 2d and 3c clone two further repositories into your **home** directory
+rather than the checkout -- about **285 MB**, nearly all of it bitstreams.
+
 ### Host prerequisites
 
 Both installers hard-require these, and neither checks usefully:
 
-- **`wget`**
+- **`wget`**, **`tar`**, **`git`** -- the installers check for these and stop if
+  any is missing.
 - **`cmake`** -- and it must be a *working* one. See the warning below.
 
 > **Check what `cmake` you have before starting:**
@@ -294,8 +307,12 @@ downstream.
 > ```console
 > source "$(dirname "$(dirname "$(command -v conda)")")/etc/profile.d/conda.sh"
 > ```
-> Check the path it reports: it should be
-> `backends/zephyr-chipyard-sw/tools/miniforge3`.
+> `command -v conda` will still point at *your* conda -- expected, and exactly
+> why the deactivate is needed. What matters is where 2b then installs: watch its
+> output for
+> `Installing Miniforge to .../backends/zephyr-chipyard-sw/tools/miniforge3`.
+> That directory does not exist until 2b creates it, so do not go looking for it
+> beforehand.
 
 ### 2c. Install the toolchain
 
@@ -321,13 +338,16 @@ rather than the wrong package.
 > **This step writes outside the checkout.** It registers the SDK in the
 > *user-global* `~/.cmake/packages/Zephyr-sdk/`, one file per SDK, named for the
 > md5 of that SDK's path. So a second checkout **adds** a second entry rather
-> than replacing the first, and the directory accumulates one per checkout you
-> ever install.
+> than replacing the first, and two live checkouts each keep their own.
+>
+> It does not grow without bound: CMake prunes entries whose target directory no
+> longer exists, on the next `find_package` that reads the registry. You need not
+> clean up after a deleted checkout.
 >
 > None of this affects `rb`, which passes `ZEPHYR_SDK_INSTALL_DIR` explicitly and
-> never consults the registry. It matters only if you run `west build` by hand
-> outside `rb`, where CMake may then have several registered SDKs to choose
-> between. Old entries pointing at deleted checkouts are safe to delete.
+> never consults the registry -- verified by building with `HOME` pointed at an
+> empty directory. It matters only if you run `west build` by hand outside `rb`,
+> where CMake may then have several registered SDKs to choose between.
 
 `rb` finds the SDK's host tools by looking inside the SDK, so no path needs
 editing afterwards.

@@ -101,21 +101,31 @@ class RbError(RuntimeError):
     """A concise, user-facing command failure."""
 
 
-def _populated(path: Path) -> bool:
-    """True when a directory exists AND has something in it.
+def _populated(path: Path, *markers: str) -> bool:
+    """True when a directory exists and looks actually installed.
 
-    Every path in the doctor table can exist while being empty, and each one
-    means "not installed" when it is: an uninitialised submodule, an
+    Every path in the doctor table can exist while not being usable, and each
+    one means "not installed" when it is: an uninitialised submodule, an
     interrupted conda install, a half-extracted SDK, a west module that was
     never fetched. Reporting those as ok is worse than reporting nothing,
     because the setup guide's checkpoints are exactly where someone looks to
     decide whether the previous step worked.
 
-    Checked as a group rather than per-path because this bug has now been fixed
-    one line at a time twice, each fix missing the next-nearest check.
+    A non-empty test is not enough, which is the trap this used to fall into: a
+    submodule init that is interrupted after writing its `.git` file and before
+    checking anything out leaves a directory with exactly one entry in it. So
+    callers name something the install is *supposed* to contain, and a directory
+    holding only debris fails.
+
+    Falls back to a non-empty test when no marker is given, for paths with no
+    single stable member.
     """
     try:
-        return path.is_dir() and any(path.iterdir())
+        if not path.is_dir():
+            return False
+        if markers:
+            return any((path / m).exists() for m in markers)
+        return any(path.iterdir())
     except OSError:
         return False
 
@@ -365,26 +375,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print(f"RiskyBird rb {__version__}")
     print(f"repository       {ROOT}")
     checks = (
-        ("Chipyard backend", _populated(CHIPYARD), CHIPYARD),
-        ("Chipyard env", _populated(CHIPYARD_PREFIX), CHIPYARD_PREFIX),
+        ("Chipyard backend", _populated(CHIPYARD, "build.sbt", "build-setup.sh"), CHIPYARD),
+        ("Chipyard env", _populated(CHIPYARD_PREFIX, "bin"), CHIPYARD_PREFIX),
         # Populated, not merely present -- same reason as Zephyr base below.
         # An uninitialised submodule leaves an EMPTY directory here, and
         # reporting that as ok contradicted the setup guide's own first
         # checkpoint on a clone where nothing was installed yet.
         (
             "Zephyr backend",
-            _populated(ZEPHYR_BACKEND),
+            _populated(ZEPHYR_BACKEND, "scripts"),
             ZEPHYR_BACKEND,
         ),
-        ("Zephyr env", _populated(ZEPHYR_PREFIX), ZEPHYR_PREFIX),
+        ("Zephyr env", _populated(ZEPHYR_PREFIX, "bin"), ZEPHYR_PREFIX),
         # Populated, not merely present. `git submodule update` and a failed
         # west workspace both leave an EMPTY directory here, and reporting that
         # as ok made the setup guide's own checkpoint pass on an install whose
         # very next command (rb build) could not run.
         ("Zephyr base", (ZEPHYR_BASE / "VERSION").is_file(), ZEPHYR_BASE),
-        ("Zephyr SDK", _populated(ZEPHYR_SDK), ZEPHYR_SDK),
-        ("Espressif HAL", _populated(ESPRESSIF_HAL), ESPRESSIF_HAL),
-        ("ST HAL", _populated(ST_HAL), ST_HAL),
+        ("Zephyr SDK", _populated(ZEPHYR_SDK, "cmake"), ZEPHYR_SDK),
+        ("Espressif HAL", _populated(ESPRESSIF_HAL, "components"), ESPRESSIF_HAL),
+        ("ST HAL", _populated(ST_HAL, "CMakeLists.txt", "sensor"), ST_HAL),
         ("west", executable("zephyr", "west") is not None, executable("zephyr", "west")),
         (
             "RISC-V compiler",
@@ -1452,7 +1462,9 @@ def cmd_probe_ftdi(args: argparse.Namespace) -> int:
     if not adapters:
         print("no FTDI devices attached")
         return 1
-    width = max(len(a["location"]) for a in adapters)
+    # Include the header, or a short location like "5-2" leaves the column
+    # narrower than the word LOCATION and every row shifts left of its heading.
+    width = max(len("LOCATION"), *(len(a["location"]) for a in adapters))
     print(f"{'LOCATION'.ljust(width)}  BUS:DEV  VID:PID    SERIAL        INTERFACES")
     for adapter in adapters:
         print(
