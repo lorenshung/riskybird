@@ -626,6 +626,18 @@ Everything above can be verified with no board. This is the sequence that closes
 the remaining gap, in order, each step meaningful on its own. Run it the first
 time a board is attached.
 
+All six in one command, stopping at the first failure:
+
+```console
+tools/bench/acceptance.sh <bitstream-loc> <debug-loc>
+```
+
+It prints what each step proved, or what its failure means, and leaves per-step
+logs under `.rb/acceptance/`. It has **not itself been run against hardware** --
+it was written from the sequence below while the bench was unavailable, so treat
+the first run as testing the script too. The steps individually, which is what
+it runs:
+
 ```console
 # 0. Which adapter is which. Locations change on every replug -- read, don't remember.
 rb probe-ftdi --idcode
