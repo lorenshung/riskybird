@@ -72,12 +72,28 @@ reading.
 > command fails. (`lorenshung/zephyr-chipyard-sw`, fetched in step 2a, is public
 > and uses HTTPS.)
 
-Every command below is written as `rb`. Run it as `./rb` from the repository
-root, or put the root on your `PATH` once:
+### Put `rb` on your PATH
+
+**Do this now.** Every command on this page from here on is written as `rb`, so
+without this they fail with `rb: command not found` -- and this page is meant to
+be copy-pasted.
 
 ```console
 export PATH="$PWD:$PATH"
 ```
+
+Confirm it took, before anything depends on it:
+
+```console
+$ rb --version
+rb 0.1.0
+```
+
+If that says `rb: command not found`, the export did not apply to this shell --
+re-run it from the repository root. Put the same line in your shell profile so
+later sessions have it too.
+
+`./rb` also works, but only when your working directory is the repository root.
 
 **Do not use `--recursive`.** The backends carry their own nested submodules -- recursing pulls
 several gigabytes, including three separate copies of Chipyard, none of which the bench tier
@@ -88,7 +104,7 @@ uses. Later steps initialise exactly the submodules they need.
 Three commands, no hardware and no toolchain required.
 
 ```console
-$ ./rb --help
+$ rb --help
 usage: rb [-h] [--version]
           {doctor,targets,workloads,env,chipyard,zephyr,build,flash,probe-ftdi,...}
 
@@ -96,7 +112,7 @@ One entry point for RiskyBird FPGA and Zephyr flows.
 ```
 
 ```console
-$ ./rb targets
+$ rb targets
 TARGET       KIND  ZEPHYR BOARD                                  EVIDENCE
 arty100t     fpga  chipyard_riscv64/rocketchip_virt_riscv64      generated and synthesized
   active SoC RAM: 1024 MiB; physical memory: not recorded; ...
@@ -110,7 +126,7 @@ ku040        fpga  chipyard_riscv64/rocketchip_virt_riscv64      generated and s
 Every row is followed by an indented detail line; they are elided above.
 
 ```console
-$ ./rb workloads
+$ rb workloads
 WORKLOAD          MODES          TARGETS                  STATUS/SAFETY
 hello_world       default        arty100t,arty200t,ku040,esp32c6,firesim normal
   Console bring-up probe: banner, timed tick loop, and a completion marker a debugger can break on
@@ -123,7 +139,7 @@ hello_world       default        arty100t,arty200t,ku040,esp32c6,firesim normal
 almost entirely `MISSING` -- that is the correct output, not a failure:
 
 ```console
-$ ./rb doctor
+$ rb doctor
 RiskyBird rb 0.1.0
 repository       /path/to/riskybird-dev
 Chipyard backend  MISSING .../backends/chipyard
