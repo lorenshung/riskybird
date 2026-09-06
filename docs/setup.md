@@ -748,7 +748,13 @@ backends/chipyard/fpga/generated-src/<generated-name>/obj/<Harness>.bit
 
 which is exactly where `rb program` looks first.
 
-> **Verified** 2026-09-06 by building `RocketArty200TDroneFullDDRDmaConfig` --
+> **Verified twice.** 2026-09-06, from a cold clone of this branch by a reader
+> following only this page: `RocketArty200TDroneFullDDRConfig` -- the MIG drone
+> config -- elaborated and built, reporting *"All user specified timing
+> constraints are met."* and 9,730,764 bytes. The same reader also elaborated
+> `NoCoresArty200TConfig` and saw the contract message described above.
+>
+> And earlier the same day by building `RocketArty200TDroneFullDDRDmaConfig` --
 > a config that had never been synthesised, so nothing could no-op -- exactly as
 > written above. `write_bitstream completed successfully`, timing met
 > (`WNS=0.153  TNS=0.000  WHS=0.055  THS=0.000`), 9,730,764 bytes, which is the
