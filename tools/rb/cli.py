@@ -7,6 +7,7 @@ import contextlib
 import json
 import os
 import shlex
+import shutil
 import re
 import signal
 import socket
@@ -334,7 +335,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         ("Chipyard env", CHIPYARD_PREFIX.is_dir(), CHIPYARD_PREFIX),
         ("Zephyr backend", ZEPHYR_BACKEND.is_dir(), ZEPHYR_BACKEND),
         ("Zephyr env", ZEPHYR_PREFIX.is_dir(), ZEPHYR_PREFIX),
-        ("Zephyr base", ZEPHYR_BASE.is_dir(), ZEPHYR_BASE),
+        # Populated, not merely present. `git submodule update` and a failed
+        # west workspace both leave an EMPTY directory here, and reporting that
+        # as ok made the setup guide's own checkpoint pass on an install whose
+        # very next command (rb build) could not run.
+        ("Zephyr base", (ZEPHYR_BASE / "VERSION").is_file(), ZEPHYR_BASE),
         ("Zephyr SDK", ZEPHYR_SDK.is_dir(), ZEPHYR_SDK),
         ("Espressif HAL", ESPRESSIF_HAL.is_dir(), ESPRESSIF_HAL),
         ("ST HAL", ST_HAL.is_dir(), ST_HAL),
@@ -350,11 +355,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             executable("chipyard", "espresso"),
         ),
         ("Vivado", (VIVADO_BIN / "vivado").is_file(), VIVADO_BIN / "vivado"),
+        # Mirror openocd_command(): the SDK's own binary, or one on PATH. The
+        # ELF loader is NOT required -- it is a workaround for a relocated SDK,
+        # and demanding it reported MISSING on any host that does not need one,
+        # macOS included, while rb ran OpenOCD perfectly well.
         (
             "OpenOCD",
             (ZEPHYR_HOST_BIN / "openocd").is_file()
-            and ZEPHYR_HOST_LOADER.is_file(),
-            ZEPHYR_HOST_BIN / "openocd",
+            or shutil.which("openocd") is not None,
+            ZEPHYR_HOST_BIN / "openocd"
+            if (ZEPHYR_HOST_BIN / "openocd").is_file()
+            else (shutil.which("openocd") or ZEPHYR_HOST_BIN / "openocd"),
         ),
         (
             "GDB",
@@ -369,7 +380,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     if executable("zephyr", "west"):
         print(f"{'west version':17}         {_probe(['west', '--version'], 'zephyr')}")
-    if (ZEPHYR_HOST_BIN / "openocd").is_file() and ZEPHYR_HOST_LOADER.is_file():
+    if (ZEPHYR_HOST_BIN / "openocd").is_file() or shutil.which("openocd"):
         print(
             f"{'OpenOCD version':17}         "
             f"{_probe(openocd_command('--version'), 'zephyr')}"

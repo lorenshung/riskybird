@@ -59,6 +59,13 @@ git clone git@github.com:lorenshung/riskybird-dev.git
 cd riskybird-dev
 ```
 
+Every command below is written as `rb`. Run it as `./rb` from the repository
+root, or put the root on your `PATH` once:
+
+```console
+export PATH="$PWD:$PATH"
+```
+
 **Do not use `--recursive`.** The backends carry their own nested submodules -- recursing pulls
 several gigabytes, including three separate copies of Chipyard, none of which the bench tier
 uses. Later steps initialise exactly the submodules they need.
@@ -79,9 +86,15 @@ One entry point for RiskyBird FPGA and Zephyr flows.
 $ ./rb targets
 TARGET       KIND  ZEPHYR BOARD                                  EVIDENCE
 arty100t     fpga  chipyard_riscv64/rocketchip_virt_riscv64      generated and synthesized
+  active SoC RAM: 1024 MiB; physical memory: not recorded; ...
 arty200t     fpga  chipyard_riscv64/rocketchip_virt_riscv64      generated
+  ...
 ku040        fpga  chipyard_riscv64/rocketchip_virt_riscv64      generated and synthesized
+  ...
+(esp32c6, firesim and rose-spike also listed)
 ```
+
+Every row is followed by an indented detail line; they are elided above.
 
 ```console
 $ ./rb workloads
@@ -103,10 +116,11 @@ repository       /path/to/riskybird-dev
 Chipyard backend  MISSING .../backends/chipyard
 Zephyr backend    MISSING .../backends/zephyr-chipyard-sw
 Zephyr SDK        MISSING .../backends/zephyr-chipyard-sw/tools-manual/zephyr-sdk-1.0.0-beta1
+Zephyr base       MISSING .../zephyr_ws/zephyr
 west              MISSING
 RISC-V compiler   MISSING .../riscv64-zephyr-elf-gcc
-OpenOCD           MISSING .../hosttools/sysroots/x86_64-pokysdk-linux/usr/bin/openocd
 GDB               MISSING .../riscv64-zephyr-elf-gdb
+(several more lines: Zephyr env, the HALs, Espresso, Vivado)
 hardware contracts
   arty200t     pending generated DTS not present
 serial devices
@@ -154,28 +168,71 @@ You can skip this until you have hardware attached.
 Adds the toolchain. After this step `rb build` produces a real ELF, with no FPGA
 attached and -- on the bench tier -- no Chipyard installed.
 
+**Budget ~16 GB of disk and around half an hour**, most of it unattended
+downloads. The bulk lands in `backends/zephyr-chipyard-sw`: ~4 GB SDK, ~7 GB
+conda environment, ~3 GB Zephyr workspace.
+
+### Host prerequisites
+
+Both installers hard-require these, and neither checks usefully:
+
+- **`wget`**
+- **`cmake`** -- and it must be a *working* one. See the warning below.
+
+> **Check what `cmake` you have before starting:**
+> ```console
+> $ which cmake && cmake --version
+> ```
+> If it resolves to something under `/ecad`, Vitis or another vendor toolchain,
+> put a real one first: `export PATH=/usr/bin:$PATH`. A Xilinx-shipped cmake
+> satisfies `command -v cmake` and then dies with
+> `cmake: error while loading shared libraries: libidn.so.11`, failing SDK
+> installation at the *"Register CMake package"* step with exit 40.
+>
+> Step 2b installs a known-good cmake into the environment, which is why it
+> comes **before** the SDK. Doing them in the other order walks into this.
+
 ### 2a. Initialise only the backend you need
 
 ```console
 git submodule update --init backends/zephyr-chipyard-sw
 ```
 
-Again, **not `--recursive`**. The backend initialises its own nested submodules
-during its setup; recursing here pulls a large set it deliberately skips.
+**Not `--recursive`.** The backend has its own nested submodules; 2b brings up
+exactly the ones it needs.
 
 The bench tier does not initialise `backends/chipyard` at all. An uninitialised
-submodule is just an empty directory -- nothing is deleted and nothing is
+submodule is just an empty directory -- nothing is deleted, nothing is
 special-cased.
 
-### 2b. Install the toolchain
+### 2b. Build the Zephyr environment
 
-Follow the backend's own README, which owns this process. The SDK installer
-picks the right prebuilt tarball for your host automatically:
+```console
+rb env setup zephyr
+```
+
+This runs the backend's `install_conda.sh` and `install_submodules.sh`: it
+creates a conda environment under `backends/zephyr-chipyard-sw/tools/miniforge3`,
+installs **`west`** and a pinned `cmake<4` plus `ninja`, and checks out the
+nested submodules including the Zephyr tree itself. Takes several minutes.
+
+Nothing later works without this. `rb build` shells out to `west`, so skipping
+it fails with a bare `No such file or directory: 'west'` several steps
+downstream.
+
+> If you already have a conda environment active, `rb env setup zephyr` may
+> build into *that* rather than into the checkout. Run it from a shell with no
+> conda active, or accept the environment it reports.
+
+### 2c. Install the toolchain
 
 ```console
 cd backends/zephyr-chipyard-sw
 ./scripts/install_toolchain_sdk.sh
+cd -
 ```
+
+The installer picks the right prebuilt tarball for your host:
 
 | host | tarball |
 | --- | --- |
@@ -183,15 +240,20 @@ cd backends/zephyr-chipyard-sw
 | **macOS Apple Silicon** | `zephyr-sdk-1.0.0-beta1_macos-aarch64_minimal.tar.xz` |
 | macOS Intel | `zephyr-sdk-1.0.0-beta1_macos-x86_64_minimal.tar.xz` |
 
-Set `RB_SDK_HOST` to override for a host the installer does not know. Getting
-this wrong is worth avoiding: the Linux tarball extracts perfectly well on
-macOS and then every tool fails with *"bad CPU type in executable"*, which reads
-like a corrupt download rather than the wrong package.
+`RB_SDK_HOST` overrides for a host it does not know. Getting this wrong is worth
+avoiding: the Linux tarball extracts perfectly well on macOS and then every tool
+fails with *"bad CPU type in executable"*, which reads like a corrupt download
+rather than the wrong package.
+
+> **This step writes outside the checkout.** It registers the SDK in
+> `~/.cmake/packages/Zephyr-sdk`, which is a *user-global* registry holding one
+> entry. A second checkout that runs this takes over the registration from the
+> first. If you keep two, expect to re-run this when you switch.
 
 `rb` finds the SDK's host tools by looking inside the SDK, so no path needs
-editing after this.
+editing afterwards.
 
-### 2c. Supply an elaborated devicetree
+### 2d. Supply an elaborated devicetree
 
 **This is the step that lets a Mac build at all**, and it has no equivalent in a
 Linux silicon-tier install.
@@ -206,28 +268,36 @@ git clone git@github.com:lorenshung/dts.git ~/riskybird-dts
 export RB_DTS_DIR=~/riskybird-dts
 ```
 
-The layout matches the bitstream and ELF side-repositories:
-`<board>/<board>.<Config>.dts`. `rb` prefers a local Chipyard elaboration when
-one exists, so on a machine with Chipyard this is ignored entirely.
+Layout is `<board>/<board>.<Config>.dts`. `rb` prefers a local Chipyard
+elaboration when one exists, so on a machine with Chipyard this is ignored.
 
-Regenerate it from a machine that has Chipyard with `tools/collect-dts.py`.
+> `RB_DTS_DIR` must be set in **every** shell that runs `rb`, not just this one.
+> Put it in your shell profile. Without it `rb doctor` reports
+> `pending  generated DTS not present` and `rb build` refuses to start.
+
+Regenerate the collection from a machine that has Chipyard with
+`tools/collect-dts.py`.
 
 ### Verify
 
-`rb doctor` should now report the Zephyr lines `ok` and the hardware contracts
-resolved. The contract lines are the ones that prove step 2c worked -- they are
-read out of the DTS:
+`rb doctor` should now report the Zephyr lines `ok`. **Check the `west` line
+specifically** -- it is the one whose absence stops `rb build`:
 
 ```console
 $ rb doctor
 Zephyr backend    ok      .../backends/zephyr-chipyard-sw
+Zephyr env        ok      .../tools/miniforge3/envs/zephyr
+Zephyr base       ok      .../zephyr_ws/zephyr
 Zephyr SDK        ok      .../tools-manual/zephyr-sdk-1.0.0-beta1
+west              ok      .../envs/zephyr/bin/west
 RISC-V compiler   ok      .../riscv64-zephyr-elf-gcc
 hardware contracts
   arty200t     ok      config RocketArty200TOspiConfig, RAM 0x80000000+0x40000000, UART 0x10020000 irq 2, I2C 0x10040000 irq 1
 ```
 
-Chipyard and Vivado stay `MISSING` on the bench tier. That is correct.
+`Chipyard backend` and `Chipyard env` stay `MISSING` on the bench tier, and
+`rb doctor` still exits non-zero because of them. That is correct. `Vivado` may
+be `ok` or `MISSING` depending on the machine; the bench tier does not use it.
 
 Then build something:
 
@@ -241,14 +311,13 @@ Memory region         Used Size  Region Size  %age Used
 An ELF at `build/zephyr/arty200t/hello_world/default/zephyr/zephyr.elf` is the
 end of step 2. Nothing so far has needed hardware.
 
-That `1 GB` region is itself the proof that step 2c worked: it comes from the
-`RocketArty200TDroneFullDDRConfig` devicetree, so the build read the collected
-DTS. A scratchpad config would report 32 KB here.
+That `1 GB` region is the proof step 2d worked: it comes from the
+`RocketArty200TDroneFullDDRConfig` devicetree. A scratchpad config reports
+`32 KB` and `59.28%` here instead.
 
-**Verified** on 2026-09-05 exactly as written above, with `backends/chipyard`
-absent and the devicetree supplied through `RB_DTS_DIR` -- `rb doctor` reported
-every Zephyr line `ok`, Chipyard and its conda environment `MISSING`, and the
-build produced a 409 KB ELF.
+> **The build directory is keyed on target, workload and mode -- but not on
+> config.** Building a second config for the same workload overwrites the ELF at
+> that path. If you build two, note which one is currently there.
 
 ---
 
@@ -295,6 +364,18 @@ work at all: Chipyard names every bitstream after its harness, so a directory of
 
 `rb` prefers a local Chipyard build when one exists. Regenerate the collection
 from a machine that has Chipyard with `tools/collect-bitstreams.py`.
+
+Not every config has a bitstream -- a shell has to have been synthesised for one
+to exist. Check before relying on one:
+
+```console
+$ ls ~/riskybird-bitstreams/arty200t/
+arty200t.RocketArty200TDroneFullDDRConfig.bit   arty200t.RocketArty200TOspiConfig.bit
+...
+```
+
+`rb doctor`'s contract line names each board's default config, which is what
+`rb program --board arty200t` uses when you pass no `--config`.
 
 ### 3d. Find the adapters
 
@@ -343,9 +424,8 @@ rb program --board arty200t --config <Config> --usb-location <bitstream-location
 rb console --port /dev/ttyUSB5 --baudrate 115200
 ```
 
-> **Not yet verified end to end.** Steps 1 and 2 were run exactly as written.
-> Step 3's tool discovery, bitstream resolution and adapter probing are
-> verified; the programming and console commands are recorded from a working
-> bench but have not been re-run against this checkout, because the board was
-> detached while it was written. Treat this section as recorded, not verified,
-> until it is.
+> **Status of this section: recorded, not verified.** Tool discovery, bitstream
+> resolution and adapter probing have been exercised on this checkout. The
+> `rb program` and `rb console` commands are transcribed from a working bench
+> and have **not** been re-run here, because no board was attached when this was
+> written. Steps 1 and 2 have been run from a clean clone; step 3 has not.
