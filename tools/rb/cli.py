@@ -2984,7 +2984,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     rose_cli = sub.add_parser(
         "rose",
-        help="inspect and build the FPGA-free RoSE Spike executor",
+        help="[experimental] inspect and build the FPGA-free RoSE Spike executor",
     )
     rose_sub = rose_cli.add_subparsers(dest="rose_action", required=True)
     rose_doctor = rose_sub.add_parser("doctor", help="check RoSE host and simulator prerequisites")
@@ -3006,7 +3006,7 @@ def build_parser() -> argparse.ArgumentParser:
     rose_summary.add_argument("run_dir", type=Path)
     rose_summary.set_defaults(func=cmd_rose)
 
-    hil = sub.add_parser("hil", help="supervise closed-loop hardware-in-the-loop replays")
+    hil = sub.add_parser("hil", help="[experimental] supervise closed-loop hardware-in-the-loop replays")
     hil_sub = hil.add_subparsers(dest="hil_action", required=True)
     hil_replay = hil_sub.add_parser("replay", help="run a recorded or simulated closed-loop scenario")
     hil_replay.add_argument("scenario", choices=("mpc-hover",))
@@ -3026,7 +3026,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     xp = sub.add_parser(
         "xpurt",
-        help="schedule a workload mix on an XPU-RT hardware pairing and plot it",
+        help="[experimental] schedule a workload mix on an XPU-RT hardware pairing and plot it",
     )
     xp_sub = xp.add_subparsers(dest="xpurt_action", required=True)
 
@@ -3148,7 +3148,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     schedule_cli = sub.add_parser(
         "schedule",
-        help="replay a scheduling policy inside an application scenario",
+        help="[experimental] replay a scheduling policy inside an application scenario",
     )
     schedule_sub = schedule_cli.add_subparsers(dest="schedule_action", required=True)
     schedule_replay = schedule_sub.add_parser(
@@ -3178,7 +3178,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ds = sub.add_parser(
         "dse",
-        help="join resource and performance results into a rankable dataset",
+        help="[experimental] join resource and performance results into a rankable dataset",
     )
     ds_sub = ds.add_subparsers(dest="dse_action", required=True)
 
@@ -3206,7 +3206,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     area = sub.add_parser(
         "area",
-        help="characterize FPGA resource utilization per Chipyard config",
+        help="[experimental] characterize FPGA resource utilization per Chipyard config",
     )
     area_sub = area.add_subparsers(dest="area_action", required=True)
 

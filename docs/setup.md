@@ -15,6 +15,26 @@ Vivado has no macOS release, so a Mac cannot build bitstreams. It can do everyth
 consuming bitstreams built elsewhere. Nothing in the bench tier needs Chipyard installed at all;
 an uninitialised submodule is simply an empty directory.
 
+### What is supported, and what is not yet
+
+The supported surface is **Chipyard and Zephyr**: elaborating a shell, building a workload,
+programming a board, and debugging what runs on it. That is what this guide covers and what the
+verification at the end of each step exercises.
+
+`rb --help` also lists six commands marked **`[experimental]`**:
+
+| | |
+| --- | --- |
+| `rose`, `hil` | RoSE co-simulation and hardware-in-the-loop replay |
+| `xpurt`, `schedule` | workload-mix scheduling and policy replay |
+| `dse`, `area` | design-space exploration and FPGA resource characterisation |
+
+They work here and are used in this repository's own experiments, but they are in progress: they
+carry dependencies this guide does not install (`gymnasium`, `isaaclab`), their setup is not
+documented, and their interfaces are expected to change. Nothing in the supported surface depends
+on them -- their modules are imported lazily, so an absent dependency costs nothing until you
+invoke one. Treat them as a preview rather than part of the install.
+
 ---
 
 ## Step 1 -- `rb`, the entry point
