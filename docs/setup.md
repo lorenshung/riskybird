@@ -580,6 +580,34 @@ rb console --port /dev/ttyUSB5 --baudrate 115200
 > written. Steps 1 and 2 have been run from a clean clone; step 3 has not.
 
 
+### 3f. Loading and running a workload
+
+Programming the FPGA puts a *shell* on the board. Getting your ELF into it is a
+separate step, and **which mechanism works depends on the shell**:
+
+| Shell | Load path | Command |
+| --- | --- | --- |
+| Scratchpad shells (`*Spad*`, `CameraBringup200T`) | UART-TSI | `rb run` — builds, programs, loads and opens the console in one go |
+| **The drone shells** (`RocketArty200TDroneDDRConfig`, `RocketArty200TDroneFullDDRConfig`) | **JTAG** | `rb debug` |
+
+The drone shells are elaborated with `uartTsi = false` and their devicetree
+contains no TSI node at all, so `rb run` and `rb load` have nothing to talk to
+on them. Use `rb debug`, which loads the ELF over the same JTAG link that
+attaches the debugger:
+
+```console
+rb debug hello_world --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --program --program-usb-location <bitstream-loc> --usb-location <debug-loc>
+```
+
+`--program` loads the bitstream first, so this one command covers programming
+and loading. It loads and then **runs** the workload; add `--no-run` to stop at
+a GDB prompt instead, and `--gdb-script <file>` to drive a scripted session and
+exit.
+
+Console output appears on channel B of the *debug* adapter, so one cable carries
+both JTAG and the console.
+
 ### Where to go next
 
 The install is done; these are the pages that use it.
