@@ -33,12 +33,20 @@ unset _rb_pair _rb_var _rb_dir
 # 3. A vendor cmake earlier on PATH breaks the Zephyr SDK install. See
 #    docs/setup.md step 2 "Host prerequisites" for why this is not paranoia.
 if command -v cmake >/dev/null 2>&1; then
-  case "$(command -v cmake)" in
-    /ecad/*|*/Vitis/*|*/Vivado/*)
-      echo "rb-env: cmake resolves to $(command -v cmake)" >&2
-      echo "rb-env: that one is likely broken; putting /usr/bin first" >&2
-      PATH="/usr/bin:${PATH}"; export PATH ;;
-  esac
+  # Test whether it RUNS, not where it lives. The known-bad case here is a
+  # Xilinx-shipped cmake missing libidn, but keying on its path only catches
+  # this one site's layout -- any cmake that fails to execute breaks the SDK
+  # install the same way, and `command -v` cannot tell the difference.
+  if ! cmake --version >/dev/null 2>&1; then
+    echo "rb-env: cmake at $(command -v cmake) does not run:" >&2
+    cmake --version 2>&1 | head -1 | sed 's/^/rb-env:   /' >&2
+    if [ -x /usr/bin/cmake ] && /usr/bin/cmake --version >/dev/null 2>&1; then
+      echo "rb-env: putting /usr/bin first, which has a working one" >&2
+      PATH="/usr/bin:${PATH}"; export PATH
+    else
+      echo "rb-env: and /usr/bin has no working cmake either -- install one" >&2
+    fi
+  fi
 fi
 
 # 4. An active conda environment makes the Zephyr installer build into it
