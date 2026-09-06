@@ -72,7 +72,7 @@ source tree.
 
 RoSE, XPU-RT, Isaac Sim, and FireSim adapters should consume stable top-level
 contracts rather than moving or rewriting backend-owned infrastructure. See the
-[full-stack platform roadmap](README.md).
+full-stack platform roadmap (not carried on this branch; see `main`).
 
 ## Hardware contract
 
