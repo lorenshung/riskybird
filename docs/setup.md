@@ -632,6 +632,14 @@ rb debug camera_photo --target arty200t --config RocketArty200TDroneFullDDRConfi
 #    writes camera-frame.png next to you. See hm01b0-camera-bringup.md.
 ```
 
+**What is already checked, so a failure here means something specific.** The
+memory contract between shell and workload is verified statically on every
+build: this shell declares `ram0` at `0x8000_0000 + 0x4000_0000` (1 GiB DDR3),
+`zephyr,sram` points at it, and the ELF's single LOAD segment sits at
+`0x8000_0000` -- the same address the image that has run on this board loads at.
+So if step 2 loads and then prints nothing, the linker and the memory map are
+not the cause; look at the console wiring and the shell's UART instead.
+
 Steps 0-5 need **no battery and no propellers**. Anything that drives a motor
 does: see `motor-pwm-bringup.md` and `flight-on-fpga.md`, and note that the full
 drone shell drives the motor pins from configuration onward, before any code
