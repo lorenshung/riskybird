@@ -11,3 +11,8 @@ build/
 
 # mill build output for hardware/ospi
 hardware/ospi/out/
+
+# Published separately; see tools/collect-bitstreams.py
+bitstreams/
+dts/
+elfs/
