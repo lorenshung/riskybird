@@ -38,4 +38,4 @@ rm -rf "$OBJ"
     -o tb_motor_pwm \
     "$GEN/PWMTimer.sv" "$ROOT/hardware/pwm/tb_motor_pwm.cpp" >/dev/null
 
-exec "$OBJ/tb_motor_pwm" "${@:2}"
+exec "$OBJ/tb_motor_pwm" "$CONFIG" "${@:2}"

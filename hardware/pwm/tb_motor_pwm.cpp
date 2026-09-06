@@ -367,7 +367,11 @@ int main(int argc, char **argv)
     const uint32_t period_ns = 50000;   // 20 kHz, from motor_4.overlay
     const uint32_t period_cycles = ns_to_cycles(period_ns);
 
-    printf("PWMTimer from RocketArty200TMotorSpadConfig\n");
+    // Which config's RTL this actually is, passed in by run.sh. It used to be a
+    // hardcoded string naming MotorSpad, so a run against any other config
+    // reported the wrong provenance -- the one thing this banner exists to say.
+    const char *config = (argc > 1) ? argv[1] : "(config not supplied)";
+    printf("PWMTimer from %s\n", config);
     printf("  f_sys %llu Hz, period %u ns = %u cycles, cmpwidth %d\n\n",
            (unsigned long long)F_SYS, period_ns, period_cycles, CMPWIDTH);
 

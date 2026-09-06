@@ -495,3 +495,51 @@ with `hardware/pwm/probe.gdb`. Propellers off throughout.
 | `tests/test_pwm.py` | the four-way contract |
 | `dse/scripts/plot_motor_pwm_duty.py` | the duty figure |
 | `dse/scripts/plot_te0712_j1_signal_map.py` | the J1 figure |
+
+---
+
+## Simulating the shell's own PWM RTL
+
+`hardware/pwm/run.sh` verilates the `PWMTimer` **out of a given config's
+`gen-collateral`**, so what it measures is the RTL that goes into that
+bitstream rather than a copy of it. No board required.
+
+```console
+$ ./rb chipyard elaborate --board arty200t --config RocketArty200TDroneFullDDRConfig
+$ ./hardware/pwm/run.sh RocketArty200TDroneFullDDRConfig
+PWMTimer from RocketArty200TDroneFullDDRConfig
+  f_sys 50000000 Hz, period 50000 ns = 2500 cycles, cmpwidth 16
+
+PASS   power-on: pin is low before software runs      raw comparator 100% high, pin 0% high
+PASS   after pwm_sifive_init: pin is low              raw comparator 100% high, pin 0% high
+PASS   pwm_set_dt 50% duty reaches the pin as 50%     scale 0, 1249/2500 = 49.96% at 20.00 kHz
+PASS   three channels hold three different duties     cmp1 10.00%, cmp2 19.99%, cmp3 0.00%
+PASS   Zephyr refuses comparator 0 as an output       returns -ENOTSUP
+OK: 0 failure(s)
+```
+
+It also prints what the same RTL would do **without** the harness inversion,
+which is the number that matters for safety:
+
+```
+       requested   0% -> pin 100.00%  (full throttle)
+       requested 100% -> pin   0.04%
+```
+
+### What this establishes, and what it does not
+
+**Establishes.** The drone shell's PWM RTL is correct: 20 kHz at `pwmscale 0`,
+duty linear from 5% to 100% within 0.05%, three comparators independent, and
+Zephyr's driver correctly refusing comparator 0. It also confirms the hazard is
+real rather than theoretical -- the raw comparator sits **100% high at reset**,
+before any instruction runs, so an uninverted path is full throttle from
+configuration.
+
+**Does not establish that the harness inversion is present in the built
+design.** The testbench *models* the inversion (`pin() { return gpio ^ 1; }`)
+because `WithArty200TPWM` applies it outside `PWMTimer`, in the harness. So this
+proves "if the harness inverts, the pin is low", not "the harness inverts".
+
+That remains open and needs a meter on J1_31 / J1_36 / J1_99 / J1_100 with the
+motors unplugged. See the note in `flight-on-fpga.md`. Until then, treat a
+freshly configured drone shell as capable of driving the motor pins.
