@@ -49,6 +49,7 @@ side needs the other's toolchain.
 | [`te0712-ftdi-carrier-ddr-bringup.md`](docs/te0712-ftdi-carrier-ddr-bringup.md) | the same DDR3 work on the FTDI carrier |
 | [`verification.md`](docs/verification.md) | what "verified" means here, and which tests pass where |
 | [`repository-layout.md`](docs/repository-layout.md) | orientation |
+| [`merging-into-main.md`](docs/merging-into-main.md) | what this branch changed, and how to fold it back |
 
 Docs distinguish **verified** (run here, output quoted) from **recorded**,
 **declared** and **blocked**. That vocabulary is load-bearing — if a page says a
