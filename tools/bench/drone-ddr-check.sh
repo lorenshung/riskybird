@@ -8,7 +8,10 @@
 # sessions -- the bitstream and debug adapters have swapped between 7-1.1.4.1 and
 # 7-1.1.4.3, so always re-probe rather than trusting a previous note.
 set -u
-ROOT=/scratch2/loren/riskybird-dev
+# Derived, not hardcoded: this pointed at one particular checkout, so on any
+# other machine -- or a second clone on the same one -- it silently used the
+# wrong tree.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CFG="$1"; DBG="$2"; shift 2
 CONFIGS=("$@")
 [ ${#CONFIGS[@]} -eq 0 ] && CONFIGS=(RocketArty200TSpadConfig RocketArty200TDroneDDRConfig \

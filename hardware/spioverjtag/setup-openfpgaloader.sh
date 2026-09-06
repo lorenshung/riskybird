@@ -12,7 +12,10 @@
 # Override the install location with OFL_PREFIX, the board with KU040_FTDI_SERIAL.
 set -euo pipefail
 
-PREFIX="${OFL_PREFIX:-/scratch2/loren/tools/openFPGALoader}"
+# Default under the repository rather than one particular user's home, so a
+# fresh clone installs somewhere that exists. Override with OFL_PREFIX.
+_ofl_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PREFIX="${OFL_PREFIX:-${_ofl_root}/.rb/openFPGALoader}"
 PIN="${OFL_COMMIT:-63c519c3c57ded2d8cc412197d8b781115b1922a}"
 REPO=https://github.com/trabucayre/openFPGALoader.git
 SERIAL="${KU040_FTDI_SERIAL:-TE0000991948}"
