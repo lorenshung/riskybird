@@ -633,9 +633,10 @@ tools/bench/acceptance.sh <bitstream-loc> <debug-loc>
 ```
 
 It prints what each step proved, or what its failure means, and leaves per-step
-logs under `.rb/acceptance/`. It has **not itself been run against hardware** --
-it was written from the sequence below while the bench was unavailable, so treat
-the first run as testing the script too. The steps individually, which is what
+logs under `.rb/acceptance/`. Its **control flow is verified** -- clean run, mid-sequence failure and a bad
+adapter location were each exercised against a stubbed `rb` -- but it has **not
+been run against hardware**, so treat the first real run as testing the script's
+hardware path too. The steps individually, which is what
 it runs:
 
 ```console

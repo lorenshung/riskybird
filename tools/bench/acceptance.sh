@@ -44,31 +44,49 @@ step() {   # step <name> <why-it-matters> <command...>
     fail=$((fail+1)); return 1
 }
 
-debug() { ./rb debug "$1" --target arty200t --config "$CFG" \
-            --program --program-usb-location "$BIT" --usb-location "$DBG" "${@:2}"; }
+# The timeout lives INSIDE this: `timeout` execs a binary and cannot run a
+# shell function, so `debug 120 hello_world` fails with
+# "failed to run command 'debug'" -- a scripting bug that looks exactly like a
+# dead board.
+debug() { local secs="$1" wl="$2"; shift 2
+          timeout "$secs" rb debug "$wl" --target arty200t --config "$CFG" \
+            --program --program-usb-location "$BIT" --usb-location "$DBG" "$@"; }
 
 echo "RiskyBird hardware acceptance check"
 echo "  config    $CFG"
 echo "  bitstream adapter $BIT   debug adapter $DBG"
 echo "  logs      $LOG"
 
-step "adapters" "both TAPs answer; 0x13636093 is the config TAP, 0x00000001 Rocket's" \
-     ./rb probe-ftdi --idcode || exit 1
+# NOT `probe-ftdi --idcode`. That shifts a JTAG IDCODE scan through EVERY FTDI
+# on the host, including any unrelated FPGA card someone else is using, and
+# detaches ftdi_sio from their JTAG channel as a side effect. Both locations are
+# already supplied as arguments, so identifying them again is redundant --
+# confirm they are present and leave every other adapter alone.
+step "adapters" "both supplied adapter locations are attached" \
+     bash -c 'for l in "$1" "$2"; do [ -d "/sys/bus/usb/devices/$l" ] || {
+                  echo "no USB device at location $l"; echo
+                  echo "Locations change on every replug. Re-read them with:"
+                  echo "  rb probe-ftdi            # lists adapters, no JTAG activity"
+                  echo "  rb probe-ftdi --idcode   # identifies which TAP is which"
+                  echo
+                  echo "Run --idcode only if this host has no other FPGA hardware:"
+                  echo "it scans every FTDI it finds."
+                  exit 1; }; done' _ "$BIT" "$DBG" || exit 1
 
 step "configure" "the shell configures; a MIG stall here is input voltage, not the cable" \
-     ./rb program --board arty200t --config "$CFG" --usb-location "$BIT" || exit 1
+     rb program --board arty200t --config "$CFG" --usb-location "$BIT" || exit 1
 
 step "hello_world" "code runs and the console talks -- touches nothing else" \
-     timeout 120 debug hello_world || exit 1
+     debug 120 hello_world || exit 1
 
 step "ddr_stress" "the DDR3 is real, not merely that the shell configured" \
-     timeout 900 debug ddr_stress
+     debug 900 ddr_stress
 
 step "sensor_check" "the I2C bus and the on-board sensors answer" \
-     timeout 300 debug sensor_check
+     debug 300 sensor_check
 
 step "camera_photo" "a workload drives real hardware end to end" \
-     timeout 300 debug camera_photo --gdb-script hardware/ospi/capture-frame.gdb
+     debug 300 camera_photo --gdb-script hardware/ospi/capture-frame.gdb
 
 printf '\n=== summary ===\n  %d passed, %d failed\n' "$pass" "$fail"
 if [ -f camera-frame.png ]; then
