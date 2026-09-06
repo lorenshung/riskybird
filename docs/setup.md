@@ -195,10 +195,16 @@ pip install pyusb
 ```
 
 `rb` computes the same bus-and-port location string OpenOCD's own libusb backend uses
-(`7-1.1.4.1`), so the value it prints is the one to pass to `--usb-location`. It does **not**
-report which serial node belongs to which channel -- that is a Linux `ftdi_sio` property. On
-macOS match them by the trailing letter of the device name: `/dev/cu.usbserial-<serial>A` is
-channel A (JTAG), `...B` is channel B (console).
+(`7-1.1.4.1`), so the value it prints is the one to pass to `--usb-location`.
+
+**Verified**, rather than assumed: the libusb path was run against a real FT4232H and compared
+to the sysfs path on the same device. Identical location, bus:device, PID, serial and product
+string; only the interface column differs.
+
+It does **not** report which serial node belongs to which channel -- that is a Linux `ftdi_sio`
+property, so the libusb path prints `if0=?` rather than guessing. On macOS match them by the
+trailing letter of the device name: `/dev/cu.usbserial-<serial>A` is channel A (JTAG), `...B` is
+channel B (console).
 
 You can skip this until you have hardware attached.
 
