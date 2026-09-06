@@ -501,3 +501,82 @@ replug. `USBDEVFS_RESET` re-enumerates without reliably clearing MPSSE state.
   `generated-src`, and the two have not been compared on hardware.
 - **The UART-TSI pair.** P16/U18 on J1_92/J1_85 remain unexercised in either
   direction, and this config carries no TSI client.
+
+---
+
+## Resolved: a MIG shell that stalls at `EOS=0` is an input-voltage problem
+
+Recorded 2026-09-04/05. This is the section to read when a DDR-backed shell
+refuses to come up.
+
+### The symptom
+
+`openFPGALoader` reports `Done`, the FPGA's configuration `STATUS` register
+reads `DONE=1`, and yet the design never starts. The Rocket debug TAP scans all
+ones and the board looks like a broken JTAG cable.
+
+The distinguishing read is the configuration `STATUS` register (UG470
+Table 5-27 — **DONE = bit 3, EOS = bit 13, DCI_MATCH = bit 14**):
+
+| value | meaning |
+| --- | --- |
+| `0x501079fc` | `EOS=1`, `DCI_MATCH=1` — fully started |
+| `0x5000190c` | `DONE=1`, **`EOS=0`, `DCI_MATCH=0`** — configured, startup stalled |
+
+`EOS=0` with `DONE=1` means the part loaded its bitstream and then failed to
+finish start-up. On this carrier that is a **power** result, not a JTAG one.
+
+### What actually fixes it
+
+Measured on one board across two supply arrangements, same bitstreams:
+
+| shell | bench PSU @ 3.3 V | battery + on-board USB-C |
+| --- | --- | --- |
+| `RocketArty200TFlowSpadConfig` (no MIG) | `0x501079fc` | `0x501079fc` |
+| `RocketArty200TDroneDDRConfig` (MIG) | `0x5000190c` | **`0x501079fc`** |
+| `RocketArty200TDroneFullDDRConfig` (MIG) | `0x5000190c` | **`0x501079fc`** |
+
+With the battery in, all three configure fully and the Rocket debug TAP answers
+on every one.
+
+### Why — and why it is not "3.3 V is too low"
+
+The board makes its 3.3 V rail with a **step-down** converter (`U15`,
+TPS552882Q). A buck cannot produce its output from an equal input: it would need
+100% duty, and a real part tops out around 90–95%, so it needs roughly **≥3.5 V**
+in to make 3.3 V out.
+
+- **Vin = 3.7 V** → duty ≈ 3.3/3.7 = **89%**. Comfortable.
+- **Vin = 3.3 V** → duty = **100%**. Impossible; the rail sits *below* 3.3 V.
+
+The scratchpad shells do not care because they never bring the SOM's DDR3 rails
+up. A MIG shell does, and those rails are what fail — which is exactly the split
+the table shows.
+
+So the fix is **headroom, not more volts on the 3.3 V rail**. A 1S LiPo
+(3.7–4.2 V) or USB-C VBUS (5 V) entering through the board's designed input is
+correct. Injecting a higher voltage directly onto `+3V3` is not — that rail is
+downstream of every protection device on the board.
+
+### Two things this is not
+
+- **Not a broken cable.** An all-ones scan on the debug TAP is the correct
+  reading for a part that has not finished start-up. Read `STATUS` before
+  suspecting the adapter.
+- **Not a current limit.** It reproduces inside a 1 A cap at 3.7 V, where it
+  works; the binding constraint is the converter's dropout, not the supply's
+  ceiling.
+
+### Related failure, different cause
+
+A board that is *hot* and drawing far more than usual is a separate problem. On
+one board the ESP32-C6 fried into a **10.1 Ω** short from `+3V3` to ground —
+measured with the board off, while `+BATT` and 2.8 V stayed in the megaohms.
+3.3 V / 10.1 Ω = 330 mA, matching the observed current rise exactly, and a fresh
+board drew 0.04 A where that one drew 0.38 A.
+
+**Measure rail-to-ground resistance with the board off before drawing any
+conclusion about voltage margins.** Tens of ohms or less is a damaged die, and
+re-energising spreads the damage. Note the voltage sensitivity above is real and
+*independent* of that fault: it reproduces on a healthy board with no short
+anywhere.
