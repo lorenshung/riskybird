@@ -573,7 +573,16 @@ Not `--recursive`: Chipyard initialises its own nested submodules during 4b, and
 recursing here pulls a large set its setup deliberately skips.
 
 This checkout is far larger than the bench tier's, and 4b is a long install.
-Budget considerably more than step 2's ~16 GB.
+Measured on the machine these figures come from:
+
+| | |
+| --- | --- |
+| `backends/chipyard` after 4b, before any build | **~50 GB** (of which ~8 GB is its conda environment) |
+| each config you elaborate or build | **~0.5 GB** under `fpga/generated-src/` |
+
+So budget ~50 GB for the silicon tier on top of step 2's ~16 GB, and expect
+`generated-src/` to grow with every config you touch -- it is a per-config
+directory, not a shared one, and nothing prunes it.
 
 ### 4b. Chipyard's environment
 
