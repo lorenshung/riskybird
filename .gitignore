@@ -16,3 +16,6 @@ hardware/ospi/out/
 bitstreams/
 dts/
 elfs/
+
+# Verilator build output for hardware/pwm
+hardware/pwm/obj_dir/

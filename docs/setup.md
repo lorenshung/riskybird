@@ -238,6 +238,8 @@ Both installers hard-require these, and neither checks usefully:
 - **`wget`**, **`tar`**, **`git`** -- the installers check for these and stop if
   any is missing.
 - **`cmake`** -- and it must be a *working* one. See the warning below.
+- **Java** is needed only by `hardware/ospi`'s mill test suite, not by the
+  install itself.
 
 > **Check what `cmake` you have before starting:**
 > ```console
@@ -369,6 +371,13 @@ export RB_DTS_DIR=~/riskybird-dts
 
 Layout is `<board>/<board>.<Config>.dts`. `rb` prefers a local Chipyard
 elaboration when one exists, so on a machine with Chipyard this is ignored.
+
+> **You can skip the environment variable.** With no `RB_DTS_DIR` set, `rb`
+> looks in `<repo>/dts` -- so unpacking the collection there works with no
+> configuration at all. Same for `<repo>/bitstreams` and `RB_BITSTREAM_DIR`.
+> Both directories are gitignored. The environment variables exist for keeping
+> the collections outside the checkout, and are the better choice if you have
+> several checkouts sharing one collection.
 
 > `RB_DTS_DIR` must be set in **every** shell that runs `rb`, not just this one.
 > Put it in your shell profile. Without it `rb doctor` reports
@@ -656,12 +665,14 @@ Measured on the machine these figures come from:
 
 | | |
 | --- | --- |
-| `backends/chipyard` after 4b, before any build | **~50 GB** (of which ~8 GB is its conda environment) |
-| each config you elaborate or build | **~0.5 GB** under `fpga/generated-src/` |
+| `backends/chipyard` after 4b, before any build | **~11 GB** (of which ~6 GB is its conda environment) |
+| each config you **elaborate** | ~45 MB under `fpga/generated-src/` |
+| each config you **build** | ~425 MB under `fpga/generated-src/` |
 
-So budget ~50 GB for the silicon tier on top of step 2's ~16 GB, and expect
+So budget ~11 GB for the silicon tier on top of step 2's ~16 GB, and expect
 `generated-src/` to grow with every config you touch -- it is a per-config
-directory, not a shared one, and nothing prunes it.
+directory, not a shared one, and nothing prunes it. A long-lived checkout that
+has built dozens of configs can carry tens of gigabytes there alone.
 
 ### 4b. Chipyard's environment
 
@@ -670,7 +681,9 @@ rb env setup chipyard
 ```
 
 Runs Chipyard's own `build-setup.sh --use-lean-conda`, building a locked conda
-environment at `backends/chipyard/.conda-env`. Check it:
+environment at `backends/chipyard/.conda-env`. This is also what supplies
+**Espresso**, the one `rb doctor` line that no earlier step turns green -- so
+after 4b `rb doctor` can reach a fully-`ok` scorecard and exit 0. Check it:
 
 ```console
 $ rb env status
@@ -695,6 +708,11 @@ $ rb doctor
 Vivado            ok      /path/to/Vivado/2023.1/bin/vivado
 Vivado version            vivado v2023.1 (64-bit)
 ```
+
+> That `ok` means the binary exists and runs -- **not** that it is licensed.
+> `rb doctor` cannot tell the difference, so an unlicensed install passes here
+> and then fails deep inside 4d. If your site uses a floating licence, make sure
+> `XILINXD_LICENSE_FILE` is set before starting.
 
 ### 4d. Elaborate, then build
 
@@ -740,13 +758,28 @@ which is exactly where `rb program` looks first.
 This is what makes the bench tier work on a Mac.
 
 ```console
-python3 tools/collect-dts.py         --out ~/riskybird-dts
-python3 tools/collect-bitstreams.py  --out ~/riskybird-bitstreams
+python3 tools/collect-dts.py         --out ~/riskybird-dts-out
+python3 tools/collect-bitstreams.py  --out ~/riskybird-bitstreams-out
 ```
 
+> **Do not point `--out` at the checkouts you cloned in steps 2d and 3c.** The
+> collectors copy files in without deleting, but they **overwrite
+> `manifest.json` and `README.md`** with only what *this* machine has
+> elaborated or built. Aim them somewhere else and copy what you want across,
+> or the collection ends up with fifty devicetrees beside a manifest claiming
+> one.
+>
+> Omitting `--out` writes to `<repo>/dts` and `<repo>/bitstreams`, which is
+> often what you want -- see below.
+
 Each writes `<board>/<board>.<Config>.<ext>` plus a `manifest.json` recording
-the source revisions -- and for bitstreams, resource and timing figures, with
-any config that missed timing flagged.
+the source revisions -- and for bitstreams, per-config LUT/FF/BRAM/DSP counts,
+`wns_ns`, `whs_ns` and a `timing_met` flag, with any config that missed timing
+called out in the README too.
+
+> The two manifests are **not** the same schema: the devicetree one keys its
+> list as `entries`, the bitstream one as `bitstreams`. Anything parsing both
+> has to handle each separately.
 
 The renaming is the point. Chipyard names every bitstream after its *harness*,
 so a directory of `Arty200THarness.bit` files is indistinguishable once moved;
