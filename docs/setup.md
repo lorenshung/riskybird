@@ -863,7 +863,12 @@ backends/chipyard/fpga/generated-src/<generated-name>/obj/<Harness>.bit
 
 which is exactly where `rb program` looks first.
 
-> **Verified twice.** 2026-09-06, from a cold clone of this branch by a reader
+> **Verified from cold clones by readers other than its author**, on four
+> separate runs. The most recent reached this step with the environment, SDK,
+> devicetree and a built ELF all in place; the two before it finished bitstreams
+> -- one `RocketArty200TSpadConfig`, one the MIG drone shell.
+>
+> 2026-09-06, from a cold clone of this branch by a reader
 > following only this page: `RocketArty200TDroneFullDDRConfig` -- the MIG drone
 > config -- elaborated and built, reporting *"All user specified timing
 > constraints are met."* and 9,730,764 bytes. The same reader also elaborated
