@@ -339,24 +339,20 @@ The installer picks the right prebuilt tarball for your host:
 | --- | --- |
 | Linux x86_64 | `zephyr-sdk-1.0.0-beta1_linux-x86_64_minimal.tar.xz` |
 | Linux aarch64 | `zephyr-sdk-1.0.0-beta1_linux-aarch64_minimal.tar.xz` |
-| **macOS Apple Silicon** | `zephyr-sdk-1.0.1_macos-aarch64_minimal.tar.xz` |
-| macOS Intel | `zephyr-sdk-1.0.1_macos-x86_64_minimal.tar.xz` |
+| **macOS Apple Silicon** | `zephyr-sdk-1.0.0-beta1_macos-aarch64_minimal.tar.xz` |
+| macOS Intel | `zephyr-sdk-1.0.0-beta1_macos-x86_64_minimal.tar.xz` |
 
 `RB_SDK_HOST` overrides the host; `RB_SDK_VERSION` overrides the version.
 
-> **macOS gets a different SDK version, deliberately.** The version this project
-> pins, `1.0.0-beta1`, publishes **zero-byte** macOS tarballs -- verified against
-> the release API: 67 MB for `linux-x86_64`, **0 MB** for both macOS builds. The
-> asset exists, so the download returns 200 and you get a silent empty extract
-> rather than a 404, after which every SDK tool simply appears absent.
+> **The macOS tarball is a few KB and that is correct.** `linux-x86_64` is about
+> 70 MB and `macos-aarch64` about 6 KB, which looks like a broken asset and is
+> not: *minimal* means the cmake scaffolding and `setup.sh`, and the installer's
+> `setup.sh -t riscv64-zephyr-elf -l -h -c` downloads the toolchains afterwards.
+> Do not "fix" this by selecting a different SDK version -- that would give macOS
+> a toolchain which does not match the one Linux pins.
 >
-> `1.0.1` ships a real 83 MB macOS build, so the installer selects it on macOS
-> and prints why. Linux still installs the pinned `beta1`. It follows that a
-> Mac's toolchain is **not** the version Linux pins -- worth knowing if you
-> compare binaries built on the two.
->
-> `rb` finds whichever SDK is installed rather than assuming the pinned version,
-> so nothing else needs changing. Getting this wrong is worth
+> `rb` locates whichever SDK version is installed rather than assuming the
+> pinned one, so `RB_SDK_VERSION` works without any other change. Getting this wrong is worth
 avoiding: the Linux tarball extracts perfectly well on macOS and then every tool
 fails with *"bad CPU type in executable"*, which reads like a corrupt download
 rather than the wrong package.
