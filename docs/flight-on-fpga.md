@@ -220,7 +220,7 @@ Each phase has a verification criterion. No phase is "done" on a successful buil
 ```console
 [11/11] Linking CXX executable zephyr/zephyr.elf
 Memory region         Used Size  Region Size  %age Used
-             RAM:      384880 B         1 GB      0.04%
+             RAM:      387728 B         1 GB      0.04%
 ```
 
 **Verified** by symbol, not by the build succeeding — what actually linked:

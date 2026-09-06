@@ -218,7 +218,7 @@ $ grep 'assign motor' generated-src/.../gen-collateral/Arty200THarness.sv
 
 $ ./rb zephyr build motor_4 --target arty200t --config RocketArty200TMotorSpadConfig
 Memory region         Used Size  Region Size  %age Used
-             RAM:       22272 B        32 KB     67.97%
+             RAM:       24704 B        32 KB     75.39%
 ```
 
 ### 5. Place, route and close timing

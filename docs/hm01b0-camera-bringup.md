@@ -331,7 +331,7 @@ place-and-route results only.
 |---|---|
 | `./mill ospi.test` | **26 tests pass** (17 pre-existing + 9 new), ~9 s |
 | Chisel elaboration, `CameraBringupConfig` | pass; DTS has 32 KiB at `0x80000000`, `i2c@10040000`, `ospi@10080000` IRQ 3, `serial@10020000` |
-| Firmware build | pass, **24,880 B / 32 KB = 75.9 %** |
+| Firmware build | pass, **26,928 B / 32 KB = 82.18 %** |
 | Bitstream | pass, timing **met** |
 | Regression: `RocketArty100TOspiConfig`, `RocketArty100TOspiSpadConfig`, `DualRocketArty100TOspiConfig` | all still elaborate |
 

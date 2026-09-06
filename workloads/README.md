@@ -45,8 +45,12 @@ workloads consume the stable top-level contract under
 Install the ESP and ST HAL projects required by the additional targets once:
 
 ```console
-./rb zephyr setup-targets
+rb zephyr setup-targets
 ```
+
+Usually unnecessary. `rb env setup zephyr` -- step 2b of `docs/setup.md` -- runs
+a west update that already fetches both HALs, and `rb doctor` reports them `ok`
+afterwards. Run this only if that check says otherwise.
 
 Discover the registered interface and build individual diagnostics:
 
