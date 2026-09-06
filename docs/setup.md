@@ -6,14 +6,19 @@ its verification command printed what this page says it prints.
 
 Two tiers, and you almost certainly want the first:
 
-| Tier | What it does | Needs | macOS |
-| --- | --- | --- | --- |
-| **Bench** | build workloads, program the FPGA, debug, run the drone | Python, Zephyr SDK, openFPGALoader, OpenOCD | **yes** |
-| **Silicon** | elaborate Chipyard, build bitstreams, FireSim | Vivado, sbt/Verilator | **no -- Linux only** |
+| Tier | What it does | Steps | Needs | macOS |
+| --- | --- | --- | --- | --- |
+| **Bench** | build workloads, program the FPGA, debug, run the drone | 1-3 | Python, Zephyr SDK, openFPGALoader, OpenOCD | **yes** |
+| **Silicon** | elaborate Chipyard, build bitstreams | 1, then 4 | Vivado, Chipyard | **no -- Linux only** |
 
 Vivado has no macOS release, so a Mac cannot build bitstreams. It can do everything else,
-consuming bitstreams built elsewhere. Nothing in the bench tier needs Chipyard installed at all;
-an uninitialised submodule is simply an empty directory.
+consuming bitstreams and devicetrees built elsewhere. Nothing in the bench tier needs Chipyard
+installed at all; an uninitialised submodule is simply an empty directory.
+
+**The two-machine split** this supports, which is the common case: one Linux machine runs step 4
+and publishes its output with `tools/collect-dts.py` and `tools/collect-bitstreams.py`; every
+other machine -- Macs included -- runs steps 1-3 and points `RB_DTS_DIR` and `RB_BITSTREAM_DIR`
+at that output. Neither side needs the other's toolchain.
 
 ### What is supported, and what is not yet
 
@@ -547,3 +552,115 @@ rb console --port /dev/ttyUSB5 --baudrate 115200
 > `rb program` and `rb console` commands are transcribed from a working bench
 > and have **not** been re-run here, because no board was attached when this was
 > written. Steps 1 and 2 have been run from a clean clone; step 3 has not.
+
+---
+
+## Step 4 -- build a bitstream (silicon tier, Linux only)
+
+Everything above *consumes* bitstreams built elsewhere. This step builds them.
+
+**Linux only.** Vivado has no macOS release, so a Mac cannot do this step at all.
+On a Mac, someone else runs step 4 and you consume the output through steps 2d
+and 3c.
+
+### 4a. Initialise Chipyard
+
+```console
+git submodule update --init backends/chipyard
+```
+
+Not `--recursive`: Chipyard initialises its own nested submodules during 4b, and
+recursing here pulls a large set its setup deliberately skips.
+
+This checkout is far larger than the bench tier's, and 4b is a long install.
+Budget considerably more than step 2's ~16 GB.
+
+### 4b. Chipyard's environment
+
+```console
+rb env setup chipyard
+```
+
+Runs Chipyard's own `build-setup.sh --use-lean-conda`, building a locked conda
+environment at `backends/chipyard/.conda-env`. Check it:
+
+```console
+$ rb env status
+chipyard  ok      .../backends/chipyard/.conda-env
+zephyr    ok      .../tools/miniforge3/envs/zephyr
+```
+
+### 4c. Vivado
+
+Not vendored and not installed by anything here -- it is a licensed Xilinx tool
+you install yourself. `rb` defaults to `/ecad/tools/xilinx/Vivado/2023.1/bin`,
+which is one particular bench's path and almost certainly not yours:
+
+```console
+export RB_VIVADO_BIN=/path/to/Vivado/2023.1/bin
+```
+
+Confirm `rb` sees it:
+
+```console
+$ rb doctor
+Vivado            ok      /path/to/Vivado/2023.1/bin/vivado
+Vivado version            vivado v2023.1 (64-bit)
+```
+
+### 4d. Elaborate, then build
+
+Elaboration is minutes and catches configuration errors without spending an hour
+in Vivado, so do it first on a config you have not built before:
+
+```console
+rb chipyard elaborate --board arty200t --config RocketArty200TDroneFullDDRConfig
+```
+
+It writes the `.dts` that step 2d distributes. Then the bitstream:
+
+```console
+rb chipyard build --board arty200t --config RocketArty200TDroneFullDDRConfig
+```
+
+This runs `make bitstream` inside Chipyard's environment. A DDR-backed config
+takes on the order of an hour -- the MIG dominates -- and a scratchpad config is
+considerably faster. The result lands at
+
+```
+backends/chipyard/fpga/generated-src/<generated-name>/obj/<Harness>.bit
+```
+
+which is exactly where `rb program` looks first.
+
+> **A config that "fails" the contract check has still built.** `NoCores*Config`
+> elaborates cleanly and then reports *"elaborated successfully, but the
+> generated DTS is not a deployable RiskyBird target"* -- it has no cores and no
+> UART by design. That is a correct rejection of a config that was never a
+> deployment target, not a broken build. The same config exists for all three
+> boards and behaves the same way.
+
+### 4e. Publish for hosts that cannot build
+
+This is what makes the bench tier work on a Mac.
+
+```console
+python3 tools/collect-dts.py         --out ~/riskybird-dts
+python3 tools/collect-bitstreams.py  --out ~/riskybird-bitstreams
+```
+
+Each writes `<board>/<board>.<Config>.<ext>` plus a `manifest.json` recording
+the source revisions -- and for bitstreams, resource and timing figures, with
+any config that missed timing flagged.
+
+The renaming is the point. Chipyard names every bitstream after its *harness*,
+so a directory of `Arty200THarness.bit` files is indistinguishable once moved;
+naming by board and config is what lets `RB_BITSTREAM_DIR` and `RB_DTS_DIR`
+resolve a specific shell on a machine that never built it.
+
+Commit and push those two directories to their side repositories, and a Mac
+picks them up through steps 2d and 3c.
+
+Only *synthesised* configs produce bitstreams. A config that was elaborated but
+never built appears in the DTS collection and not the bitstream one -- which is
+precisely the situation step 3c warns about for `arty200t`'s default config.
