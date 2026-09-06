@@ -669,6 +669,14 @@ build: this shell declares `ram0` at `0x8000_0000 + 0x4000_0000` (1 GiB DDR3),
 So if step 2 loads and then prints nothing, the linker and the memory map are
 not the cause; look at the console wiring and the shell's UART instead.
 
+The JTAG chain is likewise resolved end to end before you plug anything in: the
+SDK's OpenOCD binary, `hardware/openocd/ft-link.cfg`, the board's target config
+and `riscv64-zephyr-elf-gdb` all exist and are what `rb debug` invokes, and the
+adapter config matches both parts this bench uses
+(`ftdi vid_pid 0x0403 0x6010 0x0403 0x6011` -- FT2232H and FT4232H). A failure at
+step 0 or 1 is therefore about the cable, the adapter's state or the board's
+power, not about a missing or mis-pathed tool.
+
 Steps 0-5 need **no battery and no propellers**. Anything that drives a motor
 does: see `motor-pwm-bringup.md` and `flight-on-fpga.md`, and note that the full
 drone shell drives the motor pins from configuration onward, before any code
