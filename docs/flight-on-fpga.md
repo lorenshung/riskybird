@@ -468,3 +468,28 @@ Both env vars must be on the `rb debug` line — it rebuilds.
   configuration. See `motor-pwm-bringup.md`. Note this does **not** explain the
   two motors that spun on 2026-09-04; that cause is still unknown, so keep
   propellers off regardless.
+
+- **A lead on what did spin them: two J1 pins this shell claims arbitrarily.**
+  `RocketArty200TDroneFullDDRConfig` drives a strict superset of
+  `RocketArty200TDroneDDRConfig`'s pins, and the latter has never spun a motor.
+  Two of the additions are, in `WithArty200TGPIO`'s own words, *"arbitrary
+  placeholders on J1 nets this repository never names"* -- chosen only because
+  the sifive GPIO block is three bits wide and `pmw3901_test`'s devicetree
+  contract needs three properties:
+
+  | signal | pin | connector | reset state |
+  | --- | --- | --- | --- |
+  | `gpio_0` — PMW3901 NCS, legitimate | D16 | J1_76 | BIDIR, no pull |
+  | `gpio_1` — **placeholder** | A20 | **J1_38** | BIDIR, **no pull: floats** |
+  | `gpio_2` — **placeholder** | A21 | **J1_57** | BIDIR, pulldown |
+
+  This repository does not know what J1_38 and J1_57 carry on the v3 base, and
+  its `hardware/pcb` snapshot is a stale v2 layout, so it cannot find out. A
+  floating pin on an unknown net is a plausible cause of non-deterministic
+  behaviour -- and "two of four motors" is the shape a marginal, undriven gate
+  produces.
+
+  **Check J1_38 and J1_57 against `riskybirdv3_base` before the next motor
+  session.** If either lands on anything motor-related, that is the answer, and
+  the fix is to move the placeholders to genuinely unused pins and give them
+  pulldowns. Stated as a lead, not a conclusion: it has not been measured.
