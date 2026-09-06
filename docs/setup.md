@@ -252,7 +252,100 @@ build produced a 409 KB ELF.
 
 ---
 
-## Step 3 -- (not written yet)
+## Step 3 -- program a board and open a console
 
-Programming the FPGA and opening a console: openFPGALoader, OpenOCD, and the
-FTDI adapters.
+Adds the two host tools that talk to hardware, and the bitstream to load. This
+is the first step that needs the board attached.
+
+### 3a. openFPGALoader
+
+Not vendored -- it is a normal package:
+
+```console
+brew install openfpgaloader          # macOS
+sudo apt install openfpgaloader      # Debian/Ubuntu
+```
+
+`hardware/spioverjtag/setup-openfpgaloader.sh` builds it from source if your
+distribution's package is too old; set `OFL_PREFIX` to choose where it lands.
+
+### 3b. OpenOCD
+
+The Zephyr SDK from step 2 ships one, and `rb` uses it automatically. If your
+SDK has none, install OpenOCD yourself (`brew install open-ocd`) -- `rb` falls
+back to whatever is on `PATH`.
+
+There is nothing to configure. `rb` looks inside the SDK for the host-tools
+sysroot belonging to *your* machine, so the same command works on Linux and
+macOS.
+
+### 3c. Supply a bitstream
+
+Same split as the devicetree in step 2c, and for the same reason: **programming
+a board needs the bitstream file, not the toolchain that synthesised it.**
+
+```console
+git clone git@github.com:lorenshung/bitstream.git ~/riskybird-bitstreams
+export RB_BITSTREAM_DIR=~/riskybird-bitstreams
+```
+
+Layout is `<board>/<board>.<Config>.bit`. That naming is what makes the fallback
+work at all: Chipyard names every bitstream after its harness, so a directory of
+`Arty200THarness.bit` files would be indistinguishable once moved.
+
+`rb` prefers a local Chipyard build when one exists. Regenerate the collection
+from a machine that has Chipyard with `tools/collect-bitstreams.py`.
+
+### 3d. Find the adapters
+
+The drone bench has two FT2232H adapters: one reaches the FPGA's configuration
+TAP (bitstream), the other the Rocket debug TAP (ELF loading, and the console on
+its channel B). Which is which is **not stable across replugs**, so read it
+rather than remember it:
+
+```console
+$ rb bench
+ROLE       LOCATION   BUS:DEV  JTAG chA       CONSOLE chB    IDCODE
+debug      7-1.1.4.1  7:22     detached       /dev/ttyUSB5   0x00000001  Rocket debug TAP
+bitstream  7-1.1.4.3  7:21     detached       /dev/ttyUSB0   0x13636093  xc7a200t config TAP
+```
+
+On Linux this needs nothing installed. **On macOS it needs pyusb** (step 1's
+optional section): there is no sysfs, so `rb` asks libusb instead. It reports
+the same bus-and-port location string OpenOCD matches, so the value is
+interchangeable.
+
+Note the debug TAP reads `0x00000001` only **after** the part is configured.
+Before that it scans all ones, which is correct behaviour and not a fault --
+probe with a bitstream already loaded or the debug link looks dead.
+
+### 3e. Recovering a wedged adapter
+
+Only the first OpenOCD run after an adapter enumerates is reliable. Afterwards
+the MPSSE engine can be left in a state where the JTAG scan returns all zeroes
+or all ones -- which reads exactly like a broken cable or an unconfigured part.
+
+```console
+python3 tools/bench/usbreset.py 7-1.1.4.1
+```
+
+Linux uses the `USBDEVFS_RESET` ioctl; macOS has no usbfs, so the same script
+uses libusb through pyusb. The location argument is identical on both.
+
+If a scan returns **all zeroes**, suspect that the part lost its configuration
+(power cycled, or a programming run was interrupted) before suspecting the
+cable.
+
+### Verify
+
+```console
+rb program --board arty200t --config <Config> --usb-location <bitstream-location>
+rb console --port /dev/ttyUSB5 --baudrate 115200
+```
+
+> **Not yet verified end to end.** Steps 1 and 2 were run exactly as written.
+> Step 3's tool discovery, bitstream resolution and adapter probing are
+> verified; the programming and console commands are recorded from a working
+> bench but have not been re-run against this checkout, because the board was
+> detached while it was written. Treat this section as recorded, not verified,
+> until it is.

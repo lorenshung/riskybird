@@ -113,7 +113,36 @@ class Board:
 
     @property
     def bitstream(self) -> Path:
-        return self.generated_dir / "obj" / f"{self.harness}.bit"
+        """The bitstream for this board+config.
+
+        Same split as generated_dts, for the same reason: Chipyard's build
+        output is the source of truth, but PROGRAMMING a board needs the file
+        rather than the toolchain that made it. A host that cannot synthesise --
+        a Mac, since Vivado has no macOS release -- programs from bitstreams
+        built elsewhere.
+
+        Prefer a local Chipyard build when one is present, otherwise fall back
+        to a collected directory laid out the way tools/collect-bitstreams.py
+        publishes it: <board>/<board>.<Config>.bit. Note that layout is what
+        makes the fallback usable at all -- Chipyard names every bitstream after
+        its harness, so a directory of Arty200THarness.bit files would be
+        indistinguishable once moved.
+
+        Set RB_BITSTREAM_DIR to point it somewhere other than <root>/bitstreams.
+        """
+        built = self.generated_dir / "obj" / f"{self.harness}.bit"
+        if built.is_file():
+            return built
+        collected = self.collected_bitstream
+        if collected.is_file():
+            return collected
+        return built
+
+    @property
+    def collected_bitstream(self) -> Path:
+        """Where a bitstream built on another machine is looked for."""
+        root = Path(os.environ.get("RB_BITSTREAM_DIR", ROOT / "bitstreams"))
+        return root / self.name / f"{self.name}.{self.config}.bit"
 
     @property
     def overlay(self) -> Path:
