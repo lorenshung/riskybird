@@ -1,0 +1,10 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# rb's own scratch: caches and runtime environments it creates under the repo
+# root so nothing has to be writable outside the checkout.
+.rb/
+
+# Zephyr/CMake build trees, one per target+workload+mode.
+build/

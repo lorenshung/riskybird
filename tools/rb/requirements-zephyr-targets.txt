@@ -1,0 +1,5 @@
+# Runtime required by Zephyr's ESP32 image and flash flow.
+esptool>=5.0.2
+
+# Required by Zephyr's Twister test runner.
+natsort>=8.4
