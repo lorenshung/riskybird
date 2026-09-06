@@ -27,7 +27,9 @@ side needs the other's toolchain.
 | Path | |
 | --- | --- |
 | `rb`, `tools/rb/` | the entry point; `rb --help` lists every flow |
-| `workloads/` | Zephyr applications — sensors, camera, motors, DDR stress |
+| `rb-env.sh` | `source` it to get a shell that can run `rb` — for scripts and CI |
+| `tests/` | the test suite; needs the backends installed |
+| `workloads/` | Zephyr applications — sensors, camera, motors, DDR stress. (`flight_controller` is the exception: it is maintained upstream and lives in the Zephyr backend, built in place.) |
 | `hardware/zephyr/` | device-tree overlays and Kconfig per board, target and workload |
 | `hardware/openocd/` | JTAG adapter and target configs |
 | `tools/bench/` | bench helpers, including the FTDI reset the JTAG link needs |
@@ -44,6 +46,7 @@ side needs the other's toolchain.
 | [`hm01b0-camera-bringup.md`](docs/hm01b0-camera-bringup.md) | the camera, end to end |
 | [`motor-pwm-bringup.md`](docs/motor-pwm-bringup.md) | motor PWM |
 | [`flight-on-fpga.md`](docs/flight-on-fpga.md) | porting the flight controller onto Rocket; phase plan and what is verified |
+| [`te0712-ftdi-carrier-ddr-bringup.md`](docs/te0712-ftdi-carrier-ddr-bringup.md) | the same DDR3 work on the FTDI carrier |
 | [`verification.md`](docs/verification.md) | what "verified" means here |
 | [`repository-layout.md`](docs/repository-layout.md) | orientation |
 

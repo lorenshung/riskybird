@@ -100,6 +100,15 @@ later sessions have it too.
 
 `./rb` also works, but only when your working directory is the repository root.
 
+> **Driving this from a script, a Makefile, CI or an agent?** Those get a fresh
+> environment for every command, so "export it once and put it in your shell
+> profile" does not apply. Source `rb-env.sh` at the top of each invocation
+> instead -- it applies everything this page tells you to export, is safe to
+> source repeatedly, and warns about the two environment hazards in step 2:
+> ```console
+> source ./rb-env.sh
+> ```
+
 **Do not use `--recursive`.** The backends carry their own nested submodules -- recursing pulls
 several gigabytes, including three separate copies of Chipyard, none of which the bench tier
 uses. Later steps initialise exactly the submodules they need.
