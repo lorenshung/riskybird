@@ -415,3 +415,66 @@ Run in order. Each stage has an unambiguous pass signal, and each depends on the
 | 7 | **One-line capture** | `[8/9] 324/324` and `RESULT: PASS` | check D0–D7 order against the dump; `constant-data` means a stuck bus |
 
 Stages 1–5 prove the **control path**. Only stages 6–7 prove the **receive path**.
+
+---
+
+## Taking a picture
+
+`camera_bringup` above answers *does the camera work*. Once that is settled,
+`camera_photo` does the one thing that follows: configure the sensor, capture a
+full frame, stop. It needs a DDR-backed shell -- a frame is ~79 KB and a
+scratchpad holds 32 KB -- which the workload's RAM floor enforces at build time.
+
+```bash
+rb debug camera_photo --target arty200t \
+    --config RocketArty200TDroneFullDDRConfig --program \
+    --program-usb-location <bitstream-loc> --usb-location <debug-loc> \
+    --gdb-script hardware/ospi/capture-frame.gdb
+```
+
+The frame is never printed. It is left in `pixels[]`, and `capture-frame.gdb`
+copies it out over the same JTAG link that loaded the image, then converts it:
+
+```console
+=== capture core ===
+  measured   326 x 242    configured 324 x 244
+  pclk=1068349 fvld=4 lvld=1296 frames=1
+=== frame ===
+  valid bytes in pixels[]: 78892
+  wrote camera-frame.raw
+camera-frame.raw: 78892 bytes -> 324x242 (cropped 2 columns)
+  wrote camera-frame.png
+```
+
+Both files land in the directory you ran from.
+
+![HM01B0 frame](figures/hm01b0_first_frame.png)
+
+Same frame with `--stretch`, which rescales to full black-to-white -- the
+sensor's default exposure is dark indoors:
+
+![HM01B0 frame, contrast stretched](figures/hm01b0_first_frame_bright.png)
+
+### Two things that look like broken hardware and are not
+
+**Reshape at the MEASURED width, not the configured one.** The core reports
+`measured 326` where `GEOM` is configured for 324, because each line carries two
+dummy pixels ahead of the active window. Reshaping at 324 shears the picture one
+pixel per row, which looks exactly like a corrupt capture.
+`frame-to-png.py` takes the width as an argument for this reason and drops the
+two leading columns by default.
+
+**`OVERFLOW` alongside a complete capture is not a failure.** The CDC FIFO is
+1024 beats and the sensor streams at several MHz, so it refills far faster than
+a polling CPU drains it. Once `PIXTARGET` is reached the capture is already
+satisfied and every further pixel is surplus -- the flag describes data nobody
+wanted, not data that was lost. It is only fatal when the drained count also
+came up short.
+
+### If a capture comes back empty
+
+Run it again before concluding anything. Captures on this bench are
+intermittent: a run that returned zero pixels was followed immediately by one
+that returned all 78892 with identical counters. The GDB script reports the
+failing stage by reading `fail()`'s own arguments over JTAG, so a failed run
+names its stage without needing the console.
