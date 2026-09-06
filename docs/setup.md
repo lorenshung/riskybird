@@ -29,9 +29,12 @@ verification at the end of each step exercises.
 | `xpurt`, `schedule` | workload-mix scheduling and policy replay |
 | `dse`, `area` | design-space exploration and FPGA resource characterisation |
 
-They work here and are used in this repository's own experiments, but they are in progress: they
-carry dependencies this guide does not install (`gymnasium`, `isaaclab`), their setup is not
-documented, and their interfaces are expected to change. Nothing in the supported surface depends
+They work here and are used in this repository's own experiments, but they are in progress:
+their setup is not documented, and their interfaces are expected to change. Note that step 2b
+*does* pull several gigabytes of their dependencies -- `gymnasium`, `torch`, CUDA runtime
+libraries, `stable-baselines3` -- into the Zephyr environment as a side effect. None of it is
+needed for the supported surface; it is simply part of the environment the backend defines, and
+is most of why that environment is ~7 GB. Nothing in the supported surface depends
 on them -- their modules are imported lazily, so an absent dependency costs nothing until you
 invoke one. Treat them as a preview rather than part of the install.
 
@@ -58,6 +61,12 @@ library.
 git clone git@github.com:lorenshung/riskybird-dev.git
 cd riskybird-dev
 ```
+
+> **These are private repositories.** This one, and the two side repositories in
+> steps 2d and 3c, are cloned over SSH and are not publicly readable. You need a
+> GitHub account with access and an SSH key configured, or the very first
+> command fails. (`lorenshung/zephyr-chipyard-sw`, fetched in step 2a, is public
+> and uses HTTPS.)
 
 Every command below is written as `rb`. Run it as `./rb` from the repository
 root, or put the root on your `PATH` once:
@@ -136,8 +145,9 @@ shell test yet. (It currently has no way to say "complete *for the bench tier*",
 Mac install will keep reporting the Vivado and Chipyard lines forever. That is a known rough
 edge, not a problem with your install.)
 
-**`MISSING` lines name the path that was expected**, so they double as the answer to "where is it
-supposed to go". The SDK line naming `x86_64-pokysdk-linux` on a Mac is not a bug -- with no SDK
+**Most `MISSING` lines name the path that was expected**, so they double as the answer to "where
+is it supposed to go". Two do not: `west` and `Espresso` are looked up on a `PATH` rather than at
+a fixed location, so they print `MISSING` with nothing after it. The SDK line naming `x86_64-pokysdk-linux` on a Mac is not a bug -- with no SDK
 installed there is nothing to detect yet, so it reports the Linux default; once the SDK is
 installed, step 2 finds the right sysroot for your host automatically.
 
@@ -189,8 +199,13 @@ Both installers hard-require these, and neither checks usefully:
 > `cmake: error while loading shared libraries: libidn.so.11`, failing SDK
 > installation at the *"Register CMake package"* step with exit 40.
 >
-> Step 2b installs a known-good cmake into the environment, which is why it
-> comes **before** the SDK. Doing them in the other order walks into this.
+> Fixing `PATH` is the whole remedy -- do it before step 2c and the installer
+> runs clean.
+>
+> Note that step 2b installs a pinned `cmake<4` into the Zephyr *environment*,
+> and that is the cmake `west build` uses later. It does **not** protect step 2c:
+> 2c is a plain shell script that never activates that environment, so whatever
+> `cmake` your shell resolves is what it gets.
 
 ### 2a. Initialise only the backend you need
 
@@ -220,9 +235,20 @@ Nothing later works without this. `rb build` shells out to `west`, so skipping
 it fails with a bare `No such file or directory: 'west'` several steps
 downstream.
 
-> If you already have a conda environment active, `rb env setup zephyr` may
-> build into *that* rather than into the checkout. Run it from a shell with no
-> conda active, or accept the environment it reports.
+> **This step edits `~/.condarc`**, which is user-global: it adds the
+> `conda-forge` channel, sets `channel_priority: strict` and switches the solver
+> to `libmamba`. That changes solver behaviour for every other conda environment
+> you own, not just this one. Back the file up first if you care about it.
+
+> **If you have a conda environment active, deactivate it first.** The
+> installer only bootstraps its own Miniforge when `CONDA_DEFAULT_ENV` is unset;
+> with one active it builds into *that* environment instead -- putting ~7 GB
+> into your base install rather than into the checkout.
+> ```console
+> conda deactivate          # repeat until `echo $CONDA_DEFAULT_ENV` is empty
+> ```
+> Check the path it reports: it should be
+> `backends/zephyr-chipyard-sw/tools/miniforge3`.
 
 ### 2c. Install the toolchain
 
@@ -246,9 +272,13 @@ fails with *"bad CPU type in executable"*, which reads like a corrupt download
 rather than the wrong package.
 
 > **This step writes outside the checkout.** It registers the SDK in
-> `~/.cmake/packages/Zephyr-sdk`, which is a *user-global* registry holding one
-> entry. A second checkout that runs this takes over the registration from the
-> first. If you keep two, expect to re-run this when you switch.
+> `~/.cmake/packages/Zephyr-sdk`, a *user-global* registry holding one entry, so
+> a second checkout running this takes the registration over from the first.
+>
+> That does not affect `rb`, which passes `ZEPHYR_SDK_INSTALL_DIR` explicitly and
+> never consults the registry -- `rb build` works with the registration pointing
+> somewhere else entirely. It matters only if you run `west build` by hand,
+> outside `rb`.
 
 `rb` finds the SDK's host tools by looking inside the SDK, so no path needs
 editing afterwards.
@@ -311,9 +341,20 @@ Memory region         Used Size  Region Size  %age Used
 An ELF at `build/zephyr/arty200t/hello_world/default/zephyr/zephyr.elf` is the
 end of step 2. Nothing so far has needed hardware.
 
+> **Verified 2026-09-05 from a clean clone of this branch into an empty
+> directory**, by someone following only this page, with no access to any other
+> checkout. Steps 1 and 2 completed with no undocumented workarounds; the two
+> deviations taken were the `PATH` remedy and the `conda deactivate`, both
+> prescribed above. Every figure quoted on this page -- the doctor lines, the
+> `19424 B / 1 GB`, the `32 KB / 59.28%` -- was reproduced exactly.
+>
+> Step 3 has **not** been verified that way; see the note at the end of it.
+
 That `1 GB` region is the proof step 2d worked: it comes from the
-`RocketArty200TDroneFullDDRConfig` devicetree. A scratchpad config reports
-`32 KB` and `59.28%` here instead.
+`RocketArty200TDroneFullDDRConfig` devicetree. Build
+`--config RocketArty200TSpadConfig` instead and the same workload reports
+`32 KB` and `59.28%`, because that shell presents a 32 KiB scratchpad rather
+than DDR.
 
 > **The build directory is keyed on target, workload and mode -- but not on
 > config.** Building a second config for the same workload overwrites the ELF at
@@ -365,17 +406,42 @@ work at all: Chipyard names every bitstream after its harness, so a directory of
 `rb` prefers a local Chipyard build when one exists. Regenerate the collection
 from a machine that has Chipyard with `tools/collect-bitstreams.py`.
 
-Not every config has a bitstream -- a shell has to have been synthesised for one
-to exist. Check before relying on one:
+Not every config has a bitstream. A shell has to have been *synthesised* for one
+to exist, and several are only ever elaborated -- enough for `rb build`, not
+enough to program. Check before relying on one:
 
 ```console
 $ ls ~/riskybird-bitstreams/arty200t/
-arty200t.RocketArty200TDroneFullDDRConfig.bit   arty200t.RocketArty200TOspiConfig.bit
+arty200t.RocketArty200TDroneDDRConfig.bit
+arty200t.RocketArty200TDroneFullDDRConfig.bit
+arty200t.RocketArty200TFlowSpadConfig.bit
 ...
 ```
 
-`rb doctor`'s contract line names each board's default config, which is what
-`rb program --board arty200t` uses when you pass no `--config`.
+> **On arty200t you must pass `--config`.** `rb doctor`'s contract line names
+> each board's *default* config, which is what `rb program --board <board>` uses
+> when you give no `--config` -- and arty200t's default,
+> `RocketArty200TOspiConfig`, has been elaborated but never synthesised, so it
+> has no bitstream in the collection. arty100t and ku040 do have theirs.
+>
+> Use a config you have confirmed above, e.g. the one step 2 builds for:
+> ```console
+> rb program --board arty200t --config RocketArty200TDroneFullDDRConfig --usb-location <loc>
+> ```
+
+### 3c-bis. USB and serial access (Linux)
+
+Step 3 talks to FTDI adapters and serial ports. On Linux that needs group
+membership the installer mentions in passing and this guide previously did not:
+
+```console
+sudo usermod -aG plugdev,dialout "$USER"
+```
+
+Log out and back in for it to take effect. Without it `rb probe-ftdi` and
+`rb console` fail on permissions, which looks like absent hardware.
+
+macOS needs no equivalent.
 
 ### 3d. Find the adapters
 
@@ -399,6 +465,13 @@ interchangeable.
 Note the debug TAP reads `0x00000001` only **after** the part is configured.
 Before that it scans all ones, which is correct behaviour and not a fault --
 probe with a bitstream already loaded or the debug link looks dead.
+
+> `rb bench` runs a JTAG IDCODE scan on **every** FTDI device attached to the
+> host, not just the drone bench's, in order to work out which is which. It
+> labels foreign adapters clearly (an Alveo card shows up as
+> `xcu250 config TAP -- Alveo card, not the drone bench`), but on a machine with
+> other FPGA hardware attached, be aware it touches those adapters too -- and
+> see 3e on why the first scan after enumeration is the reliable one.
 
 ### 3e. Recovering a wedged adapter
 

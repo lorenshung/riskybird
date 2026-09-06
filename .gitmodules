@@ -7,3 +7,7 @@
 [submodule "backends/zephyr-chipyard-sw"]
 	path = backends/zephyr-chipyard-sw
 	url = https://github.com/lorenshung/zephyr-chipyard-sw.git
+[submodule "backends/chipyard"]
+	path = backends/chipyard
+	url = https://github.com/lorenshung/chipyard.git
+	branch = arty200t-dual-uart

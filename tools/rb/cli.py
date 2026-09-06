@@ -333,7 +333,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks = (
         ("Chipyard backend", CHIPYARD.is_dir(), CHIPYARD),
         ("Chipyard env", CHIPYARD_PREFIX.is_dir(), CHIPYARD_PREFIX),
-        ("Zephyr backend", ZEPHYR_BACKEND.is_dir(), ZEPHYR_BACKEND),
+        # Populated, not merely present -- same reason as Zephyr base below.
+        # An uninitialised submodule leaves an EMPTY directory here, and
+        # reporting that as ok contradicted the setup guide's own first
+        # checkpoint on a clone where nothing was installed yet.
+        (
+            "Zephyr backend",
+            (ZEPHYR_BACKEND / "scripts").is_dir(),
+            ZEPHYR_BACKEND,
+        ),
         ("Zephyr env", ZEPHYR_PREFIX.is_dir(), ZEPHYR_PREFIX),
         # Populated, not merely present. `git submodule update` and a failed
         # west workspace both leave an EMPTY directory here, and reporting that
