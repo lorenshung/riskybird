@@ -74,6 +74,9 @@ def reset_libusb(location: str) -> str:
 
 
 def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
     if len(sys.argv) != 2:
         print(f"usage: {Path(sys.argv[0]).name} <usb-location>", file=sys.stderr)
         print("  e.g. 7-1.1.4.1   (as printed by: rb probe-ftdi)", file=sys.stderr)

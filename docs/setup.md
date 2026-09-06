@@ -58,9 +58,13 @@ library.
 ### Get it
 
 ```console
-git clone git@github.com:lorenshung/riskybird-dev.git
+git clone --branch setup git@github.com:lorenshung/riskybird-dev.git
 cd riskybird-dev
 ```
+
+`--branch setup` matters: `main` carries an older, shorter version of this same
+file, so cloning without it gives you a different page from the one you are
+reading.
 
 > **These are private repositories.** This one, and the two side repositories in
 > steps 2d and 3c, are cloned over SSH and are not publicly readable. You need a
@@ -123,13 +127,19 @@ $ ./rb doctor
 RiskyBird rb 0.1.0
 repository       /path/to/riskybird-dev
 Chipyard backend  MISSING .../backends/chipyard
+Chipyard env      MISSING .../backends/chipyard/.conda-env
 Zephyr backend    MISSING .../backends/zephyr-chipyard-sw
-Zephyr SDK        MISSING .../backends/zephyr-chipyard-sw/tools-manual/zephyr-sdk-1.0.0-beta1
+Zephyr env        MISSING .../tools/miniforge3/envs/zephyr
 Zephyr base       MISSING .../zephyr_ws/zephyr
+Zephyr SDK        MISSING .../tools-manual/zephyr-sdk-1.0.0-beta1
+Espressif HAL     MISSING .../zephyr_ws/modules/hal/espressif
+ST HAL            MISSING .../zephyr_ws/modules/hal/st
 west              MISSING
 RISC-V compiler   MISSING .../riscv64-zephyr-elf-gcc
+Espresso          MISSING
+Vivado            ok      /ecad/tools/xilinx/Vivado/2023.1/bin/vivado
+OpenOCD           MISSING .../hosttools/.../usr/bin/openocd
 GDB               MISSING .../riscv64-zephyr-elf-gdb
-(several more lines: Zephyr env, the HALs, Espresso, Vivado)
 hardware contracts
   arty200t     pending generated DTS not present
 serial devices
@@ -239,6 +249,10 @@ downstream.
 > `conda-forge` channel, sets `channel_priority: strict` and switches the solver
 > to `libmamba`. That changes solver behaviour for every other conda environment
 > you own, not just this one. Back the file up first if you care about it.
+>
+> It also appends the new environment to `~/.conda/environments.txt` and touches
+> `~/.wget-hsts`. Both are harmless; listed so that nothing this install does
+> outside the checkout is a surprise.
 
 > **If you have a conda environment active, deactivate it first.** The
 > installer only bootstraps its own Miniforge when `CONDA_DEFAULT_ENV` is unset;
@@ -246,6 +260,12 @@ downstream.
 > into your base install rather than into the checkout.
 > ```console
 > conda deactivate          # repeat until `echo $CONDA_DEFAULT_ENV` is empty
+> ```
+> If that returns `CondaError: Run 'conda init' before 'conda deactivate'`, the
+> shell has the environment variables but not the shell function -- usual in a
+> non-interactive shell. Load it first, then deactivate:
+> ```console
+> source "$(dirname "$(dirname "$(command -v conda)")")/etc/profile.d/conda.sh"
 > ```
 > Check the path it reports: it should be
 > `backends/zephyr-chipyard-sw/tools/miniforge3`.
@@ -271,14 +291,16 @@ avoiding: the Linux tarball extracts perfectly well on macOS and then every tool
 fails with *"bad CPU type in executable"*, which reads like a corrupt download
 rather than the wrong package.
 
-> **This step writes outside the checkout.** It registers the SDK in
-> `~/.cmake/packages/Zephyr-sdk`, a *user-global* registry holding one entry, so
-> a second checkout running this takes the registration over from the first.
+> **This step writes outside the checkout.** It registers the SDK in the
+> *user-global* `~/.cmake/packages/Zephyr-sdk/`, one file per SDK, named for the
+> md5 of that SDK's path. So a second checkout **adds** a second entry rather
+> than replacing the first, and the directory accumulates one per checkout you
+> ever install.
 >
-> That does not affect `rb`, which passes `ZEPHYR_SDK_INSTALL_DIR` explicitly and
-> never consults the registry -- `rb build` works with the registration pointing
-> somewhere else entirely. It matters only if you run `west build` by hand,
-> outside `rb`.
+> None of this affects `rb`, which passes `ZEPHYR_SDK_INSTALL_DIR` explicitly and
+> never consults the registry. It matters only if you run `west build` by hand
+> outside `rb`, where CMake may then have several registered SDKs to choose
+> between. Old entries pointing at deleted checkouts are safe to delete.
 
 `rb` finds the SDK's host tools by looking inside the SDK, so no path needs
 editing afterwards.
@@ -341,14 +363,16 @@ Memory region         Used Size  Region Size  %age Used
 An ELF at `build/zephyr/arty200t/hello_world/default/zephyr/zephyr.elf` is the
 end of step 2. Nothing so far has needed hardware.
 
-> **Verified 2026-09-05 from a clean clone of this branch into an empty
-> directory**, by someone following only this page, with no access to any other
-> checkout. Steps 1 and 2 completed with no undocumented workarounds; the two
-> deviations taken were the `PATH` remedy and the `conda deactivate`, both
-> prescribed above. Every figure quoted on this page -- the doctor lines, the
-> `19424 B / 1 GB`, the `32 KB / 59.28%` -- was reproduced exactly.
+> **Verified 2026-09-05, twice, from a clean clone of this branch into an empty
+> directory**, each time by someone following only this page with no access to
+> any other checkout. Steps 1 and 2 completed both times with no undocumented
+> workarounds beyond the `PATH` and `conda deactivate` remedies prescribed
+> above. Every figure quoted on this page -- the doctor lines, the
+> `19424 B / 1 GB`, the `32 KB / 59.28%`, the ~16 GB footprint -- was reproduced
+> exactly.
 >
-> Step 3 has **not** been verified that way; see the note at the end of it.
+> Step 3 has **not** been verified that way and cannot be without an FPGA board
+> attached; see the note at the end of it.
 
 That `1 GB` region is the proof step 2d worked: it comes from the
 `RocketArty200TDroneFullDDRConfig` devicetree. Build
@@ -391,7 +415,7 @@ macOS.
 
 ### 3c. Supply a bitstream
 
-Same split as the devicetree in step 2c, and for the same reason: **programming
+Same split as the devicetree in step 2d, and for the same reason: **programming
 a board needs the bitstream file, not the toolchain that synthesised it.**
 
 ```console
@@ -406,15 +430,20 @@ work at all: Chipyard names every bitstream after its harness, so a directory of
 `rb` prefers a local Chipyard build when one exists. Regenerate the collection
 from a machine that has Chipyard with `tools/collect-bitstreams.py`.
 
+> Like `RB_DTS_DIR`, this must be set in **every** shell that runs `rb`. Put both
+> in your shell profile.
+
 Not every config has a bitstream. A shell has to have been *synthesised* for one
 to exist, and several are only ever elaborated -- enough for `rb build`, not
 enough to program. Check before relying on one:
 
 ```console
 $ ls ~/riskybird-bitstreams/arty200t/
+arty200t.CameraBringup200TConfig.bit
+arty200t.DualRocketArty200TOspiConfig.bit
+arty200t.RocketArty200TConfig.bit
 arty200t.RocketArty200TDroneDDRConfig.bit
 arty200t.RocketArty200TDroneFullDDRConfig.bit
-arty200t.RocketArty200TFlowSpadConfig.bit
 ...
 ```
 

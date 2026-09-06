@@ -101,6 +101,25 @@ class RbError(RuntimeError):
     """A concise, user-facing command failure."""
 
 
+def _populated(path: Path) -> bool:
+    """True when a directory exists AND has something in it.
+
+    Every path in the doctor table can exist while being empty, and each one
+    means "not installed" when it is: an uninitialised submodule, an
+    interrupted conda install, a half-extracted SDK, a west module that was
+    never fetched. Reporting those as ok is worse than reporting nothing,
+    because the setup guide's checkpoints are exactly where someone looks to
+    decide whether the previous step worked.
+
+    Checked as a group rather than per-path because this bug has now been fixed
+    one line at a time twice, each fix missing the next-nearest check.
+    """
+    try:
+        return path.is_dir() and any(path.iterdir())
+    except OSError:
+        return False
+
+
 def _yes_no(value: bool) -> str:
     return "ok" if value else "MISSING"
 
@@ -331,26 +350,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print(f"RiskyBird rb {__version__}")
     print(f"repository       {ROOT}")
     checks = (
-        ("Chipyard backend", CHIPYARD.is_dir(), CHIPYARD),
-        ("Chipyard env", CHIPYARD_PREFIX.is_dir(), CHIPYARD_PREFIX),
+        ("Chipyard backend", _populated(CHIPYARD), CHIPYARD),
+        ("Chipyard env", _populated(CHIPYARD_PREFIX), CHIPYARD_PREFIX),
         # Populated, not merely present -- same reason as Zephyr base below.
         # An uninitialised submodule leaves an EMPTY directory here, and
         # reporting that as ok contradicted the setup guide's own first
         # checkpoint on a clone where nothing was installed yet.
         (
             "Zephyr backend",
-            (ZEPHYR_BACKEND / "scripts").is_dir(),
+            _populated(ZEPHYR_BACKEND),
             ZEPHYR_BACKEND,
         ),
-        ("Zephyr env", ZEPHYR_PREFIX.is_dir(), ZEPHYR_PREFIX),
+        ("Zephyr env", _populated(ZEPHYR_PREFIX), ZEPHYR_PREFIX),
         # Populated, not merely present. `git submodule update` and a failed
         # west workspace both leave an EMPTY directory here, and reporting that
         # as ok made the setup guide's own checkpoint pass on an install whose
         # very next command (rb build) could not run.
         ("Zephyr base", (ZEPHYR_BASE / "VERSION").is_file(), ZEPHYR_BASE),
-        ("Zephyr SDK", ZEPHYR_SDK.is_dir(), ZEPHYR_SDK),
-        ("Espressif HAL", ESPRESSIF_HAL.is_dir(), ESPRESSIF_HAL),
-        ("ST HAL", ST_HAL.is_dir(), ST_HAL),
+        ("Zephyr SDK", _populated(ZEPHYR_SDK), ZEPHYR_SDK),
+        ("Espressif HAL", _populated(ESPRESSIF_HAL), ESPRESSIF_HAL),
+        ("ST HAL", _populated(ST_HAL), ST_HAL),
         ("west", executable("zephyr", "west") is not None, executable("zephyr", "west")),
         (
             "RISC-V compiler",
