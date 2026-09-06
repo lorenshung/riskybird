@@ -318,9 +318,24 @@ def validate_hardware_contract(
             + "|".join(f"0x{size:x}" for size in board.legal_memory_sizes)
         )
     if failures:
+        # Elaboration SUCCEEDED if we got here -- this is a check on what the
+        # shell contains, not on whether it built. Say so: the old message read
+        # as a build failure, which sent people looking for a Chisel error that
+        # does not exist.
+        #
+        # A config with no cores is the honest case. NoCores*Config elaborates
+        # cleanly and has neither a CPU nor a UART by design, so it fails a
+        # contract whose whole purpose is to describe a deployable RiskyBird
+        # target. That is a correct rejection of an inapplicable config, not a
+        # broken one.
         raise RbError(
-            f"{board.name} generated DTS does not match the RiskyBird contract: "
-            + ", ".join(failures)
+            f"{board.name} elaborated successfully, but the generated DTS is "
+            f"not a deployable RiskyBird target.\n"
+            f"  config:  {board.config}\n"
+            f"  missing: " + ", ".join(failures) + "\n"
+            "The RTL is fine -- this config simply does not present the "
+            "periphery a\nRiskyBird workload needs. Configs with no cores, or "
+            "built for another\npurpose, are expected to fail here."
         )
     uart_irq = re.search(
         r"serial@10020000\s*\{.*?interrupts\s*=\s*<(\d+)>;",
