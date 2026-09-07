@@ -396,6 +396,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         ("Espressif HAL", _populated(ESPRESSIF_HAL, "components"), ESPRESSIF_HAL),
         ("ST HAL", _populated(ST_HAL, "CMakeLists.txt", "sensor"), ST_HAL),
         ("west", executable("zephyr", "west") is not None, executable("zephyr", "west")),
+        # dtc is a hard requirement of `rb build` -- CMake needs an absolute
+        # path to it -- but it is usually already installed, so its absence
+        # only ever surfaced as a CMake error deep inside a west build.
+        (
+            "dtc",
+            shutil.which("dtc", path=zephyr_env()["PATH"]) is not None,
+            shutil.which("dtc", path=zephyr_env()["PATH"]),
+        ),
         (
             "RISC-V compiler",
             (ZEPHYR_GNU_BIN / "riscv64-zephyr-elf-gcc").is_file(),
@@ -525,7 +533,8 @@ def cmd_env(args: argparse.Namespace) -> int:
         if CHIPYARD_PREFIX.is_dir():
             print(f"Chipyard environment already exists: {CHIPYARD_PREFIX}")
             return 0
-        print("Bootstrapping Chipyard's own lean, locked environment.")
+        require_chipyard("rb env setup chipyard")
+        print("Bootstrapping Chipyard's own lean, locked environment.", flush=True)
         return subprocess.call(
             ["/bin/bash", "build-setup.sh", "--use-lean-conda"], cwd=CHIPYARD
         )
@@ -559,8 +568,37 @@ def _configured_board(args: argparse.Namespace) -> Board:
     return get_board(args.board).with_config(getattr(args, "config", None))
 
 
+def require_chipyard(command: str) -> None:
+    """Fail with a tier explanation rather than a make/bash error.
+
+    An uninitialised submodule is an empty directory, so the underlying tools
+    report a missing file and give the reader nothing to act on.
+    """
+    if _populated(CHIPYARD, "build.sbt", "build-setup.sh"):
+        return
+    raise RbError(
+        f"'{command}' is a silicon-tier command and needs the Chipyard backend, "
+        f"which is not installed at {CHIPYARD}.\n"
+        "  The bench tier -- building Zephyr workloads and programming a board "
+        "with bitstreams\n"
+        "  built elsewhere -- does not need it, and on macOS it cannot be "
+        "installed at all\n"
+        "  because it requires Vivado, which is Linux-only.\n"
+        "  On Linux, install it with:\n"
+        "    git submodule update --init backends/chipyard\n"
+        "    rb env setup chipyard\n"
+        "  Otherwise supply prebuilt bitstreams via RB_BITSTREAM_DIR and an "
+        "elaborated\n"
+        "  devicetree via RB_DTS_DIR; see docs/setup.md steps 2d and 3c."
+    )
+
+
 def cmd_chipyard(args: argparse.Namespace) -> int:
     board = _configured_board(args)
+    # 'path' is exempt: it resolves against RB_BITSTREAM_DIR too, so it is
+    # answerable on the bench tier.
+    if args.chipyard_action != "path":
+        require_chipyard(f"rb chipyard {args.chipyard_action}")
     if args.chipyard_action == "path":
         # stdout stays the bare path so this remains scriptable, but a
         # non-zero exit with an empty stderr is indistinguishable from a
@@ -914,7 +952,11 @@ def zephyr_build(
     cmake_args = [
         f"-DRB_ROOT={ROOT}",
         f"-DRB_TARGET={target.name}",
-        "-DDTC=/usr/bin/dtc",
+        # Resolved against the build environment's PATH, not the caller's: on a
+        # Mac dtc is Homebrew's, and 2b may install it into the conda env. A bare
+        # "-DDTC=dtc" does not work -- CMake resolves it relative to the build
+        # directory. /usr/bin is SIP-protected, so a symlink is not a way out.
+        f"-DDTC={shutil.which('dtc', path=zephyr_env()['PATH']) or '/usr/bin/dtc'}",
         f"-DDTS_ROOT={ROOT / 'hardware' / 'zephyr'}",
     ]
     if not (workload.source_dir / "Kconfig").is_file():

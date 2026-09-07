@@ -86,10 +86,10 @@ without it they fail with `rb: command not found`.
 source ./rb-env.sh
 ```
 
-That is the whole of it. `rb-env.sh` applies everything this page would
-otherwise ask you to export one at a time, is safe to source repeatedly, sets
-nothing you have already set, and warns you about both of step 2's environment
-hazards before you meet them:
+That is the whole of it *for now*. `rb-env.sh` applies everything this page
+would otherwise ask you to export one at a time, is safe to source repeatedly,
+sets nothing you have already set, and warns you about both of step 2's
+environment hazards before you meet them:
 
 ```console
 $ source ./rb-env.sh
@@ -111,6 +111,18 @@ rb 0.1.0
 driving this from a script, a Makefile, CI or an agent, since those get a fresh
 environment every time. For an interactive shell you can put it in your profile
 instead.
+
+**Re-source it after steps 2d and 3c.** `RB_DTS_DIR` and `RB_BITSTREAM_DIR` are
+exported only if those directories already exist, so sourcing here -- before the
+side repositories are cloned -- correctly leaves both unset:
+
+```console
+$ source ./rb-env.sh
+$ echo "[$RB_DTS_DIR] [$RB_BITSTREAM_DIR]"
+[] []
+```
+
+Source it again once each clone lands and the variables appear.
 
 <details><summary>Doing it by hand instead</summary>
 
@@ -183,6 +195,7 @@ Zephyr SDK        MISSING .../tools-manual/zephyr-sdk-1.0.0-beta1
 Espressif HAL     MISSING .../zephyr_ws/modules/hal/espressif
 ST HAL            MISSING .../zephyr_ws/modules/hal/st
 west              MISSING
+dtc               ok      /usr/bin/dtc
 RISC-V compiler   MISSING .../riscv64-zephyr-elf-gcc
 Espresso          MISSING
 Vivado            ok      /ecad/tools/xilinx/Vivado/2023.1/bin/vivado
@@ -198,10 +211,12 @@ serial devices
   ...
 ```
 
-Two of those lines depend on your machine rather than on this step. `Vivado`
-and `OpenOCD` report `ok` if you happen to have them installed system-wide and
-`MISSING` if you do not; neither matters yet. The `version` lines print only for
-whatever was found.
+Three of those lines depend on your machine rather than on this step. `Vivado`,
+`OpenOCD` and `dtc` report `ok` if you happen to have them installed
+system-wide and `MISSING` if you do not. The first two do not matter yet.
+**`dtc` does** -- it is a hard requirement of step 2's build, so if it says
+`MISSING`, install it now (see the prerequisites at the top of step 2). The
+`version` lines print only for whatever was found.
 
 Each later step turns one of those lines green. What matters here is only that the command runs,
 prints your repository path, and does not raise.
@@ -214,9 +229,15 @@ edge, not a problem with your install.)
 
 **Most `MISSING` lines name the path that was expected**, so they double as the answer to "where
 is it supposed to go". Two do not: `west` and `Espresso` are looked up on a `PATH` rather than at
-a fixed location, so they print `MISSING` with nothing after it. The SDK line naming `x86_64-pokysdk-linux` on a Mac is not a bug -- with no SDK
-installed there is nothing to detect yet, so it reports the Linux default; once the SDK is
-installed, step 2 finds the right sysroot for your host automatically.
+a fixed location, so they print `MISSING` with nothing after it.
+
+**`west` may already say `ok` here, and if it does it is a false green.** If you
+have ever `brew install`ed or `pip install`ed west, the doctor finds *that* one
+-- on a Mac typically `ok /opt/homebrew/bin/west`. It is not the west this
+project builds with, so step 2's "check the `west` line specifically"
+verification would pass for the wrong reason. Step 2b installs west into the
+project's conda environment and the line re-resolves there; the check is only
+meaningful after 2b.
 
 ### Optional: FTDI discovery on macOS
 
@@ -227,8 +248,21 @@ macOS has no sysfs, so those two commands need libusb:
 
 ```console
 brew install libusb
-pip install pyusb
+python3 -m pip install --break-system-packages --user pyusb
 ```
+
+Two traps here, both of which bite if you follow this page top to bottom:
+
+- A Homebrew python is *externally managed*, so a plain `pip install pyusb`
+  stops with `error: externally-managed-environment`. Hence the flags above.
+  (There may also be no bare `pip` on `PATH` at all -- use `python3 -m pip`.)
+- **Install it into the interpreter `rb` will actually run under.** `rb` starts
+  with `#!/usr/bin/env python3`. If you run this step while a conda environment
+  is active -- which is the state `rb-env.sh` warns you about -- pyusb lands in
+  the conda python, and then step 2b tells you to `conda deactivate`, after
+  which `rb` resolves to a *different* python and reports
+  `ModuleNotFoundError: No module named 'usb'`. Either `conda deactivate` before
+  installing pyusb, or reinstall it afterwards.
 
 `rb` computes the same bus-and-port location string OpenOCD's own libusb backend uses
 (`7-1.1.4.1`), so the value it prints is the one to pass to `--usb-location`.
@@ -251,12 +285,24 @@ You can skip this until you have hardware attached.
 Adds the toolchain. After this step `rb build` produces a real ELF, with no FPGA
 attached and -- on the bench tier -- no Chipyard installed.
 
-**Budget ~16 GB of disk and around half an hour**, most of it unattended
-downloads. The bulk lands in `backends/zephyr-chipyard-sw`: ~4 GB SDK, ~7 GB
-conda environment, ~3 GB Zephyr workspace.
+**Budget ~16 GB of disk on Linux, ~9 GB on macOS, and around half an hour**,
+most of it unattended downloads. The bulk lands in
+`backends/zephyr-chipyard-sw`. Measured, on each platform:
+
+| | Linux | macOS (Apple Silicon) |
+| --- | --- | --- |
+| whole checkout after step 2 | ~16 GB | 8.3 GB |
+| SDK (`tools-manual`) | ~4 GB | 3.3 GB |
+| conda environment | ~7 GB | 851 MB |
+| Zephyr workspace (`zephyr_ws`) | ~3 GB | 2.9 GB |
+
+macOS is much smaller for one reason: the torch/CUDA/pybullet stack in the
+conda environment is Linux-only and does not install (see 2b below). If you are
+on a Mac and your conda environment is 7 GB, something unexpected happened.
 
 Steps 2d and 3c clone two further repositories into your **home** directory
-rather than the checkout -- about **285 MB**, nearly all of it bitstreams.
+rather than the checkout -- **~400 MB**, nearly all of it bitstreams (the DTS
+repository is under 1 MB). This grows as bitstreams are added.
 
 ### Host prerequisites
 
@@ -265,6 +311,10 @@ Both installers hard-require these, and neither checks usefully:
 - **`wget`**, **`tar`**, **`git`** -- the installers check for these and stop if
   any is missing.
 - **`cmake`** -- and it must be a *working* one. See the warning below.
+- **`dtc`**, the devicetree compiler (`brew install dtc`,
+  `apt install device-tree-compiler`). 2b checks for it, and `rb build` cannot
+  run without it. It is often already present, which is why it is easy to miss
+  that it is a real dependency.
 - **Java** is needed only by `hardware/ospi`'s mill test suite, not by the
   install itself.
 
@@ -342,6 +392,22 @@ downstream.
 > `Installing Miniforge to .../backends/zephyr-chipyard-sw/tools/miniforge3`.
 > That directory does not exist until 2b creates it, so do not go looking for it
 > beforehand.
+
+> **On macOS, 2b ends with one failure line and still exits 0.** This is
+> expected and safe to ignore:
+> ```
+> [hh:mm:ss] ERROR: gym-pybullet-drones installation failed - continuing with other installations
+>   - gym-pybullet-drones installation failed (pybullet build error).
+> [hh:mm:ss] Installation completed with 1 warning(s)
+> ```
+> `gym-pybullet-drones` is part of the experimental simulation surface, not the
+> build path, and its `pybullet` dependency does not build on Apple Silicon.
+> Nothing in steps 2c through 3 uses it. This is also why a macOS conda
+> environment is ~850 MB rather than the ~7 GB it is on Linux.
+>
+> The installer also prints Linux-only advice on macOS:
+> `sudo usermod -aG plugdev,dialout "$USER"`. There is no `usermod` on macOS and
+> none of it is needed there -- see 3c-bis.
 
 ### 2c. Install the toolchain
 
@@ -457,13 +523,22 @@ Memory region         Used Size  Region Size  %age Used
 An ELF at `build/zephyr/arty200t/hello_world/default/zephyr/zephyr.elf` is the
 end of step 2. Nothing so far has needed hardware.
 
-> **Verified 2026-09-05, twice, from a clean clone of this branch into an empty
-> directory**, each time by someone following only this page with no access to
-> any other checkout. Steps 1 and 2 completed both times with no undocumented
-> workarounds beyond the `PATH` and `conda deactivate` remedies prescribed
-> above. Every figure quoted on this page -- the doctor lines, the
+> **Verified on Linux 2026-09-05, twice, from a clean clone of this branch into
+> an empty directory**, each time by someone following only this page with no
+> access to any other checkout. Steps 1 and 2 completed both times with no
+> undocumented workarounds beyond the `PATH` and `conda deactivate` remedies
+> prescribed above. Every figure quoted on this page -- the doctor lines, the
 > `19424 B / 1 GB`, the `32 KB / 59.28%`, the ~16 GB footprint -- was reproduced
-> exactly.
+> exactly **on Linux**.
+>
+> **Verified on macOS (Apple Silicon) 2026-09-06**, once, the same way. That run
+> found fourteen deviations from this page, all now folded in above; the one
+> that stopped the build outright was `rb build` passing a hardcoded
+> `-DDTC=/usr/bin/dtc`, which does not exist on a Mac and cannot be symlinked
+> into place because `/usr/bin` is SIP-protected. `rb` now resolves `dtc` from
+> the build environment's `PATH`. After that fix both memory figures reproduce
+> exactly on macOS too. **The footprint figures do not** -- see the table in
+> "Budget" above.
 >
 > Step 3 has **not** been verified that way and cannot be without an FPGA board
 > attached; see the note at the end of it.
@@ -497,15 +572,48 @@ sudo apt install openfpgaloader      # Debian/Ubuntu
 `hardware/spioverjtag/setup-openfpgaloader.sh` builds it from source if your
 distribution's package is too old; set `OFL_PREFIX` to choose where it lands.
 
+**Verify.** `rb doctor` has no line for openFPGALoader, so the only way to prove
+`rb` found it is to run the real command. With no board attached it should reach
+openFPGALoader and fail *there*:
+
+```console
+$ rb program --board arty200t --config RocketArty200TDroneFullDDRConfig
++ openFPGALoader --board te0712_8 --write-flash --bitstream .../arty200t.RocketArty200TDroneFullDDRConfig.bit
+JTAG init failed with: unable to open ftdi device
+```
+
+That error is the pass condition here -- it means the binary was found and ran.
+`rb: command not found`-style output, or a complaint about the bitstream path,
+is not. (This needs step 3c's bitstream first; come back to it if you are
+reading in order.)
+
 ### 3b. OpenOCD
 
-The Zephyr SDK from step 2 ships one, and `rb` uses it automatically. If your
-SDK has none, install OpenOCD yourself (`brew install open-ocd`) -- `rb` falls
-back to whatever is on `PATH`.
+On **Linux**, the Zephyr SDK from step 2 ships one and `rb` uses it
+automatically; there is nothing to do here.
 
-There is nothing to configure. `rb` looks inside the SDK for the host-tools
-sysroot belonging to *your* machine, so the same command works on Linux and
-macOS.
+On **macOS this step is mandatory**:
+
+```console
+brew install open-ocd
+```
+
+The macOS SDK tarball is the `_minimal` one and carries no OpenOCD and no
+`sysroots/` directory at all, even though its installer logs a `- Host tools`
+line. After a clean, successful step 2c:
+
+```console
+$ ls .../zephyr-sdk-1.0.0-beta1/
+cmake  gnu  llvm  sdk_gnu_toolchains  sdk_version  setup.sh
+$ find .../zephyr-sdk-1.0.0-beta1 -iname "*openocd*"
+$
+```
+
+So the `PATH` fallback is not a fallback on a Mac, it is the only path. `rb`
+then reports `OpenOCD ok /opt/homebrew/bin/openocd`. `rb` looks inside the SDK
+for a host-tools sysroot first and falls through to `PATH` when there is none,
+so the same `rb` command works on both platforms -- but only after you have
+installed OpenOCD yourself here.
 
 ### 3c. Supply a bitstream
 
@@ -682,8 +790,9 @@ build: this shell declares `ram0` at `0x8000_0000 + 0x4000_0000` (1 GiB DDR3),
 So if step 2 loads and then prints nothing, the linker and the memory map are
 not the cause; look at the console wiring and the shell's UART instead.
 
-The JTAG chain is likewise resolved end to end before you plug anything in: the
-SDK's OpenOCD binary, `hardware/openocd/ft-link.cfg`, the board's target config
+The JTAG chain is likewise resolved end to end before you plug anything in: an
+OpenOCD binary (the SDK's on Linux, Homebrew's on macOS -- see 3b),
+`hardware/openocd/ft-link.cfg`, the board's target config
 and `riscv64-zephyr-elf-gdb` all exist and are what `rb debug` invokes, and the
 adapter config matches both parts this bench uses
 (`ftdi vid_pid 0x0403 0x6010 0x0403 0x6011` -- FT2232H and FT4232H). A failure at
@@ -738,10 +847,25 @@ Optional, and it needs step 2 finished -- the suite resolves real backend paths:
 python3 -m unittest discover -s tests
 ```
 
-Some modules are expected to fail on this branch: `test_xpurt` and `test_area`
-want profile data and Vivado reports carried on `main`, and one
-`test_fingerprint` case wants a FireSim descriptor. `verification.md` lists
-exactly which pass where -- check there before treating a failure as yours.
+**This suite is a silicon-tier check.** It resolves paths into
+`backends/chipyard`, so on the bench tier a large minority of it fails for that
+reason alone and nothing is wrong with your install:
+
+| | result |
+| --- | --- |
+| silicon tier, Linux, both backends present | `Ran 245 tests ... OK` |
+| bench tier, Linux, no Chipyard | `Ran 233 tests ... failures=18, errors=27` |
+| bench tier, macOS, no Chipyard | `Ran 233 tests ... failures=7, errors=40` |
+
+The failing modules are the same on both bench-tier platforms -- `test_xpurt`,
+`test_area`, `test_pwm`, `test_rb`, `test_fingerprint` (and `test_soc` on
+macOS) -- though how a given case lands on the failure/error line varies by
+platform, so do not read anything into the split. Every one of them traces back
+to Chipyard being absent: `fingerprint.py` raises `FingerprintError`, and
+`test_pwm` reads the pin binder from a path under `backends/chipyard`.
+
+If you are on the bench tier, this command tells you nothing about your install
+and can be skipped. `verification.md` lists which modules pass where.
 
 ### Where to go next
 
