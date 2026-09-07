@@ -660,19 +660,50 @@ arty200t.RocketArty200TDroneFullDDRConfig.bit
 > rb program --board arty200t --config RocketArty200TDroneFullDDRConfig --usb-location <loc>
 > ```
 
-### 3c-bis. USB and serial access (Linux)
+### 3c-bis. USB and serial access
 
-Step 3 talks to FTDI adapters and serial ports. On Linux that needs group
-membership the installer mentions in passing and this guide previously did not:
+Step 3 talks to FTDI adapters and serial ports. Each platform has its own
+obstacle, and both look like absent hardware when you hit them.
+
+**Linux** needs group membership the installer mentions in passing:
 
 ```console
 sudo usermod -aG plugdev,dialout "$USER"
 ```
 
 Log out and back in for it to take effect. Without it `rb probe-ftdi` and
-`rb console` fail on permissions, which looks like absent hardware.
+`rb console` fail on permissions.
 
-macOS needs no equivalent.
+**macOS needs no group membership**, but it has a different problem: Apple ships
+its own FTDI driver, `com.apple.DriverKit-AppleUSBFTDI.dext`. It is present on
+stock macOS and stays dormant until an FTDI part is plugged in, at which point
+the system can bind it to the FT2232H/FT4232H and hold the very MPSSE interface
+that openFPGALoader and OpenOCD need to reach through libusb. Unlike Linux,
+libusb on macOS cannot detach a kernel driver -- `libusb_detach_kernel_driver`
+is Linux-only -- so there is nothing `rb` can do about it from inside.
+
+Check whether it is present and whether it is active:
+
+```console
+$ systemextensionsctl list
+$ ioreg -p IOUSB -l -w 0 | grep -iA5 'FT[24]232'
+```
+
+The symptom is a `claim interface` or `unable to open ftdi device` failure from
+openFPGALoader or OpenOCD **while `rb probe-ftdi` still enumerates the adapter
+correctly** -- discovery reads descriptors, which the Apple driver does not
+block; only the MPSSE claim is contested. A `/dev/cu.usbserial-*` node appearing
+for the channel you are trying to use as JTAG is the tell.
+
+> **Not yet verified on hardware.** This hazard was identified on a Mac with no
+> adapters attached, so the symptom above is the documented failure mode for
+> this conflict, not one reproduced on this bench. The remedies people use for
+> it -- unplugging and replugging so openFPGALoader claims the interface first,
+> or unloading the system extension -- have **not** been tested here, and
+> unloading a system extension needs Recovery on modern macOS and is a heavier
+> step than it looks. Treat the diagnostics above as trustworthy and the cure as
+> an open question until someone runs it with the adapters in hand. On Linux the
+> same bench works with no equivalent step.
 
 ### 3d. Find the adapters
 

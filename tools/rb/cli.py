@@ -927,9 +927,7 @@ def zephyr_build(
     workload_overlay = target.workload_overlay(workload.name, mode)
     if workload_overlay is not None:
         overlays.append(workload_overlay)
-    workload_target_conf = target.workload_conf(workload.name, mode)
-    if workload_target_conf is not None:
-        conf_files.append(workload_target_conf)
+    conf_files.extend(target.workload_confs(workload.name, mode))
     mode_conf = workload.mode_conf(mode)
     if mode_conf is not None:
         conf_files.append(mode_conf)

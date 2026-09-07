@@ -295,26 +295,25 @@ class ZephyrTarget:
         )
         return next((path for path in candidates if path.is_file()), None)
 
-    def workload_conf(self, workload: str, mode: str) -> Path | None:
-        candidates = (
-            self.target_dir / "workloads" / f"{workload}-{mode}.conf",
-            self.target_dir / "workloads" / f"{workload}.conf",
-            ROOT
-            / "hardware"
-            / "zephyr"
-            / "targets"
-            / self.kind
-            / "workloads"
-            / f"{workload}-{mode}.conf",
-            ROOT
-            / "hardware"
-            / "zephyr"
-            / "targets"
-            / self.kind
-            / "workloads"
-            / f"{workload}.conf",
+    def workload_confs(self, workload: str, mode: str) -> tuple[Path, ...]:
+        """The workload's base config, then the mode's, in that order.
+
+        A mode config EXTENDS the base rather than replacing it. This used to
+        return a single path with `<workload>-<mode>.conf` ahead of
+        `<workload>.conf`, so adding one symbol for one mode silently dropped
+        everything the base carried -- libc, C++, sensor and bus settings --
+        and the failure surfaced as an undefined reference at link time.
+        """
+        roots = (
+            self.target_dir / "workloads",
+            ROOT / "hardware" / "zephyr" / "targets" / self.kind / "workloads",
         )
-        return next((path for path in candidates if path.is_file()), None)
+        found = []
+        for name in (f"{workload}.conf", f"{workload}-{mode}.conf"):
+            path = next((r / name for r in roots if (r / name).is_file()), None)
+            if path is not None:
+                found.append(path)
+        return tuple(found)
 
 
 TARGETS = {
