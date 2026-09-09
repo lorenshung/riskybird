@@ -357,8 +357,12 @@ rb env setup zephyr
 
 This runs the backend's `install_conda.sh` and `install_submodules.sh`: it
 creates a conda environment under `backends/zephyr-chipyard-sw/tools/miniforge3`,
-installs **`west`** and a pinned `cmake<4` plus `ninja`, and checks out the
-nested submodules including the Zephyr tree itself. Takes several minutes.
+installs **`west`**, a pinned `cmake<4`, `ninja`, `esptool` and `pyserial`, and
+checks out the nested submodules including the Zephyr tree itself. Its
+`west update` also fetches the manifest-pinned Espressif HAL used by the
+ESP32-C6 target. Takes several minutes. There is no separate ESP driver or
+prebuilt ESP collateral repository to install later; ESP workloads in this
+repository build against that Zephyr target and HAL.
 
 Nothing later works without this. `rb build` shells out to `west`, so skipping
 it fails with a bare `No such file or directory: 'west'` several steps
@@ -501,6 +505,8 @@ Zephyr backend    ok      .../backends/zephyr-chipyard-sw
 Zephyr env        ok      .../tools/miniforge3/envs/zephyr
 Zephyr base       ok      .../zephyr_ws/zephyr
 Zephyr SDK        ok      .../tools-manual/zephyr-sdk-1.0.0-beta1
+Espressif HAL     ok      .../zephyr_ws/modules/hal/espressif
+ST HAL            ok      .../zephyr_ws/modules/hal/st
 west              ok      .../envs/zephyr/bin/west
 RISC-V compiler   ok      .../riscv64-zephyr-elf-gcc
 hardware contracts
@@ -710,30 +716,43 @@ for the channel you are trying to use as JTAG is the tell.
 The drone bench has two FT2232H adapters: one reaches the FPGA's configuration
 TAP (bitstream), the other the Rocket debug TAP (ELF loading, and the console on
 its channel B). Which is which is **not stable across replugs**, so read it
-rather than remember it:
+rather than remember it. First enumerate without touching JTAG:
 
 ```console
-$ rb bench
-ROLE       LOCATION   BUS:DEV  JTAG chA       CONSOLE chB    IDCODE
-debug      7-1.1.4.1  7:22     detached       /dev/ttyUSB5   0x00000001  Rocket debug TAP
-bitstream  7-1.1.4.3  7:21     detached       /dev/ttyUSB0   0x13636093  xc7a200t config TAP
+$ rb probe-ftdi
+LOCATION   BUS:DEV  VID:PID    SERIAL        INTERFACES
+5-2        5:2      0403:6011  21320733400T  ...
+           Xilinx / A-U250-A64G
+7-1.1.4.1  7:10     0403:6010  (none)        if0=detached if1=ttyUSB1
+           FTDI / Dual RS232-HS
+7-1.1.4.3  7:9      0403:6010  (none)        if0=detached if1=ttyUSB6
+           FTDI / Dual RS232-HS
 ```
 
-On Linux this needs nothing installed. **On macOS it needs pyusb** (step 1's
-optional section): there is no sysfs, so `rb` asks libusb instead. It reports
-the same bus-and-port location string OpenOCD matches, so the value is
+Take the two drone locations from that live table, explicitly excluding any
+unrelated adapter, and scan only those locations:
+
+```console
+$ rb probe-ftdi --idcode \
+      --location <drone-location-a> --location <drone-location-b>
+# expect: 0x13636093 = xc7a200t config TAP -> bitstream link
+#         0x00000001 = Rocket debug TAP -> ELF/GDB link
+```
+
+On Linux enumeration needs nothing installed. **On macOS it needs pyusb**
+(step 1's optional section): there is no sysfs, so `rb` asks libusb instead. It
+reports the same bus-and-port location string OpenOCD matches, so the value is
 interchangeable.
 
 Note the debug TAP reads `0x00000001` only **after** the part is configured.
 Before that it scans all ones, which is correct behaviour and not a fault --
 probe with a bitstream already loaded or the debug link looks dead.
 
-> `rb bench` runs a JTAG IDCODE scan on **every** FTDI device attached to the
-> host, not just the drone bench's, in order to work out which is which. It
-> labels foreign adapters clearly (an Alveo card shows up as
-> `xcu250 config TAP -- Alveo card, not the drone bench`), but on a machine with
-> other FPGA hardware attached, be aware it touches those adapters too -- and
-> see 3e on why the first scan after enumeration is the reliable one.
+> **Never run an unscoped IDCODE scan on a shared host.** `rb bench` and
+> `rb probe-ftdi --idcode` without `--location` shift a scan through every
+> MPSSE adapter they find, including an unrelated Alveo card. The plain
+> `rb probe-ftdi` table is passive; use it first, then pass both current drone
+> locations to the scoped command above. Locations change on every replug.
 
 ### 3e. Recovering a wedged adapter
 
@@ -780,7 +799,8 @@ it runs:
 
 ```console
 # 0. Which adapter is which. Locations change on every replug -- read, don't remember.
-rb probe-ftdi --idcode
+rb probe-ftdi
+rb probe-ftdi --idcode --location <loc-a> --location <loc-b>
 #    expect: one 0x13636093 (xc7a200t config TAP -> bitstream link)
 #            one 0x00000001 (Rocket debug TAP -> ELF + console). All-ones before
 #            the part is configured is correct, not a fault.
@@ -838,16 +858,57 @@ runs.
 > **Status of this section: verified on hardware 2026-09-09.** Adapter
 > identification, `rb console`, `rb debug`, ELF load, workload execution and a
 > JTAG frame readout were all run against an attached drone on
-> `RocketArty200TDroneFullDDRConfig`. `rb program` itself was **not** re-run --
-> the shell was already configured -- so that one line remains transcribed
-> rather than re-proven. Steps 1 and 2 were separately run from a clean clone,
-> on Linux and on macOS.
+> `RocketArty200TDroneFullDDRConfig`. `rb program` was re-run, and the resulting
+> flash was separately read back with openFPGALoader's `--verify`; the same
+> bitstream was then loaded into SRAM and used for the final check. Steps 1 and
+> 2 were separately run from a clean clone, on Linux and on macOS.
 
 ### The whole-board bootup check
 
 The acceptance check above proves the *install*. This proves the *board*: one
 pass over every peripheral a flight needs, brought up in the order a flight
 would need them, ending in one verdict.
+
+#### Before connecting the battery: park the ESP motor owner
+
+The ESP32-C6 and FPGA both connect directly to the same four MOSFET gate nets;
+there is no hardware arbitration. Provision each board with the passive
+`motor_safe` ESP image before allowing the FPGA to own those nets. Do this with
+the battery disconnected and the propellers removed:
+
+```console
+$ ls -l /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_*-if00
+$ rb flash motor_safe --target esp32c6 \
+      --port /dev/serial/by-id/<Espressif-device> \
+      --build --pristine always
+...
+Verifying written data...
+Hash of data verified.
+```
+
+Open that same native USB Serial/JTAG port and require the recurring heartbeat
+before continuing. The one-time `MOTOR SAFE: ...` startup line may have printed
+before the console attached; the heartbeat is the durable proof:
+
+```console
+$ rb console --port /dev/serial/by-id/<Espressif-device>
+MOTOR SAFE heartbeat: 4/4 inputs+pulldowns
+```
+
+The image disables the ESP LEDC PWM block and makes GPIO21, GPIO20, GPIO23 and
+GPIO22 inputs with pull-downs. They remain high-impedance so the intentional
+FPGA sweep does not fight an ESP output driver. The image is stored in the
+ESP32-C6's internal flash and survives FPGA programming and power cycles; flash
+it once on a new board and repeat this step after loading *any* other ESP
+firmware. Step 2b already installed the Zephyr ESP32-C6 drivers, Espressif HAL,
+`esptool` and `pyserial` used here.
+
+This provisioning does not modify the FPGA bitstream. The motor-mode Zephyr
+workload separately parks all four FPGA PWM channels after their drivers
+initialize and before `main()`. The FullDDR shell can still expose its motor
+outputs between FPGA configuration and that software initialization. Until the
+RTL has an explicit reset-time output inhibit, keep the battery disconnected
+except for an intentional propeller-off motor test.
 
 ```console
 $ ./rb console --port /dev/ttyUSB8          # in its own terminal
@@ -874,7 +935,10 @@ Eight stages on the console, then a summary and `BOARD READY` or
 The GDB script writes `bootup-frame.png` next to you. It needs a DDR-backed
 shell: the frame is ~100 KB against a scratchpad's 32 KB, and the workload
 declares a 256 KB floor so a scratchpad config fails by contract rather than at
-link time.
+link time. Open it and confirm that it is a real, unsheared photograph rather
+than accepting the file's existence alone. The verified capture was 324 x 315;
+its 102,690-byte raw buffer ranged from 0 to 255 (the rendered PNG ranged from
+36 to 255).
 
 **The ToF `WARN` is a population question, not a fault.** Four XSHUT slots are
 declared -- ADS7128 channels 1, 2 and 3 for the side headers and 6 for the
@@ -888,20 +952,29 @@ empty header and a broken sensor into the same line.
 ```console
 $ ./rb debug bootup_check --target arty200t \
       --config RocketArty200TDroneFullDDRConfig --mode motors \
-      --usb-location <debug-loc>
+      --usb-location <debug-loc> \
+      --gdb-script hardware/ospi/bootup-capture.gdb
 ```
 
-Each output is driven to 15% for one second in turn, announced before it moves
-so a printed line can be matched to the motor that turns, after a three-second
-countdown you can Ctrl-C. The default build compiles **no PWM driver at all**
-(`nm` finds zero PWM symbols in the ELF), so the sensor-only pass cannot disturb
-a motor pin even by accident.
+Before the countdown the workload must report:
+
+```text
+         4/4 channels ready, 4/4 parked at 0% duty
+         pre-main park mask 0x0f (expect 0x0f)
+```
+
+It refuses to sweep if either check fails. Each output is then driven to 15%
+for one second in turn, announced before it moves so a printed line can be
+matched to the motor that turns, after a three-second countdown you can Ctrl-C.
+The default build compiles **no PWM driver at all** (`nm` finds zero PWM symbols
+in the ELF), so the sensor-only pass cannot disturb a motor pin through
+software.
 
 > On this board the four `MOTOR` nets are driven by the ESP32-C6 as well as the
-> FPGA, both landing on the same MOSFET gates with no arbitration. A motor that
-> is already turning when the sweep starts is therefore not evidence about that
-> output. **USB-C alone will not turn a motor**, so a silent motor with no
-> battery is the battery, not a fault.
+> FPGA, both landing on the same MOSFET gates with no arbitration. Stop if any
+> motor moves before its announced line; that is a startup-safety failure, not
+> evidence that the later sweep passed. **USB-C alone will not turn a motor**,
+> so a silent motor with no battery is the battery, not a fault.
 
 
 ### 3f. Loading and running a workload

@@ -28,6 +28,7 @@
 #include <riskybird/tof.h>
 #include "pmw3901.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -38,6 +39,7 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/init.h>
 #include <zephyr/kernel.h>
 
 #define PMW3901_NODE DT_NODELABEL(riskybird_pmw3901)
@@ -555,14 +557,38 @@ static const struct pwm_dt_spec motors[] = {
 	PWM_DT_SPEC_GET(DT_ALIAS(pwm_motor4)),
 };
 
+#define MOTOR_ALL_PARKED_MASK ((1U << ARRAY_SIZE(motors)) - 1U)
+
+/*
+ * The motor aliases make the PWM devices initialize during POST_KERNEL. Park
+ * them at the first APPLICATION priority, before main() can start the memory
+ * and sensor stages. Keeping the mask visible gives the debugger and stage 8
+ * evidence that every channel was forced off during that startup window.
+ */
+volatile uint32_t bootup_motor_early_park_mask;
+
+static int park_motors_before_main(void)
+{
+	uint32_t parked = 0U;
+
+	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
+		if (pwm_is_ready_dt(&motors[i]) &&
+		    pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0) == 0) {
+			parked |= (1U << i);
+		}
+	}
+	bootup_motor_early_park_mask = parked;
+
+	return parked == MOTOR_ALL_PARKED_MASK ? 0 : -EIO;
+}
+
+SYS_INIT(park_motors_before_main, APPLICATION, 0);
+
 static void stage_motors(void)
 {
 	unsigned int ready = 0, parked = 0;
 
-	/* Park before reporting. pwm_sifive_init() has already run by the time
-	 * main() is entered, and it writes pwmcfg -- so the outputs are in
-	 * whatever state that left them until something sets a duty. Zero duty
-	 * first, ask questions after. */
+	/* Re-park before reporting as a second line of defense. */
 	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
 		if (pwm_is_ready_dt(&motors[i])) {
 			ready++;
@@ -573,10 +599,15 @@ static void stage_motors(void)
 	}
 	printf("         %u/4 channels ready, %u/4 parked at 0%% duty\n",
 	       ready, parked);
+	printf("         pre-main park mask 0x%02x (expect 0x%02x)\n",
+	       (unsigned)bootup_motor_early_park_mask,
+	       (unsigned)MOTOR_ALL_PARKED_MASK);
 
-	if (parked != ARRAY_SIZE(motors)) {
-		finish(S_MOTORS, BAD, "%u/4 ready, %u/4 could be forced low",
-		       ready, parked);
+	if (bootup_motor_early_park_mask != MOTOR_ALL_PARKED_MASK ||
+	    parked != ARRAY_SIZE(motors)) {
+		finish(S_MOTORS, BAD,
+		       "pre-main mask 0x%02x; %u/4 ready, %u/4 forced low now",
+		       (unsigned)bootup_motor_early_park_mask, ready, parked);
 		return;
 	}
 

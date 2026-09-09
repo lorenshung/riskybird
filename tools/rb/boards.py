@@ -600,6 +600,14 @@ WORKLOADS = {
         summary="Four-motor interactive PWM diagnostic",
         safety="propellers-off",
     ),
+    "motor_safe": _workload(
+        "motor_safe",
+        targets=("esp32c6",),
+        summary=(
+            "Park the shared ESP32-C6 motor pins as high-impedance inputs "
+            "with pull-downs"
+        ),
+    ),
     "pmw3901_test": _workload(
         "pmw3901_test",
         targets=ALL_TARGETS,

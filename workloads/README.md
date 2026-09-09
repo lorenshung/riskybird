@@ -25,6 +25,7 @@ as the state-estimation and MPC workloads.
 | `vl35l5cx_test` | Four VL53L5CX sensors using ADS7128 GPIO1–GPIO4 | all four | `address` everywhere; `ranging` needs ≥192 KiB, so not on a scratchpad config |
 | `pmw3901_test` | PMW3901 SPI optical-flow stream | all four | ESP and FPGA software builds; FPGA physical I/O pending |
 | `motor_1` … `motor_4` | Explicitly armed 20 kHz PWM diagnostics | all four | ESP and FPGA software builds; FPGA physical I/O pending |
+| `motor_safe` | Hold the ESP32-C6 side of the shared motor nets as inputs with pull-downs | ESP | GPIO hog at boot plus an application-level reassertion |
 | `sensor_bringup` | Imported PMW3901 plus one VL53L1X integration test | ESP | Legacy application builds; retained for comparison rather than as the combined-sensor architecture |
 
 “Software builds” means Zephyr configured and linked the image — not a
@@ -131,6 +132,17 @@ All motor workloads force every PWM output to zero at boot. They require an
 explicit `s` command before applying the default 10% diagnostic duty cycle;
 `x`, space, or `q` stops and disarms the outputs. Remove propellers and verify
 the electrical motor-driver interface before using these tests.
+
+The carrier also connects ESP32-C6 GPIO20/21/22/23 and the FPGA PWM outputs to
+the same four MOSFET gates without arbitration. Before letting the FPGA own the
+motors, flash `motor_safe` to the ESP. Its GPIO hogs make those four pins inputs
+with pull-downs as soon as the Zephyr GPIO driver is ready, and `main()`
+reasserts that state. The pins remain high-impedance, so an intentional FPGA
+high level is not fought by an ESP output driver:
+
+```console
+./rb flash motor_safe --target esp32c6 --port /dev/ttyACM0 --build
+```
 
 A four-motor connector normally exposes one PWM signal per motor, but that does
 not mean an FPGA pin can drive the motor stage: ground reference, voltage

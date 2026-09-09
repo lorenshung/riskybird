@@ -33,6 +33,7 @@ BINDER = ROOT / "backends/chipyard/fpga/src/main/scala/arty200t/HarnessBinders.s
 CONFIGS = ROOT / "backends/chipyard/fpga/src/main/scala/arty200t/Configs.scala"
 OVERLAY = ROOT / "hardware/zephyr/targets/fpga/workloads/motor_4.overlay"
 WORKLOAD = ROOT / "workloads/motor_4/src/main.c"
+BOOTUP_WORKLOAD = ROOT / "workloads/bootup_check/src/main.c"
 DRONE_OVERLAY = ROOT / "hardware/zephyr/fpga-drone.overlay"
 BOARD_PINS = (
     ROOT / "arty_files/te0712-rd/board_files/TE0712_200_2C/1.0/part0_pins.xml"
@@ -383,6 +384,37 @@ class WorkloadTests(unittest.TestCase):
     def test_throttle_is_clamped(self) -> None:
         self.assertRegex(self.source, r"#define MOTOR_MAX_PCT \d+U")
         self.assertIn("clamp_pct", self.source)
+
+
+class BootupMotorSafetyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.source = BOOTUP_WORKLOAD.read_text(encoding="utf-8")
+
+    def test_all_motors_are_parked_before_main(self) -> None:
+        self.assertIn(
+            "SYS_INIT(park_motors_before_main, APPLICATION, 0);",
+            self.source,
+        )
+        init_body = re.search(
+            r"static int park_motors_before_main\(void\)\s*\{(.*?)\n\}",
+            self.source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(init_body)
+        self.assertIn(
+            "pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0)",
+            init_body.group(1),
+        )
+        self.assertIn(
+            "bootup_motor_early_park_mask = parked",
+            init_body.group(1),
+        )
+
+    def test_stage_refuses_sweep_if_early_park_failed(self) -> None:
+        self.assertRegex(
+            self.source,
+            r"bootup_motor_early_park_mask != MOTOR_ALL_PARKED_MASK",
+        )
 
 
 class ElaboratedShellTests(unittest.TestCase):

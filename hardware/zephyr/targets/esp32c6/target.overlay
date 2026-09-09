@@ -6,6 +6,11 @@
  * hardware capture confirms the addresses and identities.
  */
 
+/* The populated ESP32-C6FH4 carries 4 MiB, not the devkit target's 8 MiB. */
+&flash0 {
+	reg = <0x0 DT_SIZE_M(4)>;
+};
+
 &pinctrl {
 	riskybird_i2c0_default: riskybird_i2c0_default {
 		group1 {

@@ -39,6 +39,7 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("state", WORKLOADS)
         self.assertIn("sensor_bringup", WORKLOADS)
         self.assertIn("vl35l5cx_test", WORKLOADS)
+        self.assertEqual(WORKLOADS["motor_safe"].targets, ("esp32c6",))
 
     def test_separate_drone_diagnostics_are_registered_for_all_targets(self) -> None:
         expected_targets = set(TARGETS) - {"rose-spike"}
@@ -258,6 +259,7 @@ class ContractTests(unittest.TestCase):
         esp_contract = (target_root / "esp32c6" / "target.overlay").read_text()
         self.assertIn("I2C0_SDA_GPIO15", esp_contract)
         self.assertIn("I2C0_SCL_GPIO14", esp_contract)
+        self.assertIn("reg = <0x0 DT_SIZE_M(4)>", esp_contract)
         self.assertIn("gyroscope@68", esp_contract)
         self.assertNotIn("gyroscope@69", esp_contract)
 
@@ -284,6 +286,19 @@ class ContractTests(unittest.TestCase):
         ).read_text()
         for pin in ("GPIO21", "GPIO20", "GPIO23", "GPIO22"):
             self.assertIn(pin, esp_motor)
+
+        esp_motor_safe = (
+            target_root / "esp32c6" / "workloads" / "motor_safe.overlay"
+        ).read_text()
+        for pin in ("21", "20", "23", "22"):
+            self.assertRegex(esp_motor_safe, rf"<{pin}\s+GPIO_PULL_DOWN>")
+        self.assertIn("gpio-hog;", esp_motor_safe)
+        self.assertIn("input;", esp_motor_safe)
+        self.assertIn("zephyr,console = &usb_serial", esp_motor_safe)
+        self.assertRegex(
+            esp_motor_safe,
+            r"&ledc0\s*\{\s*status = \"disabled\";",
+        )
 
         fpga_motor = (
             target_root / "fpga" / "workloads" / "motor_4.overlay"
