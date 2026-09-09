@@ -1570,11 +1570,33 @@ def cmd_probe_ftdi(args: argparse.Namespace) -> int:
         print("is what tells the bitstream chain apart from the debug chain.")
         return 0
 
+    wanted = set(args.location or ())
+    if wanted:
+        unknown = wanted - {a["location"] for a in adapters}
+        if unknown:
+            raise RbError(
+                "no attached adapter at "
+                + ", ".join(sorted(unknown))
+                + ".\n  Locations change on every replug -- take them from the "
+                "table above,\n  not from a previous run."
+            )
+
     print()
     print("Probing IDCODE. This detaches ftdi_sio, so the ttyUSB nodes above")
     print("disappear until the adapter is replugged or rebound.")
+    if not wanted:
+        # A scan is not read-only from the point of view of whoever else is on
+        # this host: it drives TCK/TMS on every adapter it touches. Say which
+        # ones, so an unexpected name is noticed before the scan and not after.
+        print("Scanning every MPSSE adapter: "
+              + ", ".join(a["location"] for a in adapters
+                          if a["pid"] in MPSSE_PRODUCT_IDS))
+        print("Pass --location to restrict this on a shared host.")
     for adapter in adapters:
         if adapter["pid"] not in MPSSE_PRODUCT_IDS:
+            continue
+        if wanted and adapter["location"] not in wanted:
+            print(f"{adapter['location'].ljust(width)}  (skipped, not requested)")
             continue
         idcode = probe_idcode(adapter["location"])
         print(f"{adapter['location'].ljust(width)}  {idcode}")
@@ -3016,6 +3038,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="shift a JTAG IDCODE out of each adapter to tell them apart "
         "(detaches ftdi_sio, so ttyUSB nodes drop until replug)",
+    )
+    probe_ftdi.add_argument(
+        "--location",
+        action="append",
+        metavar="LOC",
+        help="restrict --idcode to these USB locations (repeatable). Use this on "
+        "a shared host: without it, --idcode shifts a scan through EVERY MPSSE "
+        "adapter present, including cards that belong to someone else.",
     )
 
     bench = sub.add_parser(

@@ -835,11 +835,73 @@ does: see `motor-pwm-bringup.md` and `flight-on-fpga.md`, and note that the full
 drone shell drives the motor pins from configuration onward, before any code
 runs.
 
-> **Status of this section: recorded, not verified.** Tool discovery, bitstream
-> resolution and adapter probing have been exercised on this checkout. The
-> `rb program` and `rb console` commands are transcribed from a working bench
-> and have **not** been re-run here, because no board was attached when this was
-> written. Steps 1 and 2 have been run from a clean clone; step 3 has not.
+> **Status of this section: verified on hardware 2026-09-09.** Adapter
+> identification, `rb console`, `rb debug`, ELF load, workload execution and a
+> JTAG frame readout were all run against an attached drone on
+> `RocketArty200TDroneFullDDRConfig`. `rb program` itself was **not** re-run --
+> the shell was already configured -- so that one line remains transcribed
+> rather than re-proven. Steps 1 and 2 were separately run from a clean clone,
+> on Linux and on macOS.
+
+### The whole-board bootup check
+
+The acceptance check above proves the *install*. This proves the *board*: one
+pass over every peripheral a flight needs, brought up in the order a flight
+would need them, ending in one verdict.
+
+```console
+$ ./rb console --port /dev/ttyUSB8          # in its own terminal
+$ ./rb debug bootup_check --target arty200t \
+      --config RocketArty200TDroneFullDDRConfig \
+      --usb-location <debug-loc> \
+      --gdb-script hardware/ospi/bootup-capture.gdb
+```
+
+Eight stages on the console, then a summary and `BOARD READY` or
+`BOARD NOT READY`. Measured on a healthy board:
+
+```
+[  OK  ] main memory (DDR3)   4 MiB at 0x82000000 verified address-in-address
+[  OK  ] I2C inventory        5 answered; every fixed part present
+[  OK  ] ADS7128 expander     SYSTEM_STATUS=0x81 (register framing accepted)
+[ WARN ] ToF array (XSHUT)    2 up, 2 absent -- down sensor present
+[  OK  ] BMI088 IMU           accel |a| = 9763 mm/s^2 within 5% of g; gyro reads
+[  OK  ] HM01B0 camera        102690-byte frame captured; reshape rows at 326
+[  OK  ] PMW3901 flow         chip id 0x49; dx=+0 dy=+0 SQUAL=104 shutter=4573
+[ SKIP ] PWM motors           built without PWM -- use --mode motors
+```
+
+The GDB script writes `bootup-frame.png` next to you. It needs a DDR-backed
+shell: the frame is ~100 KB against a scratchpad's 32 KB, and the workload
+declares a 256 KB floor so a scratchpad config fails by contract rather than at
+link time.
+
+**The ToF `WARN` is a population question, not a fault.** Four XSHUT slots are
+declared -- ADS7128 channels 1, 2 and 3 for the side headers and 6 for the
+down-facing sensor -- because that is what `rb_tof_scan_xshut` measured on this
+board. Slots holding nothing report absent. `2 up` with the down sensor present
+is a board carrying one side sensor; the check deliberately does not collapse an
+empty header and a broken sensor into the same line.
+
+**Motors are opt-in through the mode, and need the battery.**
+
+```console
+$ ./rb debug bootup_check --target arty200t \
+      --config RocketArty200TDroneFullDDRConfig --mode motors \
+      --usb-location <debug-loc>
+```
+
+Each output is driven to 15% for one second in turn, announced before it moves
+so a printed line can be matched to the motor that turns, after a three-second
+countdown you can Ctrl-C. The default build compiles **no PWM driver at all**
+(`nm` finds zero PWM symbols in the ELF), so the sensor-only pass cannot disturb
+a motor pin even by accident.
+
+> On this board the four `MOTOR` nets are driven by the ESP32-C6 as well as the
+> FPGA, both landing on the same MOSFET gates with no arbitration. A motor that
+> is already turning when the sweep starts is therefore not evidence about that
+> output. **USB-C alone will not turn a motor**, so a silent motor with no
+> battery is the battery, not a fault.
 
 
 ### 3f. Loading and running a workload

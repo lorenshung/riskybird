@@ -491,6 +491,20 @@ WORKLOADS = {
         summary="All on-board sensors in one pass, ending in a state-estimator go/no-go",
         minimum_ram_by_mode=(("default", 0x8000),),
     ),
+    # One pass over every peripheral a flight needs, in boot order, ending in a
+    # board-ready verdict. Needs the drone periphery for the same reason
+    # sensor_check does; `motors` additionally needs the battery and a shell
+    # that carries pwm0/pwm1.
+    "bootup_check": _workload(
+        "bootup_check",
+        modes=("default", "motors"),
+        targets=("arty200t",),
+        summary="Every peripheral in one boot-order pass, ending in a board-ready verdict",
+        # A frame is 78892 bytes and the image carries it as a static buffer, so
+        # a 32 KB scratchpad shell cannot run this at all. 256 KB excludes them
+        # by contract rather than at link time.
+        minimum_ram_by_mode=(("default", 0x40000), ("motors", 0x40000)),
+    ),
     # The ESP link lives only in the full drone shells, which are arty200t-only
     # today. Requires a shell that elaborates serial@10021000; rb appends
     # fpga-esp-uart.overlay when it detects one.
