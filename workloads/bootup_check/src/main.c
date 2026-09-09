@@ -488,6 +488,14 @@ static void stage_flow(void)
 		finish(S_FLOW, BAD, "motion burst read failed after a good init");
 		return;
 	}
+	/*
+	 * Read the identity rather than asserting it. This line used to quote a
+	 * literal "chip id 0x49" in its own success message, which reported a
+	 * value it had never read -- and did so on a run whose driver print
+	 * showed 0x92.
+	 */
+	uint8_t id = pmw3901_register_read(&dev, 0x00);
+	uint8_t inv = pmw3901_register_read(&dev, 0x5F);
 	/* SQUAL is surface quality. A stuck bus reads a rail value; a real
 	 * surface lands well inside the range, which "the register was
 	 * readable" does not distinguish. */
@@ -497,8 +505,14 @@ static void stage_flow(void)
 		       burst.squal);
 		return;
 	}
-	finish(S_FLOW, OK, "chip id 0x49; dx=%+d dy=%+d SQUAL=%u shutter=%u",
-	       burst.deltaX, burst.deltaY, burst.squal, burst.shutter);
+	if (id != 0x49U || inv != 0xB6U) {
+		finish(S_FLOW, WARN,
+		       "burst reads but id=0x%02x/inv=0x%02x, expected 0x49/0xb6",
+		       id, inv);
+		return;
+	}
+	finish(S_FLOW, OK, "id 0x%02x/inv 0x%02x; dx=%+d dy=%+d SQUAL=%u shutter=%u",
+	       id, inv, burst.deltaX, burst.deltaY, burst.squal, burst.shutter);
 }
 
 #else

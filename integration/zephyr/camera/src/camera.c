@@ -127,11 +127,24 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 			    "I2C works but this is not an HM01B0");
 	}
 
-	/* A photograph, not a test pattern: cheap insurance against a previous
-	 * run leaving a walking-1s pattern enabled. */
-	if (cam_reg_write(HM01B0_REG_TEST_PATTERN, HM01B0_TESTPAT_OFF) != 0) {
+	/*
+	 * A photograph, not a test pattern: cheap insurance against a previous
+	 * run leaving a walking-1s pattern enabled.
+	 *
+	 * RB_CAMERA_TEST_PATTERN=1 turns it back on deliberately. The pattern is
+	 * generated after the analog column path, so it separates a defect in
+	 * the capture datapath from one in the sensor's analog readout -- an
+	 * artifact present in a photograph and absent in the pattern is
+	 * upstream of the bus, and cannot be a capture-core or wiring fault.
+	 */
+#ifndef RB_CAMERA_TEST_PATTERN
+#define RB_CAMERA_TEST_PATTERN 0
+#endif
+	if (cam_reg_write(HM01B0_REG_TEST_PATTERN,
+			  RB_CAMERA_TEST_PATTERN ? HM01B0_TESTPAT_WALKING1
+						 : HM01B0_TESTPAT_OFF) != 0) {
 		return stop(stage, detail, "reg-write",
-			    "could not disable TEST_PATTERN_MODE");
+			    "could not set TEST_PATTERN_MODE");
 	}
 	if (cam_reg_write(HM01B0_REG_MODE_SELECT, HM01B0_MODE_STREAMING) != 0) {
 		return stop(stage, detail, "stream",

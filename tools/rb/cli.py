@@ -1254,6 +1254,18 @@ def cmd_console(args: argparse.Namespace) -> int:
         port = select_serial_port("console", args.port)
     except (FileNotFoundError, RuntimeError) as exc:
         raise RbError(str(exc)) from exc
+    # miniterm puts the terminal in raw mode, so it needs a real one. Without
+    # this check a piped or agent-driven run died inside the terminal library
+    # with `termios.error: (25, 'Inappropriate ioctl for device')`, which names
+    # neither the command that failed nor the thing to do about it.
+    if not sys.stdin.isatty():
+        raise RbError(
+            "rb console needs an interactive terminal: it hands the port to "
+            "miniterm,\n  which puts the terminal into raw mode.\n"
+            f"  To capture {port} from a script or an agent instead:\n"
+            f"    stty -F {port} {args.baudrate} raw -echo && cat {port} | tee console.log\n"
+            "  Or run this command inside a pseudo-terminal (script -qc ... /dev/null)."
+        )
     run(
         [
             ZEPHYR_PREFIX / "bin" / "python",
@@ -1584,6 +1596,7 @@ def cmd_probe_ftdi(args: argparse.Namespace) -> int:
     print()
     print("Probing IDCODE. This detaches ftdi_sio, so the ttyUSB nodes above")
     print("disappear until the adapter is replugged or rebound.")
+    unreadable = 0
     if not wanted:
         # A scan is not read-only from the point of view of whoever else is on
         # this host: it drives TCK/TMS on every adapter it touches. Say which
@@ -1600,6 +1613,14 @@ def cmd_probe_ftdi(args: argparse.Namespace) -> int:
             continue
         idcode = probe_idcode(adapter["location"])
         print(f"{adapter['location'].ljust(width)}  {idcode}")
+        if idcode.startswith(("cannot open", "no IDCODE", "probe failed")):
+            unreadable += 1
+    if unreadable:
+        print()
+        print(f"{unreadable} adapter(s) could not be probed. Exiting non-zero: a "
+              "scan that\nnever reached the hardware is not the same as a chain "
+              "that answered nothing.")
+        return 1
     return 0
 
 
@@ -1720,7 +1741,18 @@ def probe_idcode(location: str) -> str:
     if match is None:
         if "all ones" in result.stderr:
             return "all ones (nothing driving TDO)"
-        return "no IDCODE returned"
+        # Distinguish "the scan ran and the chain was silent" from "the scan
+        # never happened". Reporting both as `no IDCODE returned` and exiting 0
+        # made a permissions failure look like a probed-and-empty chain: the
+        # command printed a line per adapter and succeeded, having touched
+        # nothing. OpenOCD names the cause; pass it through.
+        if "LIBUSB_ERROR_ACCESS" in result.stderr or "permission" in result.stderr.lower():
+            return ("cannot open the adapter (permission denied) -- this is not "
+                    "a JTAG result; see setup.md 3c-bis")
+        if "unable to open ftdi device" in result.stderr:
+            return ("cannot open the adapter -- in use by another process, or no "
+                    "device access; this is not a JTAG result")
+        return "no IDCODE returned (the scan produced no tap/device line)"
     idcode = match.group(1)
     known = {
         "0x13636093": "xc7a200t config TAP -- bitstream link",

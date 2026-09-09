@@ -936,9 +936,61 @@ The GDB script writes `bootup-frame.png` next to you. It needs a DDR-backed
 shell: the frame is ~100 KB against a scratchpad's 32 KB, and the workload
 declares a 256 KB floor so a scratchpad config fails by contract rather than at
 link time. Open it and confirm that it is a real, unsheared photograph rather
-than accepting the file's existence alone. The verified capture was 324 x 315;
-its 102,690-byte raw buffer ranged from 0 to 255 (the rendered PNG ranged from
-36 to 255).
+than accepting the file's existence alone. The verified capture was 324 x 315
+from a 102,690-byte raw buffer.
+
+**Do not compare the pixel range against a reference.** It is a property of
+whatever the lens was pointed at, not of the capture -- two good captures of
+different scenes give different ranges. What a healthy frame must show is a
+non-uniform, unsheared image; a range that is a single value means the data bus
+is stuck, and the workload already fails that case by itself.
+
+> **Known issue: alternating columns are about 9% brighter.** Every photograph
+> this repository has produced carries a fine vertical comb. It is measured, not
+> suspected: even columns average 70.3 against odd columns 64.2, a period-2
+> pattern (period 3 shows a spread of 0.54, i.e. nothing) whose size scales with
+> brightness -- +3.4 levels in dark regions against +15.1 in bright ones, so it
+> is a gain ratio rather than an offset.
+>
+> It is **not** a capture-datapath fault. Building with
+> `RB_EXTRA_CPPFLAGS="-DRB_CAMERA_TEST_PATTERN=1"` switches the sensor to its
+> walking-1s pattern, which is generated after the analog column path. That
+> capture comes back as exactly three values -- `{0, 24, 255}` -- with no
+> intermediate or noise values and half the rows byte-identical. A bus or
+> sampling fault corrupting alternate pixels could not produce that.
+>
+> The cause is that this repository writes no sensor calibration table. Bring-up
+> is three registers: MCLK, test-pattern off, `MODE_SELECT=streaming`. Black
+> level, defect-pixel correction and the column-path trims are never programmed,
+> and column-parity gain is exactly what those settings exist to remove. The fix
+> is to apply the vendor init sequence; it is not written here because
+> `hm01b0.h` already carries the caveat that its values come from the datasheet
+> and have never been confirmed against a copy, and inventing register writes
+> for an uncalibrated sensor would make that worse.
+
+> **The first capture after changing the sensor's configuration can time out.**
+> Observed once, going from a test-pattern build back to a photograph build:
+> `[ FAIL ] HM01B0 camera  timeout -- the frame did not complete`. Two
+> consecutive re-runs then passed with no change. Re-run before investigating.
+>
+> A likely contributor, recorded as a lead rather than a diagnosis: the HM01B0
+> commits configuration writes through a group-parameter hold, and this tree
+> never uses it. `HM01B0_REG_GRP_PARAM_HOLD` is defined in `hm01b0.h` with the
+> comment `1 = hold, 0 = commit` and is written **zero** times anywhere, so a
+> `TEST_PATTERN` or `MODE_SELECT` change is not explicitly committed and the
+> first frame after it can be inconsistent. Fixing that properly means adopting
+> the vendor sequence, which is the same outstanding work as the column gain
+> above.
+
+**`attempted 'gdb' connection rejected` on a clean run is benign.** OpenOCD logs
+it, then immediately logs `accepting 'gdb' connection on tcp/3333`, and the
+following connection loads the ELF normally. Treat it as a fault only when it is
+accompanied by real symptoms -- register values that disagree with the console,
+or `valid bytes in pixels[]: 0` on a run whose console reported a captured
+frame. Those mean a stale OpenOCD from an earlier run is still holding the
+adapter; find it with `pgrep -af openocd` and check
+`/sys/bus/usb/devices/<loc>:1.0/driver`, where `usbfs` means held and empty
+means free.
 
 **The ToF `WARN` is a population question, not a fault.** Four XSHUT slots are
 declared -- ADS7128 channels 1, 2 and 3 for the side headers and 6 for the

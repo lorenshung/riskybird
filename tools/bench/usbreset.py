@@ -39,9 +39,30 @@ def reset_linux(location: str) -> str:
     busnum = int((base / "busnum").read_text())
     devnum = int((base / "devnum").read_text())
     node = f"/dev/bus/usb/{busnum:03d}/{devnum:03d}"
-    fd = os.open(node, os.O_WRONLY)
+    # Opening the usbfs node for write is the step that needs device access, and
+    # the bare OSError from it reads as a missing file rather than a missing
+    # permission -- `FileNotFoundError: /dev/bus/usb/007/010` on a device that is
+    # plainly attached. Name which it is.
+    try:
+        fd = os.open(node, os.O_WRONLY)
+    except PermissionError as exc:
+        raise SystemExit(
+            f"cannot reset {location}: no write access to {node}.\n"
+            "  Resetting a USB device needs device access. Either add yourself to "
+            "the\n  plugdev and dialout groups and log out and back in (see "
+            "docs/setup.md 3c-bis),\n  or run this one command with elevated "
+            "privileges."
+        ) from exc
+    except FileNotFoundError as exc:
+        raise SystemExit(
+            f"cannot reset {location}: {node} does not exist.\n"
+            "  The adapter was renumbered or unplugged since the location was "
+            "read.\n  Re-read it with: rb probe-ftdi"
+        ) from exc
     try:
         fcntl.ioctl(fd, USBDEVFS_RESET, 0)
+    except OSError as exc:
+        raise SystemExit(f"cannot reset {location}: {node}: {exc}") from exc
     finally:
         os.close(fd)
     return f"reset {node} ({location})"
