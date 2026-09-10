@@ -744,11 +744,23 @@ int rb_tof_scan_xshut(struct rb_tof_array *array, uint8_t *found_mask)
 			    array->config.i2c,
 			    ADS7128_GPO_VALUE,
 			    array->gpo_shadow) == 0) {
-			k_msleep(100);
-			if (probe_address(
+			/*
+			 * Same discipline as init's wait_for_sensor: poll for
+			 * up to 500 ms rather than probing once after a fixed
+			 * 100 ms. A single probe false-negatives any sensor
+			 * that takes longer than that to ACK, and this scan is
+			 * the tool used to decide whether a header is empty --
+			 * so a false negative here gets recorded as "that
+			 * channel gates nothing", which is how the claim that
+			 * channel 4 is empty was arrived at. Measured
+			 * disagreement: a sensor that init finds on channel 1
+			 * and readdresses to 0x31 was reported absent by this
+			 * scan on the same board, in the same run.
+			 */
+			if (wait_for_sensor(
 				    array->config.i2c,
 				    VL53L5CX_DEFAULT_ADDR,
-				    NULL) == 0) {
+				    VL53L5CX_DEFAULT_ADDR) == 0) {
 				mask |= bit;
 			}
 		}

@@ -232,9 +232,27 @@ static struct rb_tof_array tof;
  */
 static const struct rb_tof_array_config tof_config = {
 	.i2c = DEVICE_DT_GET(DT_NODELABEL(i2c0)),
+/*
+ * BOOTUP_TOF_SCAN=1 claims only the down sensor, which leaves every side
+ * channel unclaimed so rb_tof_scan_xshut probes all of them and reports where
+ * a sensor actually answers. Use it when the number of side sensors found
+ * disagrees with the number fitted: the default config scans channels 1, 2, 3
+ * and 6, and the schematic puts four side headers on GPIO1-4 (J9, J2, J11,
+ * J10), so a sensor on channel 4 is invisible to the default and looks exactly
+ * like an empty header.
+ */
+#ifndef BOOTUP_TOF_SCAN
+#define BOOTUP_TOF_SCAN 0
+#endif
+#if BOOTUP_TOF_SCAN
+	.sensor_count = 1,
+	.xshut_channels = { 6 },
+	.addresses = { 0x34 },
+#else
 	.sensor_count = 4,
 	.xshut_channels = { 1, 2, 3, 6 },
 	.addresses = { 0x31, 0x32, 0x33, 0x34 },
+#endif
 };
 
 static void stage_tof(void)
@@ -269,9 +287,19 @@ static void stage_tof(void)
 	/* Anything gated by a channel this config does not claim. On a board
 	 * whose population changed, that is the difference between "one sensor
 	 * is broken" and "it is on a header nobody declared". */
-	if (rb_tof_scan_xshut(&tof, &unclaimed) == 0 && unclaimed != 0U) {
-		printf("         unclaimed channels answering at 0x29: mask 0x%02x\n",
+	int scan = rb_tof_scan_xshut(&tof, &unclaimed);
+
+	if (scan != 0) {
+		printf("         unclaimed-channel scan failed (%d)\n", scan);
+	} else if (unclaimed != 0U) {
+		printf("         unclaimed channels answering at 0x29: mask 0x%02x ->",
 		       unclaimed);
+		for (unsigned ch = 0; ch < 8; ch++) {
+			if (unclaimed & (1U << ch)) { printf(" ch%u", ch); }
+		}
+		printf("\n");
+	} else {
+		printf("         no unclaimed channel answers at 0x29\n");
 	}
 
 	bool down_up = (tof.status[3] == 0);
