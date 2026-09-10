@@ -44,4 +44,35 @@
 	gyroscope@68 {
 		gyro-hz = "1000_116";
 	};
+
+	/*
+	 * Down-facing VL53L1X, declared at 0x30 rather than its power-on 0x29.
+	 *
+	 * The part boots at 0x29 and main.cpp's vl53l1x_readdress_down() moves it
+	 * to VL53L1X_DOWN_ADDR before the ST driver's deferred init runs, so this
+	 * reg MUST equal that constant (0x30) or the driver talks to nothing.
+	 *
+	 * Declaring the node is what compiles the altitude path in at all, and it
+	 * does two things at once: `st,vl53l1x` being status-okay pulls in
+	 * board_sensor_init(), which is what raises this sensor's XSHUT through
+	 * ADS7128 GPIO6, and the `tof` alias below sets HAVE_TOF. Without the node
+	 * the estimator ran with tofv=0 on every sample and z dead-reckoned off
+	 * accel -- 11 m of drift over 500 samples -- which reads as an estimator
+	 * fault and is a missing device-tree entry.
+	 *
+	 * Channel 6 is not a guess: the schematic nets ADS7128 GPIO6 to U9, the
+	 * down VL53L1X, and bootup_check brings it up on that channel and reads
+	 * back id 0xeacc.
+	 */
+	vl53l1x: vl53l1x@30 {
+		compatible = "st,vl53l1x";
+		reg = <0x30>;
+		status = "okay";
+	};
 };
+/ {
+	aliases {
+		tof = &vl53l1x;
+	};
+};
+
