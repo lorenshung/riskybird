@@ -945,28 +945,41 @@ different scenes give different ranges. What a healthy frame must show is a
 non-uniform, unsheared image; a range that is a single value means the data bus
 is stuck, and the workload already fails that case by itself.
 
-> **Known issue: alternating columns are about 9% brighter.** Every photograph
-> this repository has produced carries a fine vertical comb. It is measured, not
-> suspected: even columns average 70.3 against odd columns 64.2, a period-2
-> pattern (period 3 shows a spread of 0.54, i.e. nothing) whose size scales with
-> brightness -- +3.4 levels in dark regions against +15.1 in bright ones, so it
-> is a gain ratio rather than an offset.
+> **Known issue: alternating columns differ in brightness.** Every photograph
+> this repository has produced carries a fine vertical comb, averaging about 8%.
+> It is measured on every capture -- `frame-to-png.py` prints a
+> `column comb:` line -- and it is **reported, not corrected**, because the
+> obvious correction does not work.
 >
-> It is **not** a capture-datapath fault. Building with
-> `RB_EXTRA_CPPFLAGS="-DRB_CAMERA_TEST_PATTERN=1"` switches the sensor to its
-> walking-1s pattern, which is generated after the analog column path. That
-> capture comes back as exactly three values -- `{0, 24, 255}` -- with no
-> intermediate or noise values and half the rows byte-identical. A bus or
-> sampling fault corrupting alternate pixels could not produce that.
+> What it is not. It is not fixed-pattern column noise: the phase FLIPS between
+> captures. Four frames of one scene measured even/odd ratios of 0.9232, 0.9231,
+> 1.0833, 1.0831 -- same size, opposite sign -- and frames one column apart
+> align three times better than frames aligned as captured (mean |difference|
+> 3.25 at a one-column shift against 10.79 at zero). The capture simply does not
+> start on a fixed pixel parity. A stored calibration would be exactly wrong
+> half the time.
 >
-> The cause is that this repository writes no sensor calibration table. Bring-up
-> is three registers: MCLK, test-pattern off, `MODE_SELECT=streaming`. Black
-> level, defect-pixel correction and the column-path trims are never programmed,
-> and column-parity gain is exactly what those settings exist to remove. The fix
-> is to apply the vendor init sequence; it is not written here because
-> `hm01b0.h` already carries the caveat that its values come from the datasheet
-> and have never been confirmed against a copy, and inventing register writes
-> for an uncalibrated sensor would make that worse.
+> It is also not a constant gain, which is what makes it interesting. Equalising
+> the two parities took the mean ratio to 1.002 while the adjacent-pixel
+> difference ROSE, from 6.39 to 6.91. Measured against local brightness,
+> mean(even - odd) runs -4.4 at level 32-63, -19.9 at 64-95, -39.6 at 96-127 and
+> -58.4 at 128-159: an implied ratio sliding from 0.91 to 0.66 as the scene
+> brightens.
+>
+> An error proportional to the signal swing, on alternate samples, with a start
+> phase that is not pinned, is what an under-settled sample looks like -- one
+> pulled toward its neighbour because it is read before the bus has arrived.
+> That points at sampling timing in the capture core, so **the fix belongs in
+> the capture RTL** (sampling edge or an added pipeline stage), which is a
+> silicon-tier change and needs a rebuilt bitstream to test.
+>
+> An earlier version of this note blamed the sensor's analog column path and a
+> missing vendor calibration table, on the grounds that the walking-1s test
+> pattern comes back clean. That evidence is weaker than it looked: the pattern
+> carries three values and almost no slew, so it cannot exercise a settling
+> problem. The pattern build is still worth having -- build with
+> `RB_EXTRA_CPPFLAGS="-DRB_CAMERA_TEST_PATTERN=1"` -- but it does not exonerate
+> the datapath.
 
 > **The first capture after changing the sensor's configuration can time out.**
 > Observed once, going from a test-pattern build back to a photograph build:

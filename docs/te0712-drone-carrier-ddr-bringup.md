@@ -530,14 +530,26 @@ finish start-up. On this carrier that is a **power** result, not a JTAG one.
 
 Measured on one board across two supply arrangements, same bitstreams:
 
-| shell | bench PSU @ 3.3 V | battery + on-board USB-C |
-| --- | --- | --- |
-| `RocketArty200TFlowSpadConfig` (no MIG) | `0x501079fc` | `0x501079fc` |
-| `RocketArty200TDroneDDRConfig` (MIG) | `0x5000190c` | **`0x501079fc`** |
-| `RocketArty200TDroneFullDDRConfig` (MIG) | `0x5000190c` | **`0x501079fc`** |
+| shell | bench PSU @ 3.3 V | battery + on-board USB-C | on-board USB-C alone |
+| --- | --- | --- | --- |
+| `RocketArty200TFlowSpadConfig` (no MIG) | `0x501079fc` | `0x501079fc` | `0x501079fc` |
+| `RocketArty200TDroneDDRConfig` (MIG) | `0x5000190c` | **`0x501079fc`** | -- |
+| `RocketArty200TDroneFullDDRConfig` (MIG) | `0x5000190c` | **`0x501079fc`** | **works** |
 
-With the battery in, all three configure fully and the Rocket debug TAP answers
-on every one.
+With adequate input voltage all three configure fully and the Rocket debug TAP
+answers on every one.
+
+> **The battery is not the requirement -- input voltage is.** The third column
+> was added 2026-09-09: with the battery physically removed and only the
+> on-board USB-C connected, `RocketArty200TDroneFullDDRConfig` ran the whole
+> `bootup_check` sequence, including the DDR3 address-in-address test over
+> 4 MiB at `0x82000000`. USB-C supplies 5 V, which clears the buck's dropout
+> just as the battery does.
+>
+> This matters because the earlier wording made "battery in" sound like the
+> fix, and it sent at least one bench session looking for a battery when a
+> USB-C cable would have done. **Motors are a separate question** -- those are
+> genuinely battery-powered and do nothing on USB-C alone.
 
 ### Why — and why it is not "3.3 V is too low"
 
