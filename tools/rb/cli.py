@@ -957,6 +957,9 @@ def zephyr_build(
         f"-DDTC={shutil.which('dtc', path=zephyr_env()['PATH']) or '/usr/bin/dtc'}",
         f"-DDTS_ROOT={ROOT / 'hardware' / 'zephyr'}",
     ]
+    # The workload's own definitions, before RB_CMAKE_ARGS so an operator can
+    # still override one from the command line.
+    cmake_args.extend(f"-D{name}={value}" for name, value in workload.cmake_defines)
     if not (workload.source_dir / "Kconfig").is_file():
         cmake_args.append(
             f"-DKCONFIG_ROOT={ROOT / 'hardware' / 'zephyr' / 'Kconfig.workload'}"

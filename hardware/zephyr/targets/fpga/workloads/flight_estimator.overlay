@@ -1,0 +1,47 @@
+/*
+ * Flight controller, Phase 1: state estimation on the bench, no actuation.
+ *
+ * Only the IMU is exposed. The application selects its subsystems from device-tree aliases --
+ * HAVE_FLOW/HAVE_TOF/HAVE_BARO in main.cpp, plus DT_NODE_EXISTS(DT_ALIAS(motors)) around the
+ * whole PWM actuator block -- so declaring nothing else here compiles the optical flow, the
+ * down-ToF, the barometer, the side-ToF bumper and every motor output OUT of the image. That is
+ * a stronger guarantee than a runtime disarm: there is no code path to a motor in this build.
+ *
+ * Sensors are added one alias at a time as each is verified. See docs/flight-on-fpga.md.
+ */
+
+&i2c0 {
+	/*
+	 * 400 kHz, not the 100 kHz that hardware/zephyr/fpga-drone.overlay sets.
+	 *
+	 * This is a hard requirement of the control rate, not a tuning preference. Each control
+	 * iteration reads the accelerometer and the gyroscope over I2C: roughly 90 bits of bus
+	 * traffic each once addressing, register selection, the repeated START and the ACK bits
+	 * are counted, so ~180 bits per iteration.
+	 *
+	 *   100 kHz -> ~1.8 ms per iteration -> ~550 Hz ceiling, BELOW the 1 kHz loop
+	 *   400 kHz -> ~0.45 ms per iteration -> ~2.2 kHz ceiling, with margin
+	 *
+	 * At 100 kHz the loop cannot reach its rate no matter how fast Rocket is, and the failure
+	 * looks like a slow controller rather than a slow bus. 400 kHz is what the ESP board runs
+	 * (I2C_BITRATE_FAST) and is within spec for every device on this bus -- BMI088 and ADS7128
+	 * are rated to 1 MHz, the VL53 parts to 400 kHz.
+	 */
+	clock-frequency = <400000>;
+
+	/*
+	 * Match the rates the flight build actually used. fpga-drone.overlay asks for 200 Hz on
+	 * both, which was fine for a sensor-liveness check and is not fine here: a 1 kHz control
+	 * loop fed by a 200 Hz gyro is running five iterations on each sample, so the estimator
+	 * integrates stale rate data and the derivative terms see quantised steps.
+	 *
+	 * 800 Hz accel / 1000 Hz gyro (116 Hz bandwidth) are the ESP flight-build values.
+	 */
+	accelerometer@18 {
+		accel-hz = "800";
+	};
+
+	gyroscope@68 {
+		gyro-hz = "1000_116";
+	};
+};

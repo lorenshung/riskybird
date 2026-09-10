@@ -391,6 +391,12 @@ class Workload:
     safety: str = "normal"
     blocked_reason: str | None = None
     minimum_ram_by_mode: tuple[tuple[str, int], ...] = ()
+    # -D definitions this workload always builds with. Modes select overlays and
+    # Kconfig fragments, which cannot reach a CMake cache variable -- so a build
+    # knob like ROSE_FLOW or ROSE_ESTIMATOR_ONLY previously had to be passed by
+    # hand through RB_CMAKE_ARGS, and a workload that needed one was a command
+    # to remember rather than a thing you could ask for by name.
+    cmake_defines: tuple[tuple[str, str], ...] = ()
 
     def mode_conf(self, mode: str) -> Path | None:
         path = self.source_dir / "conf" / f"{mode}.conf"
@@ -421,6 +427,7 @@ def _workload(
     blocked_reason: str | None = None,
     minimum_ram_by_mode: tuple[tuple[str, int], ...] = (),
     source_dir: Path | None = None,
+    cmake_defines: tuple[tuple[str, str], ...] = (),
 ) -> Workload:
     return Workload(
         name=name,
@@ -432,6 +439,7 @@ def _workload(
         safety=safety,
         blocked_reason=blocked_reason,
         minimum_ram_by_mode=minimum_ram_by_mode,
+        cmake_defines=cmake_defines,
     )
 
 
@@ -538,6 +546,21 @@ WORKLOADS = {
     # (DT_NODE_EXISTS(DT_ALIAS(flow/tof/baro))), so which sensors are compiled
     # in is decided by the FPGA overlay, not here -- which is what makes a
     # sensor-at-a-time bring-up possible. See docs/flight-on-fpga.md.
+    # Dima's estimator, on its own. Same sources as flight_controller -- this is
+    # a build variant, not a fork -- with the controller compiled out, so a bench
+    # run measures the estimator and nothing else. The stale workloads/state
+    # Madgwick target is NOT this: on the same stationary board it settles to
+    # roll -178.7 deg where this reports roll 0.10, so the two disagree by half a
+    # turn and only one of them flies.
+    "flight_estimator": _workload(
+        "flight_estimator",
+        source_dir=ZEPHYR_BACKEND / "samples" / "rose_flight_controller",
+        modes=("default", "flow"),
+        targets=("arty200t",),
+        summary="RoSE estimator alone: attitude, altitude and sensor validity, no controller",
+        minimum_ram_by_mode=(("default", 0x80000),),
+        cmake_defines=(("ROSE_ESTIMATOR_ONLY", "1"),),
+    ),
     "flight_controller": _workload(
         "flight_controller",
         source_dir=ZEPHYR_BACKEND / "samples" / "rose_flight_controller",
