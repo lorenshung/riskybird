@@ -374,6 +374,73 @@ const char *rb_tof_kind_name(uint8_t kind)
 	}
 }
 
+/*
+ * How long to wait for a sensor to answer after its XSHUT is released.
+ *
+ * One constant for every release path, because they are all asking the same
+ * physical question and they used to disagree: wait_for_sensor allowed 500 ms
+ * and rb_tof_map 600 ms, so the topology map could call a sensor absent that
+ * init had just brought up.
+ *
+ * 600 ms was measured to be too short on riskybird v3. rb_tof_map reported
+ * `channel 1 -> none` for a VL53L5CX that rb_tof_array_init had found and
+ * readdressed to 0x31 seconds earlier, in the same run -- a false negative on
+ * a known-good part, from a scan whose whole purpose is deciding whether a
+ * header is empty.
+ *
+ * Raising it alone does NOT fix that false negative -- measured: at 5000 ms the
+ * map still reported `channel 1 -> none`. The cause was the probed ADDRESS, not
+ * the deadline (see rb_tof_map). 1500 ms is kept anyway because the two paths
+ * disagreeing was its own bug, and because the L5CX is genuinely slower to
+ * answer than the L1X.
+ */
+#ifndef RB_TOF_RELEASE_TIMEOUT_MS
+#define RB_TOF_RELEASE_TIMEOUT_MS 1500
+#endif
+
+/*
+ * Bitmap of which addresses in the assignable window currently answer.
+ * Bit n corresponds to VL53L5CX_DEFAULT_ADDR + n (0x29..0x35).
+ */
+static uint16_t window_mask(const struct device *i2c)
+{
+	uint16_t seen = 0U;
+
+	for (uint8_t addr = VL53L5CX_DEFAULT_ADDR; addr <= 0x35U; addr++) {
+		if (probe_address(i2c, addr, NULL) == 0) {
+			seen |= (uint16_t)(1U << (addr - VL53L5CX_DEFAULT_ADDR));
+		}
+	}
+	return seen;
+}
+
+/*
+ * Wait for a NEW VL53 part to appear anywhere in the window, relative to what
+ * was already answering before the channel was released.
+ *
+ * Differential rather than absolute, because sensors on OTHER channels stay
+ * powered during the scan and keep answering at their readdressed values. An
+ * absolute "does anything answer in the window" test reports every channel as
+ * populated -- measured: it returned mask 0xbd (ch0 ch2 ch3 ch4 ch5 ch7) on a
+ * board where those headers gate nothing, because the already-powered parts at
+ * 0x31 and 0x33 answered every time. Probing only 0x29 has the opposite
+ * failure and misses sensors that kept an address. Only the difference
+ * attributes a sensor to the channel actually being released.
+ */
+static int wait_for_new(const struct device *i2c, uint16_t before)
+{
+	int64_t start = k_uptime_get();
+
+	do {
+		if ((window_mask(i2c) & ~before) != 0U) {
+			return 0;
+		}
+		k_msleep(10);
+	} while ((k_uptime_get() - start) < RB_TOF_RELEASE_TIMEOUT_MS);
+
+	return -ETIMEDOUT;
+}
+
 static int wait_for_sensor(
 	const struct device *i2c,
 	uint8_t default_address,
@@ -387,7 +454,7 @@ static int wait_for_sensor(
 			return 0;
 		}
 		k_msleep(10);
-	} while ((k_uptime_get() - start) < 500);
+	} while ((k_uptime_get() - start) < RB_TOF_RELEASE_TIMEOUT_MS);
 
 	return -ETIMEDOUT;
 }
@@ -688,20 +755,43 @@ int rb_tof_map(
 		}
 
 		/*
-		 * Poll rather than sleep a fixed time. The VL53L5CX takes
-		 * substantially longer to answer after XSHUT is released than
-		 * the VL53L1X, and a delay tuned to the L1X reports a
-		 * perfectly good L5CX as absent.
+		 * Probe the whole assignable window, not just 0x29.
+		 *
+		 * This function's contract used to read "toggling XSHUT resets
+		 * a sensor, so it returns to 0x29 even if a previous run
+		 * readdressed it". On riskybird v3 that is false, and it is
+		 * the bug that made two fitted sensors look like empty
+		 * headers. Measured: driving every channel low powers the ch1
+		 * VL53L5CX off (it stops answering at 0x31, -ENODEV), but
+		 * releasing the channel brings it back at 0x31 -- its
+		 * readdressed value -- and never at 0x29. Probing only the
+		 * default address therefore reported `channel 1 -> none` for a
+		 * part that rb_tof_array_init had identified seconds earlier
+		 * in the same run, and raising the deadline to 5000 ms did not
+		 * change it.
+		 *
+		 * 0x29..0x35 covers the power-on default plus every address
+		 * this driver hands out, so a sensor is found whether it reset
+		 * or kept what it was given.
 		 */
 		int64_t start = k_uptime_get();
 
 		do {
-			if (detect_kind(i2c, VL53L5CX_DEFAULT_ADDR,
-					&kinds[channel], NULL) == 0) {
+			bool seen = false;
+
+			for (uint8_t addr = VL53L5CX_DEFAULT_ADDR;
+			     addr <= 0x35U; addr++) {
+				if (detect_kind(i2c, addr,
+						&kinds[channel], NULL) == 0) {
+					seen = true;
+					break;
+				}
+			}
+			if (seen) {
 				break;
 			}
 			k_msleep(20);
-		} while ((k_uptime_get() - start) < 600);
+		} while ((k_uptime_get() - start) < RB_TOF_RELEASE_TIMEOUT_MS);
 	}
 
 	(void)ads7128_write(i2c, ADS7128_GPO_VALUE, 0x00U);
@@ -733,6 +823,11 @@ int rb_tof_scan_xshut(struct rb_tof_array *array, uint8_t *found_mask)
 			continue;
 		}
 
+		/* Baseline with this channel still low: everything answering
+		 * now belongs to some other channel and must not be credited
+		 * to this one. */
+		uint16_t before = window_mask(array->config.i2c);
+
 		/* Make sure the channel really is a driven output first. */
 		(void)ads7128_set_bits(array->config.i2c, ADS7128_PIN_CFG, bit);
 		(void)ads7128_set_bits(array->config.i2c, ADS7128_GPIO_CFG, bit);
@@ -745,22 +840,21 @@ int rb_tof_scan_xshut(struct rb_tof_array *array, uint8_t *found_mask)
 			    ADS7128_GPO_VALUE,
 			    array->gpo_shadow) == 0) {
 			/*
-			 * Same discipline as init's wait_for_sensor: poll for
-			 * up to 500 ms rather than probing once after a fixed
-			 * 100 ms. A single probe false-negatives any sensor
-			 * that takes longer than that to ACK, and this scan is
-			 * the tool used to decide whether a header is empty --
-			 * so a false negative here gets recorded as "that
-			 * channel gates nothing", which is how the claim that
-			 * channel 4 is empty was arrived at. Measured
-			 * disagreement: a sensor that init finds on channel 1
-			 * and readdresses to 0x31 was reported absent by this
-			 * scan on the same board, in the same run.
+			 * Poll, and poll the whole window, and only count what
+			 * is NEW. This scan decides whether a header is empty,
+			 * so each of those three has bitten:
+			 *
+			 *  - a single probe after a fixed delay false-negatives
+			 *    any sensor slower than the delay;
+			 *  - probing only 0x29 misses a sensor that kept an
+			 *    address from an earlier run, because toggling
+			 *    XSHUT does not return these parts to the default;
+			 *  - counting any answer in the window credits this
+			 *    channel with sensors belonging to other channels,
+			 *    which reported mask 0xbd on a board whose spare
+			 *    headers gate nothing.
 			 */
-			if (wait_for_sensor(
-				    array->config.i2c,
-				    VL53L5CX_DEFAULT_ADDR,
-				    VL53L5CX_DEFAULT_ADDR) == 0) {
+			if (wait_for_new(array->config.i2c, before) == 0) {
 				mask |= bit;
 			}
 		}
