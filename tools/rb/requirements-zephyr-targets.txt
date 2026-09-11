@@ -3,3 +3,12 @@ esptool>=5.0.2
 
 # Required by Zephyr's Twister test runner.
 natsort>=8.4
+
+# Required by `west blobs fetch`, which the ESP32 WiFi driver needs.
+#
+# Zephyr's HTTP blob fetcher imports requests at module scope, and the fetcher
+# registry swallows the ImportError -- so without this the failure is
+# `ValueError: unknown fetcher for scheme "https"`, which names neither the
+# missing package nor the thing to install. Not optional: CONFIG_WIFI_ESP32
+# will not configure without the blobs.
+requests>=2.31
