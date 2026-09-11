@@ -959,7 +959,9 @@ def zephyr_build(
     ]
     # The workload's own definitions, before RB_CMAKE_ARGS so an operator can
     # still override one from the command line.
-    cmake_args.extend(f"-D{name}={value}" for name, value in workload.cmake_defines)
+    cmake_args.extend(
+        f"-D{name}={value}" for name, value in workload.defines_for(mode)
+    )
     if not (workload.source_dir / "Kconfig").is_file():
         cmake_args.append(
             f"-DKCONFIG_ROOT={ROOT / 'hardware' / 'zephyr' / 'Kconfig.workload'}"
@@ -1107,7 +1109,20 @@ def cmd_zephyr_setup_targets(args: argparse.Namespace) -> int:
         environment="zephyr",
         cwd=ROOT,
     )
-    print("Zephyr target HALs are installed from the current Zephyr manifest.")
+    # After the pip install, not before: the fetcher below needs `requests`,
+    # which requirements-zephyr-targets.txt supplies.
+    #
+    # The ESP32 WiFi driver links Espressif binary blobs that the manifest does
+    # not carry, so `west update` alone leaves an ESP WiFi build failing at
+    # CMake time with "Blob for path .../libble_app.a missing". Fetching them
+    # here makes `rb zephyr setup-targets` sufficient for every registered
+    # target rather than every target except the one that needs a radio.
+    run(
+        ["west", "blobs", "fetch", "hal_espressif"],
+        environment="zephyr",
+        cwd=ZEPHYR_BACKEND / "zephyr_ws",
+    )
+    print("Zephyr target HALs and Espressif blobs are installed.")
     return 0
 
 

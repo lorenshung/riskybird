@@ -397,6 +397,22 @@ class Workload:
     # hand through RB_CMAKE_ARGS, and a workload that needed one was a command
     # to remember rather than a thing you could ask for by name.
     cmake_defines: tuple[tuple[str, str], ...] = ()
+    # Same idea, but selected by mode. A mode is the unit an operator actually
+    # asks for ("--mode autoflight"), and the knobs that make a mode what it is
+    # are CMake cache variables, not Kconfig -- so without this, a mode can
+    # select overlays and .conf fragments but cannot set the one thing that
+    # decides whether the arming gate is even compiled in. That left flight
+    # builds as a pile of -D flags to remember, which is precisely how a build
+    # ends up flying with a safety knob silently absent.
+    cmake_defines_by_mode: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
+
+    def defines_for(self, mode: str) -> tuple[tuple[str, str], ...]:
+        """Workload-wide definitions, then this mode's, which may override."""
+        merged = dict(self.cmake_defines)
+        for selected_mode, defines in self.cmake_defines_by_mode:
+            if selected_mode == mode:
+                merged.update(defines)
+        return tuple(merged.items())
 
     def mode_conf(self, mode: str) -> Path | None:
         path = self.source_dir / "conf" / f"{mode}.conf"
@@ -428,6 +444,9 @@ def _workload(
     minimum_ram_by_mode: tuple[tuple[str, int], ...] = (),
     source_dir: Path | None = None,
     cmake_defines: tuple[tuple[str, str], ...] = (),
+    cmake_defines_by_mode: tuple[
+        tuple[str, tuple[tuple[str, str], ...]], ...
+    ] = (),
 ) -> Workload:
     return Workload(
         name=name,
@@ -440,6 +459,7 @@ def _workload(
         blocked_reason=blocked_reason,
         minimum_ram_by_mode=minimum_ram_by_mode,
         cmake_defines=cmake_defines,
+        cmake_defines_by_mode=cmake_defines_by_mode,
     )
 
 
@@ -516,6 +536,18 @@ WORKLOADS = {
     # The ESP link lives only in the full drone shells, which are arty200t-only
     # today. Requires a shell that elaborates serial@10021000; rb appends
     # fpga-esp-uart.overlay when it detects one.
+    # The ESP side of the same link esp_uart proves from the FPGA side. Deliberately
+    # a dumb pipe: the flight controller's telemetry line already matches the ground
+    # station's v1.1 parser (verified, 500/500 captured lines), so the bridge has no
+    # format to translate and does not need changing when telemetry gains fields.
+    "esp_bridge": _workload(
+        "esp_bridge",
+        targets=("esp32c6",),
+        summary=(
+            "WiFi modem for the FPGA flight controller: UART <-> UDP "
+            "telemetry :14550 and commands :14551"
+        ),
+    ),
     "esp_uart": _workload(
         "esp_uart",
         targets=("arty200t",),
@@ -570,9 +602,60 @@ WORKLOADS = {
         # cannot drift apart. What a mode declares is what the application
         # compiles in -- `default` has no `motors` alias and therefore contains
         # no code path to a motor at all.
-        modes=("default", "flow", "motors"),
+        modes=("default", "flow", "motors", "autoflight"),
         targets=("arty200t",),
         summary="RoSE flight controller: estimator + control cascade + sensors",
+        # Per-mode, because these are CMake cache variables: a .conf fragment
+        # cannot reach them, and a mode that cannot set them is a mode whose
+        # defining feature has to be remembered as a -D on the command line.
+        # ROSE_AUTOFLIGHT is exactly that kind of knob -- passed the wrong way
+        # it is silently ignored and the build falls through to an
+        # always-armed bench path, which is the trap FLIGHT_BUILD.md warns
+        # about and the reason this is declarative rather than documented.
+        cmake_defines_by_mode=(
+            (
+                "autoflight",
+                (
+                    # Compiles in the lift-and-place arm gate, the altitude
+                    # profile and the FLIGHT_MAX_MS cap. Without it none of
+                    # those exist and the build cannot arm at all.
+                    ("ROSE_AUTOFLIGHT", "1"),
+                    # Off by default upstream, which silently removes the
+                    # BATT_ARM_MIN_V pre-flight gate, the BATT_CUTOFF_V
+                    # in-flight estop and thrust sag compensation. On a 1S
+                    # LiPo that is the difference between a controlled
+                    # descent and a brownout mid-hover, so a flight mode
+                    # turns it on rather than leaving it to the operator.
+                    ("ROSE_BATT_SENSE", "1"),
+                    # The only observability that survives an untethered
+                    # flight: a background thread into RAM, flushed at the
+                    # end, costing the control loop nothing.
+                    ("ROSE_FLIGHTLOG", "1"),
+                    # ~5 Hz instead of ~100. This console is a 115200 FTDI
+                    # link in polling mode, so printk busy-waits; see the
+                    # note in flight_controller-autoflight.conf.
+                    ("ROSE_TELEM_DIV", "200"),
+                    # Finite on purpose. CTRL_ITERS=0 runs forever, which
+                    # suits a tethered estimator session but means the flight
+                    # log is never flushed. ~60 s at the measured 2.97 ms
+                    # loop: comfortably longer than FLIGHT_MAX_MS (10 s), so
+                    # the cap that ends a flight is the flight timer and not
+                    # an arbitrary iteration count.
+                    ("CTRL_ITERS", "20000"),
+                    # 50 mm, not the stock 20 mm. Measured on this board: a
+                    # drone sitting flat on the bench reads 0.022 m on the
+                    # down-ToF, so the stock threshold fails the "on the
+                    # ground" test by 2 mm and the lift-and-place gesture can
+                    # never complete -- the gate was set tighter than the
+                    # sensor's own resting value. 50 mm keeps the check
+                    # meaningful (it still refuses to arm while the drone is
+                    # held at any real height) with margin for near-field
+                    # jitter, which main.cpp already notes is unreliable when
+                    # the sensor sits flush.
+                    ("ARM_MAX_HEIGHT_M", "0.05f"),
+                ),
+            ),
+        ),
         safety="propellers-off",
         minimum_ram_by_mode=(("default", 0x80000),),
     ),
