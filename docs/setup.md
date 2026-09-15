@@ -388,9 +388,16 @@ downstream.
 > shell has the environment variables but not the shell function -- usual in a
 > non-interactive shell. Load it first, then deactivate:
 > ```console
-> source "$(dirname "$(dirname "$(command -v conda)")")/etc/profile.d/conda.sh"
+> source "$(dirname "$(dirname "$CONDA_EXE")")/etc/profile.d/conda.sh"
 > ```
-> `command -v conda` will still point at *your* conda -- expected, and exactly
+> `$CONDA_EXE`, not `command -v conda`. Once conda's shell integration is
+> loaded, `conda` is a shell *function*, so `command -v conda` prints the bare
+> word `conda` and the whole expression collapses to `./etc/profile.d/conda.sh`
+> -- "no such file", naming a path that looks nothing like the one you meant.
+> `$CONDA_EXE` is the real interpreter path (`/opt/miniconda3/bin/conda` on a
+> stock Miniconda) and the same integration sets it. Measured on macOS.
+>
+> It will still point at *your* conda -- expected, and exactly
 > why the deactivate is needed. What matters is where 2b then installs: watch its
 > output for
 > `Installing Miniforge to .../backends/zephyr-chipyard-sw/tools/miniforge3`.
@@ -409,9 +416,11 @@ downstream.
 > Nothing in steps 2c through 3 uses it. This is also why a macOS conda
 > environment is ~850 MB rather than the ~7 GB it is on Linux.
 >
-> The installer also prints Linux-only advice on macOS:
-> `sudo usermod -aG plugdev,dialout "$USER"`. There is no `usermod` on macOS and
-> none of it is needed there -- see 3c-bis.
+> The installer prints Linux-only advice about `usermod -aG plugdev,dialout` on
+> some hosts. It did **not** appear on the macOS run of 2026-09-14 -- zero
+> occurrences in the log -- so treat it as conditional rather than expected. If
+> you do see it, there is no `usermod` on macOS and none of it is needed there;
+> see 3c-bis.
 
 ### 2c. Install the toolchain
 
@@ -460,7 +469,22 @@ rather than the wrong package.
 > where CMake may then have several registered SDKs to choose between.
 
 `rb` finds the SDK's host tools by looking inside the SDK, so no path needs
-editing afterwards.
+editing afterwards -- **on Linux**.
+
+> **On macOS the SDK installs no host tools at all**, and two things say
+> otherwise. `setup.sh` prints
+> `Installing host tools ... SKIPPED: macOS host tools are not available yet.`
+> and leaves no `hosttools/` directory, while the installer's own closing
+> summary still lists `- Host tools` as though it had. Measured 2026-09-14.
+>
+> Nothing in the build path needs them, and step 3 does not either: `rb` takes
+> GDB from `gnu/riscv64-zephyr-elf/bin` (which *is* installed) and falls back to
+> a Homebrew OpenOCD, which is why 3b makes that `brew install` mandatory.
+> `select_host_sysroot()` then returns a Linux path that does not exist on this
+> host, so `OPENOCD_SCRIPTS` points nowhere -- harmless, because every OpenOCD
+> config `rb` passes is self-contained and given by absolute path. `rb doctor`
+> reporting `GDB ok` and `OpenOCD ok` on a Mac with no `hosttools/` is correct,
+> not a false pass.
 
 ### 2d. Supply an elaborated devicetree
 
@@ -549,11 +573,28 @@ end of step 2. Nothing so far has needed hardware.
 > Step 3 has **not** been verified that way and cannot be without an FPGA board
 > attached; see the note at the end of it.
 
-That `1 GB` region is the proof step 2d worked: it comes from the
-`RocketArty200TDroneFullDDRConfig` devicetree. Build
-`--config RocketArty200TSpadConfig` instead and the same workload reports
-`32 KB` and `59.28%`, because that shell presents a 32 KiB scratchpad rather
-than DDR.
+That `1 GB` region is the proof step 2d worked, but not by being read out of
+the collected devicetree -- it is worth being precise about what that file does,
+because the imprecise version sends people looking in the wrong place.
+
+The number itself is checked in, at `hardware/zephyr/arty200t.overlay:11`
+(`reg = <0x80000000 0x40000000>`), and *which* overlay gets used is decided from
+the **config name**: `Board.is_scratchpad_config` in `tools/rb/boards.py` matches
+`Spad` or `CameraBringup` in the string, and picks `arty200t-scratchpad.overlay`
+if it hits.
+
+The collected DTS is a gate and a cross-check. Without it `rb build` refuses
+outright (`rb: error: elaborated DTS is missing for arty200t`), and
+`validate_hardware_contract` (`tools/rb/cli.py:311`) matches the size the DTS
+actually declares against the board's legal set, reporting it on `rb doctor`'s
+contract line. So a DTS that disagrees with the shell you asked for is caught --
+which is the whole point of shipping it -- but the linker script's size does not
+come from it.
+
+Build `--config RocketArty200TSpadConfig` instead and the same workload reports
+`19424 B`, `32 KB` and `59.28%`, from `arty200t-scratchpad.overlay:9`, because
+that shell presents a 32 KiB scratchpad rather than DDR. Running both is the
+cheapest way to confirm the selection is live rather than a default.
 
 > **The build directory is keyed on target, workload and mode -- but not on
 > config.** Building a second config for the same workload overwrites the ELF at

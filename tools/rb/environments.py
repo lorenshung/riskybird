@@ -41,10 +41,16 @@ def select_zephyr_sdk(manual: Path = ZEPHYR_BACKEND / "tools-manual") -> Path:
     """Locate an installed Zephyr SDK, preferring the pinned version.
 
     Hardcoding the version made the SDK path unreachable for anyone who had to
-    install a different one -- and on macOS that is everyone: the pinned
-    v1.0.0-beta1 release publishes a ZERO-BYTE macos-aarch64 tarball, so an
-    Apple Silicon host has to use v1.0.0 or later, which ships a real 83 MB
-    build. rb would then report the SDK missing while it sat right there.
+    install a different one, and rb would then report the SDK missing while it
+    sat right there.
+
+    This docstring used to claim the pinned v1.0.0-beta1 publishes a ZERO-BYTE
+    macos-aarch64 tarball and that Apple Silicon therefore has to move to
+    v1.0.0+. That is wrong. The asset is 5,908 bytes -- the real _minimal_
+    package, which carries the cmake scaffolding and a setup.sh that downloads
+    the toolchain itself -- and it installs correctly on the pinned version.
+    Confirmed against the release metadata and by a macOS install on 2026-09-14.
+    Staying on the pinned version is what keeps macOS and Linux on one toolchain.
 
     Prefers the pinned name, else the newest zephyr-sdk-* directory present,
     else returns the pinned path so `rb doctor` still reports what it expected.
