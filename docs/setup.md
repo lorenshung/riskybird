@@ -579,17 +579,51 @@ because the imprecise version sends people looking in the wrong place.
 
 The number itself is checked in, at `hardware/zephyr/arty200t.overlay:11`
 (`reg = <0x80000000 0x40000000>`), and *which* overlay gets used is decided from
-the **config name**: `Board.is_scratchpad_config` in `tools/rb/boards.py` matches
-`Spad` or `CameraBringup` in the string, and picks `arty200t-scratchpad.overlay`
-if it hits.
+the **config name**. `Board.is_scratchpad_config` (`tools/rb/boards.py:161`)
+tests two things in order: an exact-name set, then substring markers.
 
-The collected DTS is a gate and a cross-check. Without it `rb build` refuses
-outright (`rb: error: elaborated DTS is missing for arty200t`), and
+```python
+if self.config in SCRATCHPAD_CONFIG_NAMES:   # five KU040 configs
+    return True
+return any(marker in self.config for marker in SCRATCHPAD_CONFIG_MARKERS)
+```
+
+The markers are `Spad` and `CameraBringup`, and on the Arty boards they are the
+whole story. The exact-name list exists because KU040 inverts the polarity:
+`WithKU040Tweaks` defaults `ddr = false`, so there the *unmarked* names are the
+scratchpad ones and a substring rule gets it backwards. See the comment at
+`boards.py:17-22`.
+
+The collected DTS is a gate and a bounds check -- **not** a cross-check against
+the config you named. Without it `rb build` refuses outright
+(`rb: error: elaborated DTS is missing for arty200t`), and
 `validate_hardware_contract` (`tools/rb/cli.py:311`) matches the size the DTS
-actually declares against the board's legal set, reporting it on `rb doctor`'s
-contract line. So a DTS that disagrees with the shell you asked for is caught --
-which is the whole point of shipping it -- but the linker script's size does not
-come from it.
+declares against `board.legal_memory_sizes`, the set of sizes the *board* can
+present at all.
+
+> **A DTS that contradicts the config you named is not caught**, and it is worth
+> knowing that before you trust the pairing. For arty200t the legal set is both
+> `0x40000000` and `0x8000`, so every shipped DTS satisfies it under every
+> config. Measured: putting a DTS declaring `0x40000000` at the path for
+> `RocketArty200TSpadConfig` builds clean --
+> `EXIT=0`, `RAM: 19424 B / 32 KB / 59.28%` -- linking against the 32 KiB
+> scratchpad overlay while the DTS it just validated declared 1 GiB.
+>
+> What *is* caught: a size outside the legal set entirely (which adds
+> `memory 0x80000000+0x40000000|0x8000` to the failures and raises), and the
+> missing UART, I2C, GPIO, PWM, SPI and PLIC patterns. Those are the reason to
+> ship the DTS; size-vs-config agreement is not among them.
+>
+> Nor is the naming convention reliable enough to stand in for the check.
+> Against the published collection it holds on the Arty boards and does not on
+> KU040: **arty100t 8/8 and arty200t 16/16 agree, ku040 11/25**. The
+> disagreements are real shells, not typos -- `SaturnKU040OspiConfig` declares
+> `0x8000` where the name rule implies `0x80000000`, and `RocketKU040Spad128Config`
+> declares `0x20000`, a 128 KiB scratchpad the binary scratchpad-or-DDR rule
+> cannot express at all. So do not tighten this check to demand agreement
+> without fixing KU040 first.
+
+The linker script's size, then, does not come from the DTS.
 
 Build `--config RocketArty200TSpadConfig` instead and the same workload reports
 `19424 B`, `32 KB` and `59.28%`, from `arty200t-scratchpad.overlay:9`, because
@@ -697,8 +731,11 @@ arty200t.RocketArty200TDroneFullDDRConfig.bit
 ```
 
 > **On arty200t you must pass `--config`.** `rb doctor`'s contract line names
-> each board's *default* config, which is what `rb program --board <board>` uses
-> when you give no `--config` -- and arty200t's default,
+> each board's *default* config -- it iterates the board registry without
+> applying one (`cli.py:455`), so that line reads
+> `config RocketArty200TOspiConfig` no matter which config you are building, and
+> cannot be used to confirm the DTS for some other shell. It is what
+> `rb program --board <board>` uses when you give no `--config` -- and arty200t's default,
 > `RocketArty200TOspiConfig`, has been elaborated but never synthesised, so it
 > has no bitstream in the collection. arty100t and ku040 do have theirs.
 >
