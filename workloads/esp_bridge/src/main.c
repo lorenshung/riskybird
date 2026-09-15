@@ -175,6 +175,25 @@ static void downlink_thread(void *a, void *b, void *c)
 
 		(void)net_dhcpv4_server_foreach_lease(net_if_get_wifi_sap(),
 						      lease_cb, &cl);
+
+		/* Diagnostic, rate-limited to the first few lines and then one a
+		 * second. Without it a silent downlink is ambiguous between three
+		 * very different faults: no bytes arriving on the UART at all, a
+		 * line assembled but no DHCP lease to unicast it to, or the send
+		 * itself failing. Each needs a different fix, and the console
+		 * cannot distinguish them after the fact. */
+		{
+			static uint32_t seen;
+			static int64_t next_report;
+
+			seen++;
+			if (seen <= 3 || k_uptime_get() >= next_report) {
+				next_report = k_uptime_get() + 1000;
+				printk("esp_bridge: line #%u (%u B), %d client(s): %.*s\n",
+				       seen, (unsigned)len, cl.count,
+				       (int)(len > 60 ? 60 : len - 1), line);
+			}
+		}
 		for (int i = 0; i < cl.count; i++) {
 			struct sockaddr_in dst = {
 				.sin_family = AF_INET,
@@ -281,7 +300,7 @@ static int softap_start(void)
 	static char ssid[32];
 	struct net_linkaddr *mac;
 	struct wifi_connect_req_params p = { 0 };
-	struct in_addr base;
+	struct in_addr base, gw, netmask;
 
 	if (iface == NULL) {
 		printk("esp_bridge: no SoftAP interface\n");
@@ -309,9 +328,32 @@ static int softap_start(void)
 		return -EIO;
 	}
 
-	/* 192.168.4.1 gateway, pool from .11 -- the addresses the ground
-	 * station defaults to. */
-	if (net_addr_pton(AF_INET, "192.168.4.11", &base) == 0) {
+	/*
+	 * Give the AP interface its own address BEFORE starting the DHCP server.
+	 *
+	 * Starting the server alone is not enough and fails silently in the worst
+	 * way: the client associates fine, sees no DHCP offer, falls back to an
+	 * IPv4LL 169.254.x address and cannot reach the drone at all. Measured
+	 * exactly that -- wpa_state=COMPLETED, then `using IPv4LL address
+	 * 169.254.150.200` and 100% packet loss to 192.168.4.1. The radio was
+	 * never the problem; the interface simply had no address to serve from.
+	 *
+	 * 192.168.4.1/24 with the pool from .11 is what the ground station
+	 * defaults to (riskybird_panel.py --drone 192.168.4.1).
+	 */
+	if (net_addr_pton(AF_INET, "192.168.4.1", &gw) != 0 ||
+	    net_addr_pton(AF_INET, "255.255.255.0", &netmask) != 0 ||
+	    net_addr_pton(AF_INET, "192.168.4.11", &base) != 0) {
+		printk("esp_bridge: bad address literal\n");
+		return -EINVAL;
+	}
+	if (net_if_ipv4_addr_add(iface, &gw, NET_ADDR_MANUAL, 0) == NULL) {
+		printk("esp_bridge: could not set 192.168.4.1 on the AP iface\n");
+		return -EIO;
+	}
+	(void)net_if_ipv4_set_netmask_by_addr(iface, &gw, &netmask);
+
+	{
 		int rc = net_dhcpv4_server_start(iface, &base);
 
 		if (rc != 0 && rc != -EALREADY) {
