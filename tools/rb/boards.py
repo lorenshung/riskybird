@@ -152,14 +152,34 @@ class Board:
         indistinguishable once moved.
 
         Set RB_BITSTREAM_DIR to point it somewhere other than <root>/bitstreams.
+
+        rb_impl.bit COMES FIRST, and that ordering is the whole point. Two
+        different flows in this repository produce a bitstream for the same
+        config:
+
+          make bitstream   Chipyard's own flow. Re-elaborates, so it discards
+                           any gen-collateral attribute injection, and writes
+                           <Harness>.bit.
+          make rb-impl     riskybird/area.mk. Routes obj/post_synth.dcp -- the
+                           netlist `rb area run --attrs dsp` measured, with
+                           use_dsp already baked in -- and writes rb_impl.bit.
+
+        The accelerator configs only fit with DSP injection, so rb_impl.bit is
+        the real artifact for them and <Harness>.bit, if one is lying around
+        from an earlier plain build, is a DIFFERENT DESIGN. Preferring the
+        harness name meant `rb program` could silently load the uninjected build
+        of a config whose recorded area and timing came from the injected one --
+        a wrong bitstream that programs perfectly and is measured against the
+        wrong numbers.
         """
-        built = self.generated_dir / "obj" / f"{self.harness}.bit"
-        if built.is_file():
-            return built
+        obj = self.generated_dir / "obj"
+        for built in (obj / "rb_impl.bit", obj / f"{self.harness}.bit"):
+            if built.is_file():
+                return built
         collected = self.collected_bitstream
         if collected.is_file():
             return collected
-        return built
+        return obj / f"{self.harness}.bit"
 
     @property
     def collected_bitstream(self) -> Path:
