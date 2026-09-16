@@ -1080,6 +1080,30 @@ def zephyr_build(
     # static entry in the workload registry. Placed after the workload's own
     # definitions and still before RB_CMAKE_ARGS, so the precedence is
     # registry < caller < operator.
+    # The ModelBlaster harness cannot build without MODEL_DIR, and the commands
+    # that make up the deploy path -- rb build, debug, run, capture -- all
+    # rebuild and none of them has a --model to pass. Left alone they fail at
+    # CMake with "MODEL_DIR not set", which made `rb modelblaster build` the only
+    # way to build this workload and the JTAG load path unusable. Fill the
+    # definitions in from the defaults when the caller has not supplied them; an
+    # explicit extra_defines still wins, which is how `rb modelblaster build`
+    # selects a non-default quantization or kernel target.
+    if workload.source_dir == MODELBLASTER / "harness" and not any(
+        name == "MODEL_DIR" for name, _ in extra_defines
+    ):
+        defaults = modelblaster.harness_defines(
+            workload.name,
+            gemmini_config=board.config if board is not None else None,
+        )
+        if board is not None:
+            # The same refusal `rb modelblaster build` makes, applied here so it
+            # cannot be walked around by using a different rb command to build
+            # the identical image.
+            _check_float_contract(
+                board,
+                dict(defaults)["MODELBLASTER_KERNEL_CFLAGS"].split(";"),
+            )
+        extra_defines = defaults + tuple(extra_defines)
     cmake_args.extend(f"-D{name}={value}" for name, value in extra_defines)
     if not (workload.source_dir / "Kconfig").is_file():
         cmake_args.append(
@@ -3059,10 +3083,12 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
             args.pristine,
             board,
             ram_console=args.ram_console,
-            extra_defines=(
-                ("MODEL_DIR", str(gen_dir)),
-                ("MODELBLASTER_BACKEND", args.target),
-                ("MODELBLASTER_KERNEL_CFLAGS", ";".join(cflags)),
+            extra_defines=modelblaster.harness_defines(
+                args.model,
+                quant=args.quant,
+                target=args.target,
+                gemmini_config=board.config,
+                gen_dir=gen_dir,
             ),
         )
         print(elf)

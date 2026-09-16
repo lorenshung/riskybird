@@ -686,6 +686,47 @@ def per_config_header_dir(config: str) -> Path:
     return MODELBLASTER / "cores" / "gemmini" / "include" / "per_config" / config
 
 
+# The ModelBlaster harness's defaults, for the rb commands that build a workload
+# without being told about models. `rb debug`, `rb run`, `rb capture` and
+# `rb build` all rebuild before they do their real job, and they have no
+# --model/--quant/--target of their own -- so without this the whole deploy path
+# fails at CMake with "MODEL_DIR not set", and only `rb modelblaster build`
+# works. These are the same defaults that command takes.
+DEFAULT_QUANT = "int8"
+DEFAULT_TARGET = "gemmini_q31"
+
+
+def harness_defines(
+    model: str,
+    *,
+    quant: str = DEFAULT_QUANT,
+    target: str = DEFAULT_TARGET,
+    gemmini_config: str | None = None,
+    gen_dir: Path | None = None,
+) -> tuple[tuple[str, str], ...]:
+    """The three -D definitions the ModelBlaster harness cannot build without.
+
+    MODEL_DIR is where codegen wrote the model; MODELBLASTER_BACKEND picks the
+    harness's Kconfig overlay; MODELBLASTER_KERNEL_CFLAGS is what makes
+    kernels.c a Gemmini kernel rather than a scalar one. The last is resolved
+    from ModelBlaster's own table rather than restated, and carries the
+    per-config Gemmini header selection with it.
+    """
+    resolved = Path(gen_dir) if gen_dir else generated_dir(model, quant, target)
+    if not resolved.is_dir():
+        raise ModelBlasterError(
+            f"no generated sources at {resolved}.\n"
+            f"Run: rb modelblaster generate --model {model} --quant {quant} "
+            f"--target {target}"
+        )
+    return (
+        ("MODEL_DIR", str(resolved)),
+        ("MODELBLASTER_BACKEND", target),
+        ("MODELBLASTER_KERNEL_CFLAGS",
+         ";".join(kernel_cflags(target, gemmini_config=gemmini_config))),
+    )
+
+
 def kernel_cflags(target: str, *, gemmini_config: str | None = None) -> list[str]:
     """The per-backend flags ModelBlaster applies to kernels.c, from its own table.
 

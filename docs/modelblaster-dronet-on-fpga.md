@@ -374,38 +374,101 @@ merge.
 > who did not already have the object locally. The URL now points at the fork;
 > the pinned commit never changed.
 
-## The rest of the hardware path
+## Runbook: DroNet on the board
 
-Written, not yet run — the board is not attached.
+**Target shell: `RocketArty200TDroneGemmini16At40Config`** — Gemmini 16×16, no
+Saturn, full scalar FPU, 40 MHz. Not the 93% combined shell: DroNet int8 reaches
+Gemmini over RoCC and uses no vector FP, and this one runs a stock hard-float
+image (see the FP16 trap above).
+
+Steps 1–2 are done and their outputs are on disk; 3–5 need the board.
+
+### 1. The bitstream
 
 ```console
-# 1. the accelerator bitstream (elaborate -> inject -> synth, then P&R)
 rb area run --board arty200t --config RocketArty200TDroneGemmini16At40Config --attrs dsp
 make -C backends/chipyard/fpga SUB_PROJECT=arty200t \
      CONFIG=RocketArty200TDroneGemmini16At40Config rb-impl
+```
 
-# 2. the model, and the image for that shell
+`--attrs dsp` first, `rb-impl` second, and in that order: injection is a
+gen-collateral source edit and `rb-impl` deliberately starts from
+`obj/post_synth.dcp` so it routes the netlist that was measured. Running
+`make bitstream` instead re-elaborates and throws the injection away.
+
+Output: `obj/rb_impl.bit`, plus `obj/report/timing.txt`. **Read the timing report
+before loading anything** — Vivado emits a bitstream for a design that misses
+timing with only a warning.
+
+### 2. The image
+
+```console
 rb modelblaster generate --model dronet --quant int8 --target gemmini_q31
 rb modelblaster build --board arty200t \
      --config RocketArty200TDroneGemmini16At40Config \
      --model dronet --quant int8 --target gemmini_q31
+```
 
-# 3. on the board. No UART-TSI on these shells, so the ELF goes in over JTAG.
+### 3. Power and link
+
+The TE0712 needs a real supply, not USB alone: 3.3 V at 1 A browns out the DDR3
+banks, and the symptom is a JTAG link that reads exactly like a broken cable
+(`te0712-drone-carrier-ddr-bringup.md`). DroNet's weights and activations live in
+DDR, so this is not optional for this workload.
+
+Check the link before anything else:
+
+```console
+rb probe-ftdi --idcode
+```
+
+An xc7a200t answers `0x13636093` (the value `docs/setup.md` records from a real probe of this bench). `all ones (nothing driving TDO)` means no
+board, no power, or the wrong JTAG pinout — not a software problem.
+
+### 4. Program and run
+
+```console
 rb program --board arty200t --config RocketArty200TDroneGemmini16At40Config
-rb capture --target arty200t --workload dronet --capture-duration 120
+```
 
-# 4. the numbers
-rb modelblaster report <capture>/console.log --model dronet \
+These shells are built `uartTsi = false`, so there is no UART-TSI and `rb load`
+cannot be used. The ELF goes in over JTAG:
+
+```console
+rb debug --target arty200t --workload dronet \
+     --config RocketArty200TDroneGemmini16At40Config
+```
+
+That is less costly than the ELF's size suggests. `zephyr.elf` is ~5.9 MB of
+memory image but a single LOAD segment of **405,128 bytes**; the rest is `.bss`
+and the harness's 4 MB `.noinit` stack, neither of which is transferred.
+
+Capture the console on the other channel. If it stays silent, retarget it rather
+than assuming the board is dead — this carrier's console pair has a history
+(`drone-initial-bringup.md`), and `--ram-console` puts output in a RAM ring
+buffer read back over the same JTAG link that loaded the image:
+
+```console
+rb debug --target arty200t --workload dronet \
+     --config RocketArty200TDroneGemmini16At40Config --ram-console
+```
+
+The harness ends by calling `sys_reboot()`, which these shells do not implement,
+so a completed run prints `Failed to reboot: spinning endlessly...` and idles.
+That is the expected end state, not a fault — the markers are already out by then.
+
+### 5. The numbers
+
+```console
+rb modelblaster report <capture> --model dronet \
      --board arty200t --config RocketArty200TDroneGemmini16At40Config
 ```
 
-Step 4 needs no `--cpu-mhz`: with a config named, the clocks come from that
-shell's devicetree, and the report says so on the `clock evidence` line.
+No `--cpu-mhz`: naming the config reads both clocks from that shell's
+devicetree, and the `clock evidence` line says so. Writes `profile.csv` and
+`gantt.svg` beside the capture.
 
-Two things to expect on first contact. The console on this carrier has a history
-(`drone-initial-bringup.md`); `--ram-console` retargets output to a RAM ring
-buffer read over the same JTAG link that loaded the image, which is the fallback
-if the UART is silent. And DroNet's weights and the harness's 4 MB main stack
-mean this workload only runs on a DDR-backed shell — `tools/rb/boards.py`
-enforces an 8 MiB floor so that surfaces as a refusal rather than a linker
-overflow.
+Sanity-check the output before believing it. `outside kernels` above 50% or a
+kernel sum larger than the frame both mean the clocks do not describe the machine
+the capture came from, and `rb` says so in a warning rather than leaving it to be
+noticed.
