@@ -42,7 +42,7 @@ design space.
 | --- | --- | --- | --- | --- |
 | `RocketArty200TDroneGemminiSaturnFp16At35Config` | Gemmini 16×16 + Saturn V128D64 fp16 | **FP16 only** | 35 MHz | WNS +0.150 ns, 92.8% LUT |
 | `RocketArty200TDroneSaturn40Config` | Saturn V128D128 fp16 | full | 40 MHz | WNS +0.422 ns, 90.1% LUT |
-| `RocketArty200TDroneGemmini16At40Config` | Gemmini 16×16 | full | 40 MHz | ~70.8% LUT |
+| `RocketArty200TDroneGemmini16At40Config` | Gemmini 16×16 | full | 40 MHz | 70.45% LUT, and see below |
 
 Periphery on all three is byte-for-byte `RocketArty200TDroneFullDDRDmaUartConfig`
 — DDR3, camera OSPI with capture DMA, I2C, PMW3901 SPI, control GPIO, both motor
@@ -107,6 +107,47 @@ make -C backends/chipyard/fpga SUB_PROJECT=arty200t \
 
 It writes `obj/rb_post_route.dcp`, `obj/rb_impl.bit`, and timing/power/DRC
 reports beside them.
+
+### The DroNet deploy shell, measured here
+
+`RocketArty200TDroneGemmini16At40Config`, `--attrs dsp`, `xc7a200tfbg484-1`:
+
+| Resource | Synth | Post-route | of device |
+| --- | --- | --- | --- |
+| Slice LUTs | 99,002 | 124,577 → **94,260** | **70.45%** |
+| Slice registers | 67,099 | 67,034 | 24.90% |
+| Block RAM tiles | 276 | 276 | 75.62% |
+| DSPs | 511 | 511 | 69.05% |
+
+Area is comfortable and matches the ~70.8% the config comment projected. Timing
+is the problem, and only just:
+
+> **WNS −0.091 ns. `Timing constraints are not met.`**
+
+Ninety-one picoseconds short of 40 MHz on a 25 ns period, on a design occupying
+70% of the part. That is not a shell that needs a smaller accelerator or a
+slower clock — it is a miss smaller than the spread between Vivado's own
+implementation directives, on a run where nothing asked the placer to try
+harder.
+
+This is exactly the trap the flow is meant to catch. Vivado writes a bitstream
+for a timing-failing design with only a warning, so without reading
+`obj/report/timing.txt` this one would load, boot, run DroNet and produce a
+frame rate — from a design that is not guaranteed to compute the right answer.
+`tools/collect-bitstreams.py` records `wns_ns` and `timing_met` per bitstream and
+refuses to let a failing one pass quietly into a published directory.
+
+The remedy is effort, not redesign: `RB_IMPL_DIRECTIVE=explore` (or
+`aggressive`) escalates opt/place/phys_opt/route together.
+
+```console
+RB_IMPL_DIRECTIVE=explore make -C backends/chipyard/fpga SUB_PROJECT=arty200t \
+    CONFIG=RocketArty200TDroneGemmini16At40Config rb-impl
+```
+
+Unset is the default and reproduces the numbers above. When it is set, `rb-impl`
+says so on the console, because a result obtained with extra effort is real but
+is not comparable with one that was not.
 
 ## Two things that will bite, both found the hard way
 
