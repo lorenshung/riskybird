@@ -226,6 +226,21 @@ def main() -> int:
 
     entries = []
     for bit in sorted(GENERATED.glob("*/obj/*.bit")):
+        # A config directory can hold two bitstreams: <Harness>.bit from
+        # Chipyard's `make bitstream`, and rb_impl.bit from `make rb-impl`,
+        # which routes the use_dsp-injected checkpoint `rb area run --attrs dsp`
+        # measured. They are DIFFERENT DESIGNS, and for the accelerator configs
+        # only the injected one fits the part at all.
+        #
+        # Both used to be collected to the same destination name, so which one a
+        # published directory ended up carrying came down to the sort order of
+        # the filenames. That happened to favour rb_impl.bit -- 'A' sorts before
+        # 'r', so it was copied second and overwrote the other -- which is an
+        # accident, not a decision, and it would have silently reversed if either
+        # file were ever renamed. Say it instead.
+        if bit.name != "rb_impl.bit" and (bit.parent / "rb_impl.bit").is_file():
+            print(f"skip (superseded by rb_impl.bit): {bit.parent.parent.name}/{bit.name}")
+            continue
         gen = bit.parent.parent.name
         # chipyard.fpga.<board>.<Harness>.<Config>
         match = re.match(r"^(chipyard\.fpga\.[a-z0-9]+)\.([A-Za-z0-9]+)\.(.+)$", gen)
