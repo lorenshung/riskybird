@@ -1407,6 +1407,21 @@ git submodule update --init backends/modelblaster
 nothing else needs it: every workload but `dronet` builds without it, and it is
 the only backend whose codegen wants torch.
 
+**Its Python dependencies are not installed by step 2.** ModelBlaster declares
+them in its own `pyproject.toml` -- torch, numpy, pillow, ultralytics, pyyaml,
+requests -- and the Zephyr backend's environment does not carry them. Install
+them into that environment:
+
+```console
+rb env shell zephyr
+pip install -e backends/modelblaster
+```
+
+This is the one step of this tier that has to happen on whichever machine runs
+5b, because codegen output is gitignored upstream (`examples/*/*/generated/`) and
+so is never published. A bench machine consuming someone else's bitstream and
+devicetree still has to generate the model itself.
+
 The pin is this fork's `riskybird-integer-dronet`, not `main`. That matters more
 than a branch name usually does -- `main`'s int8 DroNet does not verify. Measured
 here on spike, same model, same backend, same runner:

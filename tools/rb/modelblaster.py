@@ -668,9 +668,32 @@ def generate(
         capture_output=True,
     )
     if result.returncode != 0:
+        combined = result.stdout + result.stderr
+        # ModelBlaster's own dependencies -- torch above all -- are declared in
+        # its pyproject.toml, not in the Zephyr backend's environment spec. So
+        # `rb env setup zephyr` does not install them, and on a machine where
+        # nobody has installed them by hand this is the first place it shows,
+        # as a ModuleNotFoundError buried in a codegen traceback. Say what to
+        # do instead of making someone read the stack.
+        hint = ""
+        if "ModuleNotFoundError" in combined:
+            missing = re.findall(r"No module named '([^']+)'", combined)
+            hint = (
+                "\n\nThis is a missing codegen dependency"
+                + (f" ({', '.join(sorted(set(missing)))})" if missing else "")
+                + ". ModelBlaster declares its own in "
+                "backends/modelblaster/pyproject.toml -- torch, numpy, pillow, "
+                "ultralytics, pyyaml, requests -- and the Zephyr backend's "
+                "environment does not carry them. Install them into it:\n"
+                "    rb env shell zephyr\n"
+                "    pip install -e backends/modelblaster\n"
+                "Only the models tier needs this; nothing else in the "
+                "repository imports torch."
+            )
         raise ModelBlasterError(
             f"ModelBlaster codegen failed for {model} "
-            f"(quant={quant}, target={target}):\n{result.stdout[-4000:]}\n{result.stderr[-4000:]}"
+            f"(quant={quant}, target={target}):\n"
+            f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}{hint}"
         )
     out = generated_dir(model, quant, target)
     if not out.is_dir():
