@@ -47,6 +47,7 @@ side needs the other's toolchain.
 | [`motor-pwm-bringup.md`](docs/motor-pwm-bringup.md) | motor PWM |
 | [`flight-on-fpga.md`](docs/flight-on-fpga.md) | porting the flight controller onto Rocket; phase plan and what is verified |
 | [`te0712-ftdi-carrier-ddr-bringup.md`](docs/te0712-ftdi-carrier-ddr-bringup.md) | the same DDR3 work on the FTDI carrier |
+| [`modelblaster-dronet-on-fpga.md`](docs/modelblaster-dronet-on-fpga.md) | a PyTorch model to an accelerated XC7A200T shell: the Gemmini/Saturn configs, the per-op timeline and FPS, and the two clock/FPU traps |
 | [`verification.md`](docs/verification.md) | what "verified" means here, and which tests pass where |
 | [`repository-layout.md`](docs/repository-layout.md) | orientation |
 | [`merging-into-main.md`](docs/merging-into-main.md) | what this branch changed, and how to fold it back |

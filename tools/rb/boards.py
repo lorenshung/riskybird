@@ -28,6 +28,24 @@ SCRATCHPAD_CONFIG_NAMES = frozenset({
     "NoCoresKU040Config",
 })
 SCRATCHPAD_MEMORY_SIZE = 0x8000
+# Configs whose Rocket scalar FPU is FP16-only (WithRocketFPU16: fLen = 16).
+#
+# Listed by name for the same reason SCRATCHPAD_CONFIG_NAMES is: the fact cannot
+# be read off anything else. The elaborated devicetree does NOT distinguish
+# them -- rocket-chip emits "f" in riscv,isa for any FPU, so
+# RocketArty200TDroneGemminiSaturnFp16At35Config advertises rv64imafc while its
+# FPU implements only Zfh. A shell that claims FP32 it cannot execute is a trap
+# rather than a limitation: Zephyr's RISC-V CMake puts "f" in -march whenever
+# CONFIG_FPU=y (cmake/compiler/gcc/target_riscv.cmake), independent of
+# CONFIG_FLOAT_HARD, so any fp32 arithmetic compiles to fadd.s and faults at
+# run time with nothing in the build to warn about it.
+#
+# Keep in sync with WithRocketFPU16 call sites in
+# backends/chipyard/fpga/src/main/scala/arty200t/AccelConfigs.scala.
+FP16_SCALAR_FPU_CONFIGS = frozenset({
+    "RocketArty200TDroneGemminiSaturnFp16Config",
+    "RocketArty200TDroneGemminiSaturnFp16At35Config",
+})
 CHIPYARD = ROOT / "backends" / "chipyard"
 ZEPHYR_BACKEND = ROOT / "backends" / "zephyr-chipyard-sw"
 FPGA_ZEPHYR_BOARD = "chipyard_riscv64/rocketchip_virt_riscv64"
@@ -676,6 +694,26 @@ WORKLOADS = {
         targets=("arty100t", "arty200t", "ku040", "firesim"),
         summary="Main-memory stress: four patterns over a configurable window",
         minimum_ram_by_mode=(("default", 0x6000000),),
+    ),
+    # DroNet through ModelBlaster's harness. Built in place from the Zephyr
+    # backend, like flight_controller: the harness is maintained upstream and
+    # takes the generated model as -DMODEL_DIR, so there is nothing for a
+    # workloads/dronet/ directory to hold that would not be a copy.
+    #
+    # `rb build --workload dronet` alone is not enough -- MODEL_DIR has to point
+    # at codegen output that matches this board's accelerators. `rb modelblaster
+    # run` is the entry point; it runs stages 1-3, then this.
+    "dronet": _workload(
+        "dronet",
+        source_dir=ZEPHYR_BACKEND / "modelblaster" / "harness",
+        targets=("arty200t",),
+        summary="DroNet inference through the ModelBlaster harness, with a per-op profile",
+        # The harness alone asks for a 4 MB main stack
+        # (modelblaster/harness/prj.conf), before DroNet's weights, activations
+        # and the baked test io. No scratchpad shell can host this, and the
+        # floor says so at build time instead of letting it surface as a linker
+        # "region RAM overflowed" against a 32 KiB region.
+        minimum_ram_by_mode=(("default", 0x800000),),
     ),
     "i2c_scanner": _workload(
         "i2c_scanner",
