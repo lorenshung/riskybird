@@ -4,7 +4,15 @@
 #
 #   bench tier    git submodule update --init backends/zephyr-chipyard-sw
 #   silicon tier  ... plus backends/chipyard   (Linux only; needs Vivado)
+#   models        ... plus backends/modelblaster  (~143 MiB)
 #   board files   git submodule update --init hardware/pcb   (KiCad, ~18 MiB)
+#
+# backends/modelblaster is the PyTorch -> quantized -> Zephyr/RISC-V compilation
+# pipeline behind `rb modelblaster`. It is its own tier because it is an input to
+# one flow rather than to the toolchain: every other workload builds without it,
+# and it is the only backend whose codegen wants torch. It was a submodule of
+# zephyr-chipyard-sw until nothing in that backend turned out to build against
+# it; see docs/modelblaster-dronet-on-fpga.md.
 #
 # hardware/pcb is the board itself rather than a backend, and nothing in the
 # build reads it, so no tier pulls it automatically. Initialise it when you
@@ -18,6 +26,15 @@
 	path = backends/chipyard
 	url = https://github.com/lorenshung/chipyard.git
 	branch = arty200t-dual-uart
+[submodule "backends/modelblaster"]
+	path = backends/modelblaster
+	url = https://github.com/lorenshung/ModelBlaster.git
+	# riskybird-integer-dronet, not main: this fork's merge of Dima's
+	# ucb-bar/ModelBlaster branch of the same name -- integer DroNet kernels for
+	# misa.F = 0, NHWC + conv0-pool fusion, the gemmini_q31_rvv backend -- with
+	# the fork's Verilator runner, U250 target and per-config Gemmini headers.
+	# main is 300+ commits behind and its int8 DroNet does not verify.
+	branch = riskybird-integer-dronet
 [submodule "hardware/pcb"]
 	path = hardware/pcb
 	url = https://github.com/lorenshung/riskybird.git

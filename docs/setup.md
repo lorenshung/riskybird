@@ -4,12 +4,13 @@ Built up one piece at a time. Each step adds exactly one dependency and ends in 
 can run to prove that step worked -- a step is not done because it installed, it is done because
 its verification command printed what this page says it prints.
 
-Two tiers, and you almost certainly want the first:
+Three tiers, and you almost certainly want the first:
 
 | Tier | What it does | Steps | Needs | macOS |
 | --- | --- | --- | --- | --- |
 | **Bench** | build workloads, program the FPGA, debug, run the drone | 1-3 | Python, Zephyr SDK, openFPGALoader, OpenOCD | **yes** |
 | **Silicon** | elaborate Chipyard, build bitstreams | 1, then 4 | Vivado, Chipyard | **no -- Linux only** |
+| **Models** | compile a PyTorch model onto an accelerated shell | 1-2, then 5 | the bench tier, plus torch | untested |
 
 Vivado has no macOS release, so a Mac cannot build bitstreams. It can do everything else,
 consuming bitstreams and devicetrees built elsewhere. Nothing in the bench tier needs Chipyard
@@ -345,9 +346,10 @@ git submodule update --init backends/zephyr-chipyard-sw
 **Not `--recursive`.** The backend has its own nested submodules; 2b brings up
 exactly the ones it needs.
 
-The bench tier does not initialise `backends/chipyard` at all. An uninitialised
-submodule is just an empty directory -- nothing is deleted, nothing is
-special-cased.
+The bench tier does not initialise `backends/chipyard` or
+`backends/modelblaster` at all. An uninitialised submodule is just an empty
+directory -- nothing is deleted, nothing is special-cased. `rb doctor` reports
+both as `MISSING`, which on this tier is the correct state and not a warning.
 
 ### 2b. Build the Zephyr environment
 
@@ -1380,3 +1382,106 @@ Linux; only macOS itself is untested.
 Only *synthesised* configs produce bitstreams. A config that was elaborated but
 never built appears in the DTS collection and not the bitstream one -- which is
 precisely the situation step 3c warns about for `arty200t`'s default config.
+
+
+## Step 5 -- compile a model onto an accelerated shell (models tier)
+
+Needs step 1 and step 2. Step 3 as well if you intend to run the result on a
+board rather than only build it; step 4 only if you are building the bitstream
+yourself rather than consuming a published one.
+
+`rb modelblaster` takes a PyTorch model through quantization, per-target kernel
+generation and a Zephyr build, puts it on a RiskyBird shell, and turns the
+console capture into a per-op timeline and a frame rate. The pipeline behind it
+is [ModelBlaster](https://github.com/ucb-bar/ModelBlaster); the full account of
+this flow, including two traps worth reading before you build anything, is
+[`modelblaster-dronet-on-fpga.md`](modelblaster-dronet-on-fpga.md).
+
+### 5a. Initialise the backend
+
+```console
+git submodule update --init backends/modelblaster
+```
+
+~143 MiB. It is a third backend rather than part of the Zephyr one because
+nothing else needs it: every workload but `dronet` builds without it, and it is
+the only backend whose codegen wants torch.
+
+The pin is this fork's `riskybird-integer-dronet`, not `main`. That matters more
+than a branch name usually does -- `main`'s int8 DroNet does not verify. Measured
+here on spike, same model, same backend, same runner:
+
+| | `main` @ 18619ca | `riskybird-integer-dronet` |
+| --- | --- | --- |
+| `MODELBLASTER_VERIFY` | **FAILED**, max_abs_err 72 | max_abs_err 0 |
+| cycles | 14,382,306 | 4,772,860 |
+| on Gemmini | 82.2% | 98.7% |
+
+### Verify
+
+```console
+rb doctor
+```
+
+`ModelBlaster backend` should now read `ok`:
+
+```
+ModelBlaster backend ok      <repo>/backends/modelblaster
+```
+
+### 5b. Generate the model
+
+```console
+rb modelblaster generate --model dronet --quant int8 --target gemmini_q31
+```
+
+Runs ModelBlaster's stages 1-3 -- extract the graph, emit the skeleton, pick the
+kernels -- with `STAGE_ONLY=1`, so no simulator is involved. It prints the
+directory it wrote:
+
+```
+<repo>/backends/modelblaster/examples/dronet/int8/generated/gemmini_q31
+```
+
+### 5c. Build the image for a shell
+
+```console
+rb modelblaster build --board arty200t \
+    --config RocketArty200TDroneGemmini16At40Config \
+    --model dronet --quant int8 --target gemmini_q31
+```
+
+This needs that config's devicetree -- elaborated locally, or published per step
+2d -- because the Gemmini header, the kernel tick rate and the UART divisor all
+come from it rather than from a constant.
+
+It ends in an ELF:
+
+```
+Memory region         Used Size  Region Size  %age Used
+             RAM:     7012832 B         1 GB      0.65%
+<repo>/build/zephyr/arty200t/dronet/default/zephyr/zephyr.elf
+```
+
+Two refusals you may meet here, both deliberate, both explained in full in the
+doc above: a shell whose scalar FPU is FP16-only will not accept a hard-float
+kernel build, and a config with no captured Gemmini header will not build
+silently against someone else's.
+
+### 5d. Run it, and read the result
+
+Programming and capturing are ordinary step-3 commands. Then:
+
+```console
+rb modelblaster report <capture> --model dronet \
+    --board arty200t --config RocketArty200TDroneGemmini16At40Config
+```
+
+which prints the per-op breakdown by engine, the frame time and the frame rate,
+and writes `profile.csv` and `gantt.svg` beside the capture. Naming the config is
+what lets it read both clocks out of the devicetree instead of being told them;
+the `clock evidence` line in the output says which it used.
+
+**Not verified on hardware.** Steps 5a-5c have been run here end to end; 5d has
+been exercised against a spike capture but never against a board, because none
+was attached. No frame rate in this repository was measured on an FPGA.

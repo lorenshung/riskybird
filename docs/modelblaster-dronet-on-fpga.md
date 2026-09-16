@@ -284,8 +284,11 @@ That is the branch worth being on, and it is why this repo pins it.
 
 ## The ModelBlaster pin
 
-`backends/zephyr-chipyard-sw/modelblaster` is a submodule of the Zephyr backend,
-`git@github.com:lorenshung/ModelBlaster.git`, branch `riskybird-integer-dronet`.
+`backends/modelblaster` is a backend in its own right, alongside `chipyard` and
+`zephyr-chipyard-sw`: `https://github.com/lorenshung/ModelBlaster.git`, branch
+`riskybird-integer-dronet`. It is its own setup tier (`docs/setup.md` step 5),
+because every workload but `dronet` builds without it and it is the only backend
+whose codegen wants torch.
 
 That branch is this fork's merge of two lines: Dima's
 `ucb-bar/ModelBlaster riskybird-integer-dronet` (10b50ba — integer DroNet

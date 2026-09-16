@@ -10,12 +10,13 @@ camera and motors, and one command — `rb` — that builds and runs all of it.
 time, each ending in a command whose real output is quoted, so you can tell
 whether the step worked rather than assuming it did.
 
-Two tiers, and you probably want the first:
+Three tiers, and you probably want the first:
 
 | Tier | What it does | Steps | macOS |
 | --- | --- | --- | --- |
 | **Bench** | build workloads, program the FPGA, debug, run the drone | 1–3 | **yes** |
 | **Silicon** | elaborate Chipyard, build bitstreams | 1, then 4 | no — Vivado is Linux only |
+| **Models** | compile a PyTorch model onto an accelerated shell | 1–2, then 5 | untested |
 
 Because Vivado has no macOS release, the common arrangement is two machines: one
 Linux host runs step 4 and publishes its bitstreams and devicetrees; every other
@@ -34,7 +35,7 @@ side needs the other's toolchain.
 | `hardware/openocd/` | JTAG adapter and target configs |
 | `tools/bench/` | bench helpers, including the FTDI reset the JTAG link needs |
 | `tools/collect-*.py` | publish bitstreams and devicetrees for hosts that cannot build them |
-| `backends/` | Chipyard and Zephyr, as submodules, initialised per tier |
+| `backends/` | Chipyard, Zephyr and ModelBlaster, as submodules, initialised per tier |
 
 ## Documentation
 

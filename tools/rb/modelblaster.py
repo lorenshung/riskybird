@@ -1,6 +1,6 @@
 """ModelBlaster on RiskyBird hardware: codegen, capture analysis, and figures.
 
-ModelBlaster (``backends/zephyr-chipyard-sw/modelblaster``) takes a PyTorch
+ModelBlaster (``backends/modelblaster``) takes a PyTorch
 model through quantization, per-target kernel generation, a Zephyr build, and a
 run on spike, Verilator or FireSim. What it has never had is a *board*: its
 stage-5 runners are all simulators, so a model that has been measured has never
@@ -47,11 +47,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from .boards import ROOT, ZEPHYR_BACKEND
+from .boards import MODELBLASTER, ROOT
 from .environments import zephyr_env
 
-
-MODELBLASTER = ZEPHYR_BACKEND / "modelblaster"
 
 
 class ModelBlasterError(RuntimeError):
@@ -633,8 +631,8 @@ def generate(
         raise ModelBlasterError(
             f"no ModelBlaster example named {model!r}"
             + (f"; available: {', '.join(available)}" if available else
-               f"; {MODELBLASTER} is empty -- initialise the submodule "
-               "(git submodule update --init modelblaster, inside the Zephyr backend)")
+               f"; {MODELBLASTER} is empty -- initialise the backend "
+               "(git submodule update --init backends/modelblaster)")
         )
 
     # The zephyr conda environment, not the caller's: codegen needs torch,
@@ -655,7 +653,7 @@ def generate(
             # same resolution with no side effect -- modelblaster/ is a
             # namespace package, so it imports from the checkout directly.
             "PYTHONPATH": os.pathsep.join(
-                [str(ZEPHYR_BACKEND), environment.get("PYTHONPATH", "")]
+                [str(MODELBLASTER.parent), environment.get("PYTHONPATH", "")]
             ).rstrip(os.pathsep),
         }
     )
@@ -664,7 +662,7 @@ def generate(
 
     result = subprocess.run(
         ["bash", str(run_sh)],
-        cwd=str(ZEPHYR_BACKEND),
+        cwd=str(MODELBLASTER.parent),
         env=environment,
         text=True,
         capture_output=True,
@@ -712,13 +710,13 @@ def kernel_cflags(target: str, *, gemmini_config: str | None = None) -> list[str
     if gemmini_config is not None:
         environment["MODELBLASTER_GEMMINI_CONFIG"] = gemmini_config
     environment["PYTHONPATH"] = os.pathsep.join(
-        [str(ZEPHYR_BACKEND), environment.get("PYTHONPATH", "")]
+        [str(MODELBLASTER.parent), environment.get("PYTHONPATH", "")]
     ).rstrip(os.pathsep)
     result = subprocess.run(
         ["python", "-c",
          "from modelblaster.pipeline.backends import get;"
          f"print(';'.join(get({target!r}).resolved_kernel_cflags({str(MODELBLASTER)!r})))"],
-        cwd=str(ZEPHYR_BACKEND),
+        cwd=str(MODELBLASTER.parent),
         env=environment,
         text=True,
         capture_output=True,

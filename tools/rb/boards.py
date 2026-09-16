@@ -48,6 +48,11 @@ FP16_SCALAR_FPU_CONFIGS = frozenset({
 })
 CHIPYARD = ROOT / "backends" / "chipyard"
 ZEPHYR_BACKEND = ROOT / "backends" / "zephyr-chipyard-sw"
+# The PyTorch -> quantized -> Zephyr/RISC-V compilation pipeline behind
+# `rb modelblaster`. A backend in its own right rather than a submodule of the
+# Zephyr one: nothing in that backend builds against it, and the only consumer
+# of both is this repository.
+MODELBLASTER = ROOT / "backends" / "modelblaster"
 FPGA_ZEPHYR_BOARD = "chipyard_riscv64/rocketchip_virt_riscv64"
 CONFIG_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
@@ -695,17 +700,18 @@ WORKLOADS = {
         summary="Main-memory stress: four patterns over a configurable window",
         minimum_ram_by_mode=(("default", 0x6000000),),
     ),
-    # DroNet through ModelBlaster's harness. Built in place from the Zephyr
-    # backend, like flight_controller: the harness is maintained upstream and
-    # takes the generated model as -DMODEL_DIR, so there is nothing for a
-    # workloads/dronet/ directory to hold that would not be a copy.
+    # DroNet through ModelBlaster's harness. Built in place from the
+    # ModelBlaster backend, the way flight_controller is built in place from the
+    # Zephyr one: the harness is maintained upstream and takes the generated
+    # model as -DMODEL_DIR, so there is nothing for a workloads/dronet/
+    # directory to hold that would not be a copy.
     #
     # `rb build --workload dronet` alone is not enough -- MODEL_DIR has to point
     # at codegen output that matches this board's accelerators. `rb modelblaster
     # run` is the entry point; it runs stages 1-3, then this.
     "dronet": _workload(
         "dronet",
-        source_dir=ZEPHYR_BACKEND / "modelblaster" / "harness",
+        source_dir=MODELBLASTER / "harness",
         targets=("arty200t",),
         summary="DroNet inference through the ModelBlaster harness, with a per-op profile",
         # The harness alone asks for a 4 MB main stack

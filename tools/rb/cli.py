@@ -43,6 +43,7 @@ from .boards import (
     CHIPYARD,
     FP16_SCALAR_FPU_CONFIGS,
     FPGA_ZEPHYR_BOARD,
+    MODELBLASTER,
     ROOT,
     TARGETS,
     WORKLOADS,
@@ -399,6 +400,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             ZEPHYR_BACKEND,
         ),
         ("Zephyr env", _populated(ZEPHYR_PREFIX, "bin"), ZEPHYR_PREFIX),
+        # Its own tier, and MISSING is a normal state: every workload but dronet
+        # builds without it. Reported anyway, because the alternative is that
+        # `rb modelblaster` fails with a codegen traceback from inside a conda
+        # environment rather than with "that backend is not initialised".
+        (
+            "ModelBlaster backend",
+            _populated(MODELBLASTER, "pipeline", "harness"),
+            MODELBLASTER,
+        ),
         # Populated, not merely present. `git submodule update` and a failed
         # west workspace both leave an EMPTY directory here, and reporting that
         # as ok made the setup guide's own checkpoint pass on an install whose
@@ -446,8 +456,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         ),
     )
     failed = False
+    # Width from the labels themselves rather than a constant: adding a check
+    # whose name is longer than the constant used to knock every column after it
+    # out of line, which is a silly way for a diagnostic to become harder to read.
+    label_width = max(17, max(len(label) for label, _, _ in checks))
     for label, passed, value in checks:
-        print(f"{label:17} {_yes_no(passed):7} {value or ''}")
+        print(f"{label:{label_width}} {_yes_no(passed):7} {value or ''}")
         failed |= not passed
 
     if executable("zephyr", "west"):
