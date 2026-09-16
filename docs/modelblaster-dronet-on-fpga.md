@@ -345,25 +345,34 @@ that file, so "immediately" is the operative word.
 ## What is blocked, and on whom
 
 The TACIT trace variants in `TacitAccelConfigs.scala` and `TacitDropConfigs.scala`
-compile but must not be built. They need two submodule commits that are not
-published anywhere — absent from the declared upstreams, from every branch there,
-and from this clone:
+compile but must not be built, because of one commit:
 
-| Submodule | Commit | Declared URL |
+| Submodule | Commit | Status |
 | --- | --- | --- |
-| `generators/tacit` | `8af13a74` — widen `collect_counter` to the full 128-bit beat, 4 KB regnode | `riscv-tacit/tacit` |
-| `generators/rocket-chip` | `15190c09` — 4 KB trace-encoder-controller regnode | `chipsalliance/rocket-chip` |
+| `generators/rocket-chip` | `15190c09` — 4 KB trace-encoder-controller regnode | **not published** |
 
-Both are what makes the trace regnodes satisfy Saturn's `PipelinedFaultCheck`
-page alignment; without the tacit one the trace is silently discarded on a
-128-bit bus. The reachable pins are held instead, so the tree checks out and
-everything else builds — but a TACIT bitstream from this pin has the 256-byte
-regnodes and the truncating counter.
+The reachable pin is held instead, so the tree checks out and everything else
+builds — but a TACIT bitstream from it has a 256-byte encoder-controller
+regnode, which does not satisfy Saturn's `PipelinedFaultCheck` page alignment.
 
-Separately and more urgently: `generators/rocket-chip`'s **current** pin
-`ac3066c9` ("FP-stripping: WithRocketFPU{32,16}") is also on no remote branch.
-It is present in this clone and nowhere else, and the FP16 configs need it — so
-as things stand a fresh clone cannot build the 93% bitstream at all.
+The tacit half of that pair is resolved: `8af13a74` (widen `collect_counter` to
+the full 128-bit beat, 4 KB regnode) is published on
+`CobbledSteel/tacit`, branch `optional-branch-predictor`, and the submodule now
+points there and is bumped to that branch's tip.
+
+Both rocket-chip commits worth having sit on the same upstream base,
+`8f1e33b25`, as single patches — `ac3066c9` (FP-stripping) and `a174f3e5b`
+(free-run mcycle, on `CobbledSteel/rocket-chip` `tacit-mcycle-free-run`) — so a
+branch carrying all three is three cherry-picks onto that base rather than a
+merge.
+
+> **A URL, not a missing commit.** `generators/rocket-chip` was declared as
+> `chipsalliance/rocket-chip` while pinned at `ac3066c9`, which is Dima's
+> FP-stripping commit and exists only as the tip of `CobbledSteel/rocket-chip`'s
+> `xpurt` branch. `git submodule update` on a fresh clone could not resolve the
+> pin, so the FP16 configs — the 93% shell included — were unbuildable by anyone
+> who did not already have the object locally. The URL now points at the fork;
+> the pinned commit never changed.
 
 ## The rest of the hardware path
 
