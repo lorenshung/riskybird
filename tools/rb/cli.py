@@ -829,6 +829,18 @@ def generated_fpu_conf(board: Board) -> Path | None:
     %g output and any fp32 left in a model go through, which costs cycles and
     changes no answers.
     """
+    # Read the shell's own ISA string. Same source as dts_timebase_hz, and for
+    # the same reason: what the shell elaborated is a property of the build, not
+    # something to infer from a config name.
+    vector = False
+    dts = board.generated_dts
+    if dts.is_file():
+        tree = fingerprint.parse_dts(dts.read_text())
+        for node in tree.find("cpu@"):
+            isa = node.string("riscv,isa")
+            if isa and fingerprint.parse_isa(isa).has_vector:
+                vector = True
+                break
     if board.config not in FP16_SCALAR_FPU_CONFIGS:
         return None
     path = GENERATED_CONF_DIR / f"{board.name}.{board.config}.fpu.conf"
@@ -844,6 +856,15 @@ def generated_fpu_conf(board: Board) -> Path | None:
         "#\n"
         "# The vector unit is a separate symbol and is NOT disabled by this.\n"
         "CONFIG_FPU=n\n"
+        + (
+            "\n# This shell elaborated a vector unit (the devicetree's riscv,isa\n"
+            "# carries v/zve/zvl), so ask Zephyr for it explicitly. Without this\n"
+            "# the compiler never emits a vector instruction and Saturn sits\n"
+            "# idle while everything runs scalar -- which looks like a slow\n"
+            "# model rather than an unused accelerator.\n"
+            "CONFIG_RISCV_ISA_EXT_V=y\n"
+            if vector else ""
+        )
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.is_file() or path.read_text() != body:

@@ -747,6 +747,13 @@ def generate(
             f"codegen reported success but {out} does not exist; "
             "the example's directory layout has changed"
         )
+    # Keep the codegen transcript. Its per-op accept/reject lines are the whole
+    # reason the gate exists, and capture_output above was throwing them away --
+    # so every question about WHY a kernel fell back to reference needed the
+    # flow re-run by hand outside rb.
+    log = out / "codegen.log"
+    log.write_text(result.stdout + result.stderr)
+    print(f"codegen log: {log}")
     _record_verification(out, environment, drift_atol=drift_atol)
     return out
 
