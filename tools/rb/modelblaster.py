@@ -848,6 +848,26 @@ def write_build_marker(
     ) + "\n")
 
 
+def target_of(gen_dir: Path) -> str | None:
+    """The kernel backend a generated directory was produced for.
+
+    kernel_picks.json records it, so a --gen-dir does not need a --target
+    repeated alongside it -- and more importantly cannot be given a conflicting
+    one. Passing --gen-dir for a soft-float directory while the target defaulted
+    to gemmini_q31 produced the hard-float refusal for a build that was not
+    hard-float, which is a confusing way to be right.
+    """
+    path = Path(gen_dir) / "kernel_picks.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    target = data.get("target")
+    return target if isinstance(target, str) else None
+
+
 def harness_defines(
     model: str,
     *,

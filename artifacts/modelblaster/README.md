@@ -18,12 +18,29 @@ working, committed so a Mac can build the same image without a simulator.
 came from. Regenerating on a machine that cannot verify overwrites the marker
 and the refusal returns, which is the intent.
 
-## Two variants, and the choice between them is yours
+## Four directories, two shells
 
-| directory | accepted at | conv2d_s8 | measured end-to-end error |
-| --- | --- | --- | --- |
-| `dronet/int8/gemmini_q31` | bit-exact | scalar reference | **0** |
-| `dronet/int8/gemmini_q31-drift2` | 2 LSB (`--drift-atol 2`) | **Gemmini** `gemmini_tiled_conv` | **2** |
+For `RocketArty200TDroneGemmini16At40Config` — Gemmini only, full scalar FPU:
+
+| directory | accepted at | conv2d_s8 | error | measured |
+| --- | --- | --- | --- | --- |
+| `dronet/int8/gemmini_q31-drift2` | 2 LSB | **Gemmini** | **2** | **188 ms, 5.31 FPS** |
+| `dronet/int8/gemmini_q31` | bit-exact | scalar reference | **0** | 15,792 ms, 0.06 FPS |
+
+For `RocketArty200TDroneGemminiSaturnFp16At35Config` — the 93% Gemmini+Saturn
+shell, whose scalar FPU implements only Zfh, so the image is built `CONFIG_FPU=n`
+and every kernel must inherit that soft-float ABI:
+
+| directory | accepted at | on Gemmini | error | measured |
+| --- | --- | --- | --- | --- |
+| `dronet/int8/gemmini_q31_softfp` | 2 LSB | maxpool, relu, sigmoid | ≤2 | not yet run |
+| `dronet/int8/scalar` | bit-exact | nothing | **0** | not yet run |
+
+**Expect the 93% shell to be SLOW.** `conv2d_s8` is on scalar reference in both
+of its directories and it is ~99% of the network, so this will land near the
+15.8 s of the bit-exact run and a little worse again for 35 MHz against 40. The
+reason to run it is that a 93%-LUT bitstream carrying both accelerators has
+never executed anything — not to beat 188 ms.
 
 The gate's per-op results for dronet / int8 / gemmini_q31, measured on spike
 against an all-reference baseline — each kernel swapped in alone, so these are
@@ -93,3 +110,26 @@ The console was working both times. Use `--ram-console`, which buffers into a
 RAM ring read back over the same JTAG link, or `rb debug --no-run` and
 `continue` once the console is up. `rb debug` now says so before it starts
 anything.
+
+
+## Why the 93% shell cannot yet match 188 ms
+
+`gemmini_q31` pins `-march=rv64imafdc -mabi=lp64d`. The FP16 shell's FPU
+implements only Zfh, so that ABI cannot be linked against its image and those
+instructions cannot be executed. `gemmini_q31_softfp` drops the two flags so
+kernels inherit whatever the image uses — and with the flags gone, four kernels
+change behaviour:
+
+| op | under `gemmini_q31` | under `gemmini_q31_softfp` |
+| --- | --- | --- |
+| `conv2d_s8` | 2 LSB (accepted) | **56 — rejected** |
+| `add_s8` | 0 | **56 — rejected** |
+| `linear_s8` | 56 (rejected) | 56 — rejected |
+| `batchnorm2d_s8` | 0 | **56 — rejected** |
+| `maxpool2d_s8`, `relu_s8`, `sigmoid_s8` | 0 | 0 |
+
+The kernels are identical C. Something in those four depends on `-march`/`-mabi`
+rather than merely being compiled under them, and until that is understood the
+soft-float shell keeps conv2d on the scalar reference. The gate catches it in
+both directions, which is the only reason this is a known limitation rather than
+another wrong number.
