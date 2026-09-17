@@ -18,24 +18,50 @@ working, committed so a Mac can build the same image without a simulator.
 came from. Regenerating on a machine that cannot verify overwrites the marker
 and the refusal returns, which is the intent.
 
-## What the gate actually rejected, for dronet / int8 / gemmini_q31
+## Two variants, and the choice between them is yours
 
-Measured, not assumed — these are the per-op results from the run that produced
-this directory:
+| directory | accepted at | conv2d_s8 | measured end-to-end error |
+| --- | --- | --- | --- |
+| `dronet/int8/gemmini_q31` | bit-exact | scalar reference | **0** |
+| `dronet/int8/gemmini_q31-drift2` | 2 LSB (`--drift-atol 2`) | **Gemmini** `gemmini_tiled_conv` | **2** |
 
-| op | Gemmini algorithm | result |
+The gate's per-op results for dronet / int8 / gemmini_q31, measured on spike
+against an all-reference baseline — each kernel swapped in alone, so these are
+per-kernel facts and not collateral from one bad neighbour:
+
+| op | algorithm | result |
 | --- | --- | --- |
-| `conv2d_s8` | `gemmini_tiled_conv` | **FAIL** max_abs_err 2 |
-| `conv2d_s8` | `gemmini_im2col_full_C` | **FAIL** max_abs_err 56 |
-| `linear_s8` | `gemmini_tiled_matmul` | **FAIL** max_abs_err 56 |
-| `relu_s8` | `gemmini_resadd_relu` | **FAIL** max_abs_err 56 |
-| `add_s8` | `gemmini_resadd` | PASS, err 0 |
-| `batchnorm2d_s8` | `direct` | PASS, err 0 |
-| `maxpool2d_s8` | `gemmini_tiled_conv_pool` | PASS, err 0 |
-| `sigmoid_s8` | `direct` | PASS, err 0 |
+| `conv2d_s8` | `gemmini_tiled_conv` | misses exact by **2 LSB** |
+| `conv2d_s8` | `gemmini_im2col_full_C` | **broken**, 56 LSB |
+| `linear_s8` | `gemmini_tiled_matmul` | **broken**, 56 LSB |
+| `relu_s8` | `gemmini_resadd_relu` | **broken**, 56 LSB (archived; `swar` used) |
+| `add_s8`, `batchnorm2d_s8`, `maxpool2d_s8`, `sigmoid_s8` | curated | exact, 0 |
 
-So **conv2d_s8 and linear_s8 have no verified Gemmini kernel on this
-configuration** and fall back to scalar reference. Read that before quoting a
-speedup: conv2d dominates DroNet, so a *correct* run is much closer to the
-scalar timing than to the 296 ms an ungated run reported. The ungated run was
-fast because it was running the kernel that fails by 56 LSB.
+### Why the 2 LSB is worth having
+
+`conv2d_s8` dominates DroNet, and the difference between rejecting and accepting
+that drift is not marginal:
+
+```
+conv2d_s8   460,351,223 cycles   scalar reference   (bit-exact variant)
+conv2d_s8     1,989,282 cycles   gemmini_tiled_conv (drift2 variant)
+```
+
+231x on the op that is ~99% of the network. The first hardware run of the
+bit-exact variant took 15.79 s; the drift2 variant should land near a fifth of a
+second.
+
+**This is not the mistake that produced wrong numbers earlier.** That run had no
+gate at all and used `gemmini_im2col_full_C`, the 56-LSB kernel, with nothing
+measuring it. Here the gate runs, measures the error, and accepts a bound that
+is recorded in `.rb-codegen.json` and printed at build time. The difference is
+between a known 2 and an unknown anything.
+
+Whether 2 LSB is acceptable is a judgement about the airframe, not about the
+tooling. DroNet's outputs are a steering angle and a collision probability; 2 of
+255 is ~0.8% on each. `linear_s8`, which produces those two numbers, stays on
+scalar reference in both variants, so the drift enters through the convolution
+stack rather than the final layer.
+
+`linear_s8` and `gemmini_im2col_full_C` are broken by 56 LSB and no tolerance
+setting should be used to admit them. Fixing those is kernel work.

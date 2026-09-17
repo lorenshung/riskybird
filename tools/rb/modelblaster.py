@@ -647,6 +647,7 @@ def generate(
     quant: str,
     target: str,
     curated: bool = True,
+    drift_atol: int | None = None,
     env: dict[str, str] | None = None,
 ) -> Path:
     """Run ModelBlaster stages 1-3 and return the generated directory.
@@ -677,6 +678,17 @@ def generate(
             "QUANT": quant,
             "TARGET": target,
             "BACKEND": "reference",
+            # How much numeric drift the verification gate may accept, in LSB.
+            # Unset means exact: a curated kernel must match the scalar
+            # reference bit for bit or it is rejected.
+            #
+            # This is NOT the same thing as turning verification off. The gate
+            # still runs and still measures the error; this says how large a
+            # MEASURED error is tolerable. On dronet/gemmini_q31 the difference
+            # is decisive: conv2d_s8's gemmini_tiled_conv misses exact by
+            # exactly 2 LSB, and accepting that takes conv2d from 460,351,223
+            # cycles of scalar reference to 1,989,282 on the accelerator.
+            **({"MB_DRIFT_ATOL": str(drift_atol)} if drift_atol else {}),
             # examples/_run_lib.sh does `cd "${REPO_ROOT}"` into modelblaster/
             # and then runs `python -m modelblaster.pipeline.*`, which only
             # resolves if the package's PARENT is importable. Upstream gets that
@@ -735,7 +747,7 @@ def generate(
             f"codegen reported success but {out} does not exist; "
             "the example's directory layout has changed"
         )
-    _record_verification(out, environment)
+    _record_verification(out, environment, drift_atol=drift_atol)
     return out
 
 
@@ -756,7 +768,9 @@ def generate(
 CODEGEN_MARKER = ".rb-codegen.json"
 
 
-def _record_verification(gen_dir: Path, environment: dict[str, str]) -> None:
+def _record_verification(
+    gen_dir: Path, environment: dict[str, str], *, drift_atol: int | None = None
+) -> None:
     spike = shutil.which("spike", path=environment.get("PATH", ""))
     disabled = [
         name for name in sorted(environment)
@@ -768,6 +782,9 @@ def _record_verification(gen_dir: Path, environment: dict[str, str]) -> None:
         "verified": bool(spike) and not disabled,
         "spike": spike,
         "verification_disabled_by": disabled,
+        # Travels with the sources, so a published directory carries the
+        # accuracy it was accepted at rather than leaving it to be remembered.
+        "drift_atol": drift_atol,
     }, indent=2) + "\n")
 
 
@@ -904,6 +921,16 @@ def harness_defines(
         print(
             "rb: WARNING building from UNVERIFIED kernels "
             "(RB_ALLOW_UNVERIFIED_KERNELS=1). Results may be numerically wrong."
+        )
+    elif status is not None and status.get("drift_atol"):
+        # Said at build time, because the harness's own VERIFY line will report
+        # this error on hardware and it must not read as a regression. The
+        # number is a bound that was measured, not a hope.
+        print(
+            f"rb: these kernels were verified to within "
+            f"{status['drift_atol']} LSB, not bit-exact "
+            f"(--drift-atol {status['drift_atol']}). "
+            f"Expect MODELBLASTER_VERIFY to report up to that error."
         )
     return (
         ("MODEL_DIR", str(resolved)),

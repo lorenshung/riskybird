@@ -3083,7 +3083,8 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
 
     if action == "generate":
         out = modelblaster.generate(
-            args.model, quant=args.quant, target=args.target
+            args.model, quant=args.quant, target=args.target,
+            drift_atol=args.drift_atol,
         )
         print(out)
         return 0
@@ -3899,6 +3900,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="run ModelBlaster stages 1-3 (extract, skeleton, kernels); no simulator",
     )
     _add_model(mb_generate)
+    mb_generate.add_argument(
+        "--drift-atol", type=int, metavar="LSB",
+        help="accept up to LSB of MEASURED numeric drift when verifying a "
+        "curated kernel, instead of requiring a bit-exact match. Not a way to "
+        "skip verification -- the gate still runs and still measures. On "
+        "dronet/gemmini_q31, --drift-atol 2 is what lets conv2d_s8 onto Gemmini "
+        "at a bounded 2 LSB, worth 460,351,223 -> 1,989,282 cycles",
+    )
     mb_generate.set_defaults(func=cmd_modelblaster)
 
     mb_build = mb_sub.add_parser(
