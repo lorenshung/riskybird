@@ -16,6 +16,34 @@ FireSim. This page is about the board. The split is deliberate:
 `rb modelblaster generate` runs ModelBlaster with `STAGE_ONLY=1`, so no
 simulator is ever involved in the hardware path.
 
+## Measured on the board
+
+DroNet, `RocketArty200TDroneGemmini16At40Config` at 40 MHz, both kernel
+selections run back to back in one session:
+
+| | drift2 | bit-exact |
+| --- | --- | --- |
+| `MODELBLASTER_VERIFY` | max_abs_err **2** | max_abs_err **0** |
+| inference | **188.4 ms** | 15,791.8 ms |
+| frames/s | **5.31** | 0.06 |
+| Gemmini share | 99.3% | 0.7% |
+
+**83.9x**, isolating entirely to `conv2d_s8` (627,380,812 -> 3,241,262 cycles,
+193.6x); every other op moves less than 1%. The 2 LSB is the bound the
+verification gate accepted, and hardware landed exactly on it rather than above.
+
+The difference between the two is one kernel: `conv2d_s8`'s
+`gemmini_tiled_conv` misses bit-exact by 2 LSB, and the gate is exact by
+default, so it is rejected and conv2d — ~99% of the network — runs as a scalar
+triple loop. `--drift-atol 2` accepts that measured bound. It is not a way to
+skip verification: the gate still runs, still measures, and still rejects the
+kernels that are genuinely broken (`gemmini_im2col_full_C` and `linear_s8`'s
+`gemmini_tiled_matmul`, both 56 LSB). `linear_s8` produces DroNet's two outputs
+and stays on scalar reference in both variants.
+
+See [`artifacts/modelblaster/README.md`](../artifacts/modelblaster/README.md)
+for the per-kernel gate results and which directory to build from.
+
 ## Status
 
 | | |
@@ -26,11 +54,12 @@ simulator is ever involved in the hardware path.
 | The float-contract guard | **verified** — fires on the FP16 shell |
 | `RocketArty200TDroneGemminiSaturnFp16At35Config` area and timing | **verified** — synthesized, placed, routed and a bitstream written here |
 | Building the harness for a board | **verified** — a real ELF, built against the elaborated shell |
-| Running on the drone | **blocked** — the board is not attached |
+| Running on the drone | **verified** — both variants, one session, numbers above |
 
-Nothing on this page claims a frame rate measured on hardware. The one FPS
-number below came from a spike capture and is labelled as such; spike is a
-functional simulator, not cycle-accurate, so it sizes the flow, not the SoC.
+The frame rates at the top of this page ARE hardware measurements. The spike
+figures further down are labelled as such and are not predictions of the board —
+spike is a functional simulator, not cycle-accurate, and its scalar baseline for
+conv2d differs from hardware by ~36%.
 
 ## The shells
 
@@ -495,10 +524,24 @@ That is less costly than the ELF's size suggests. `zephyr.elf` is ~5.9 MB of
 memory image but a single LOAD segment of **405,128 bytes**; the rest is `.bss`
 and the harness's 4 MB `.noinit` stack, neither of which is transferred.
 
-Capture the console on the other channel. If it stays silent, retarget it rather
-than assuming the board is dead — this carrier's console pair has a history
-(`drone-initial-bringup.md`), and `--ram-console` puts output in a RAM ring
-buffer read back over the same JTAG link that loaded the image:
+**Use `--ram-console` for anything short, and that is not a workaround for a
+sick UART.** `rb debug` starts the program the instant it runs, while the console
+is a different channel opened by a different command in another shell — so
+whatever the workload prints before you attach is gone. You lose that race on a
+fast workload and win it on a slow one, which is exactly what the bench saw and
+first read as a failing UART:
+
+| run | UART yield |
+| --- | --- |
+| 15.79 s bit-exact | 978 B, lossy but readable |
+| 188 ms drift2 | 15 B — the reset glitch, and none of the program's output |
+
+The 188 ms program demonstrably completed: its halted PC symbolized to
+`arch_cpu_idle`, and the RAM console held the whole profile. Nobody was
+listening yet, that is all. `rb debug --no-run` then `continue` is the
+alternative if you want the live UART; `rb debug` now warns before it starts
+anything. `--ram-console` puts output in a RAM ring buffer read back over the
+same JTAG link that loaded the image:
 
 ```console
 rb debug --target arty200t --workload dronet \

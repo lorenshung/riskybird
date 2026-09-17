@@ -1575,6 +1575,29 @@ def cmd_debug(args: argparse.Namespace) -> int:
         # before continuing, and resuming underneath it would run the program
         # past them.
         if args.gdb_script is None and not args.no_run and not args.no_load:
+            # The program starts HERE, the moment this GDB runs -- and the
+            # console is a different channel, opened by a different command in
+            # a different shell. Anything the workload prints before someone
+            # attaches to channel B is gone.
+            #
+            # That is a race the operator loses on a fast workload and wins on
+            # a slow one, which is exactly the pattern the bench saw and read
+            # as a flaky UART: a 15.79 s DroNet run yielded 978 lossy bytes, and
+            # the same image at 188 ms yielded 15 -- the reproducible reset
+            # glitch, and none of the program's output. The console was fine
+            # both times; nobody was listening yet the second time.
+            if not args.ram_console:
+                print(
+                    "rb: the workload starts now, and its console output goes "
+                    "to channel B as it is produced.\n"
+                    "    Anything printed before you attach is LOST. A short "
+                    "workload can finish before you get there.\n"
+                    "    Either attach first --\n"
+                    "        rb debug ... --no-run   (then `continue` at the "
+                    "gdb prompt once the console is up)\n"
+                    "    or use --ram-console, which buffers output in RAM and "
+                    "is read back over this same JTAG link."
+                )
             gdb_command.extend(["-ex", "continue"])
         # -x rather than stdin: a script on stdin competes with GDB's own
         # prompt handling, and `--batch` guarantees the session ends rather

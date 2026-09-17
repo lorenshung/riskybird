@@ -47,9 +47,22 @@ conv2d_s8   460,351,223 cycles   scalar reference   (bit-exact variant)
 conv2d_s8     1,989,282 cycles   gemmini_tiled_conv (drift2 variant)
 ```
 
-231x on the op that is ~99% of the network. The first hardware run of the
-bit-exact variant took 15.79 s; the drift2 variant should land near a fifth of a
-second.
+On hardware, both variants run back to back on the same board in one session:
+
+| | drift2 | bit-exact |
+| --- | --- | --- |
+| `MODELBLASTER_VERIFY` | max_abs_err **2** | max_abs_err **0** |
+| inference | **188.4 ms** | 15,791.8 ms |
+| frames/s | **5.31** | 0.06 |
+| Gemmini share of kernel time | 99.3% | 0.7% |
+
+**83.9x end to end**, and the A/B isolates cleanly: `conv2d_s8` goes
+627,380,812 -> 3,241,262 cycles (**193.6x**) while every other op moves by less
+than 1%. The error lands at exactly the accepted bound, not above it.
+
+(The 231x quoted earlier was measured on spike, 460,351,223 -> 1,989,282. The
+193.6x here is the same comparison on hardware, whose scalar baseline is larger.
+Prefer the hardware figure.)
 
 **This is not the mistake that produced wrong numbers earlier.** That run had no
 gate at all and used `gemmini_im2col_full_C`, the 56-LSB kernel, with nothing
@@ -65,3 +78,18 @@ stack rather than the final layer.
 
 `linear_s8` and `gemmini_im2col_full_C` are broken by 56 LSB and no tolerance
 setting should be used to admit them. Fixing those is kernel work.
+
+
+## Reading the output of a fast workload
+
+At 188 ms this workload finishes before a human can attach a console, and
+`rb debug` starts the program the instant it runs. Output goes to channel B as
+it is produced, so anything printed before you attach is gone — which on the
+bench looked like a failing UART: the 15.79 s run yielded 978 lossy bytes and
+the 188 ms run yielded 15, the reproducible reset glitch and none of the
+program's output.
+
+The console was working both times. Use `--ram-console`, which buffers into a
+RAM ring read back over the same JTAG link, or `rb debug --no-run` and
+`continue` once the console is up. `rb debug` now says so before it starts
+anything.
