@@ -1091,8 +1091,24 @@ def zephyr_build(
     if workload.source_dir == MODELBLASTER / "harness" and not any(
         name == "MODEL_DIR" for name, _ in extra_defines
     ):
+        # Reuse whatever the existing build was made from, so a rebuild by a
+        # command with no --model of its own (rb debug, rb run, rb build)
+        # cannot silently swap the kernel backend underneath an image someone
+        # deliberately built with `rb modelblaster build --target ...`.
+        marker = modelblaster.read_build_marker(
+            zephyr_build_dir(target, workload, mode, ram_console)
+        )
+        if marker is not None:
+            print(
+                f"rb: reusing this build's ModelBlaster selection "
+                f"(model={marker['model']} quant={marker['quant']} "
+                f"target={marker['target']}); "
+                f"`rb modelblaster build` changes it"
+            )
         defaults = modelblaster.harness_defines(
-            workload.name,
+            marker["model"] if marker else workload.name,
+            quant=marker["quant"] if marker else modelblaster.DEFAULT_QUANT,
+            target=marker["target"] if marker else modelblaster.DEFAULT_TARGET,
             gemmini_config=board.config if board is not None else None,
         )
         if board is not None:
@@ -3091,6 +3107,13 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
                 gen_dir=gen_dir,
             ),
         )
+        # So a later rb debug / run / build rebuilds THIS selection rather than
+        # the defaults.
+        modelblaster.write_build_marker(
+            elf.parent.parent,
+            model=args.model, quant=args.quant, target=args.target,
+            gen_dir=gen_dir,
+        )
         print(elf)
         return 0
 
@@ -3958,7 +3981,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with restored_terminal():
             return int(args.func(args) or 0)
-    except (RbError, ValueError) as exc:
+    except (RbError, modelblaster.ModelBlasterError, ValueError) as exc:
+        # ModelBlasterError is an operator-facing diagnostic like RbError -- a
+        # missing backend, an unverified kernel set, a codegen dependency that
+        # is not installed. Printing a traceback for those buried the sentence
+        # that says what to do under twenty lines of stack.
         print(f"rb: error: {exc}", file=sys.stderr)
         return 2
     except subprocess.CalledProcessError as exc:

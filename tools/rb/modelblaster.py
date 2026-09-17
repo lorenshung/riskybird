@@ -42,13 +42,46 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from .boards import MODELBLASTER, ROOT
+from .boards import CHIPYARD, MODELBLASTER, ROOT
 from .environments import zephyr_env
+
+
+# Chipyard's RISC-V tools, which is where spike and libgemmini.so live.
+#
+# Codegen runs in the ZEPHYR environment and spike ships with the CHIPYARD one,
+# so the per-op verification gate had no simulator to run and silently did not
+# gate anything -- on the bench Mac, and on the Linux box too. Both tools are
+# right here; nothing was missing but the PATH between two backends.
+#
+# Absent on the bench tier, which has no Chipyard. That is what the unverified
+# refusal in harness_defines is for.
+# RB_RISCV_TOOLS overrides the location, for a checkout whose own Chipyard is
+# not initialised but which can reach one elsewhere -- a worktree, or a bench
+# machine sharing a build host's filesystem.
+CHIPYARD_RISCV_TOOLS = Path(
+    os.environ.get("RB_RISCV_TOOLS", CHIPYARD / ".conda-env" / "riscv-tools")
+)
+
+
+def _with_chipyard_tools(environment: dict[str, str]) -> dict[str, str]:
+    """Put Chipyard's spike and libgemmini on the codegen environment's path."""
+    bindir = CHIPYARD_RISCV_TOOLS / "bin"
+    libdir = CHIPYARD_RISCV_TOOLS / "lib"
+    if not (bindir / "spike").is_file():
+        return environment
+    environment["PATH"] = os.pathsep.join(
+        [str(bindir), environment.get("PATH", "")]
+    ).rstrip(os.pathsep)
+    environment["LD_LIBRARY_PATH"] = os.pathsep.join(
+        [str(libdir), environment.get("LD_LIBRARY_PATH", "")]
+    ).rstrip(os.pathsep)
+    return environment
 
 
 
@@ -659,6 +692,7 @@ def generate(
     )
     if curated:
         environment["GLOBAL_CURATED_DIR"] = str(MODELBLASTER / "kernels")
+    _with_chipyard_tools(environment)
 
     result = subprocess.run(
         ["bash", str(run_sh)],
@@ -701,7 +735,52 @@ def generate(
             f"codegen reported success but {out} does not exist; "
             "the example's directory layout has changed"
         )
+    _record_verification(out, environment)
     return out
+
+
+# Whether a codegen run's kernel selection was verify-gated, recorded beside the
+# sources it produced.
+#
+# ModelBlaster selects a curated kernel only if it passes a per-op check against
+# the scalar reference (examples/_run_lib.sh: "Defaulting to curated is safe
+# because selection is verify-gated"). That check runs the kernel, which for a
+# RISC-V accelerator target means spike. No spike, no gate -- and a curated
+# kernel is then taken on its own declared accuracy class, which is metadata the
+# kernel author wrote, not a measurement.
+#
+# This is not hypothetical. A bench run with the gate off produced DroNet
+# outputs wrong by up to 13 LSB while every checkpoint passed, and the same run
+# under MAX_ACCURACY_CLASS=bit_exact was still wrong by 3 -- because restricting
+# by declared class cannot exclude a kernel whose declaration is what is wrong.
+CODEGEN_MARKER = ".rb-codegen.json"
+
+
+def _record_verification(gen_dir: Path, environment: dict[str, str]) -> None:
+    spike = shutil.which("spike", path=environment.get("PATH", ""))
+    disabled = [
+        name for name in sorted(environment)
+        if ("VERIF" in name.upper() or "NO_VERIFY" in name.upper())
+        and name.startswith(("MB_", "MODELBLASTER_"))
+        and environment[name] not in ("", "0")
+    ]
+    (gen_dir / CODEGEN_MARKER).write_text(json.dumps({
+        "verified": bool(spike) and not disabled,
+        "spike": spike,
+        "verification_disabled_by": disabled,
+    }, indent=2) + "\n")
+
+
+def verification_status(gen_dir: Path) -> dict | None:
+    """What `generate` recorded about this directory's kernel selection."""
+    path = Path(gen_dir) / CODEGEN_MARKER
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def per_config_header_dir(config: str) -> Path:
@@ -717,6 +796,39 @@ def per_config_header_dir(config: str) -> Path:
 # works. These are the same defaults that command takes.
 DEFAULT_QUANT = "int8"
 DEFAULT_TARGET = "gemmini_q31"
+
+
+# What a built image was made from. rb debug / run / build rebuild before they do
+# their real job and have no --model of their own, so without a record they fall
+# back to the defaults below and silently replace a build made with different
+# ones -- a `--target scalar` image becomes a gemmini_q31 image on the next
+# `rb debug`, with nothing in the output saying so. That cost a real comparison
+# run on the bench.
+BUILD_MARKER = ".rb-modelblaster.json"
+
+
+def read_build_marker(build_dir: Path) -> dict | None:
+    """What the existing build in `build_dir` was generated from, if known."""
+    path = Path(build_dir) / BUILD_MARKER
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) and "target" in data else None
+
+
+def write_build_marker(
+    build_dir: Path, *, model: str, quant: str, target: str, gen_dir: Path
+) -> None:
+    path = Path(build_dir) / BUILD_MARKER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(
+        {"model": model, "quant": quant, "target": target,
+         "gen_dir": str(gen_dir)},
+        indent=2,
+    ) + "\n")
 
 
 def harness_defines(
@@ -741,6 +853,47 @@ def harness_defines(
             f"no generated sources at {resolved}.\n"
             f"Run: rb modelblaster generate --model {model} --quant {quant} "
             f"--target {target}"
+        )
+
+    # Refuse, loudly and with a named override, rather than building an image
+    # whose kernels were never checked against the reference. The override is
+    # deliberately ugly to type and greppable afterwards, because the failure it
+    # guards against is a run that passes every checkpoint and returns wrong
+    # numbers -- which is exactly what happened on the bench.
+    status = verification_status(resolved)
+    if status is not None and not status.get("verified"):
+        if os.environ.get("RB_ALLOW_UNVERIFIED_KERNELS") != "1":
+            why = (
+                "verification was disabled by "
+                + ", ".join(status["verification_disabled_by"])
+                if status.get("verification_disabled_by")
+                else "spike is not on PATH in the Zephyr environment, so the "
+                "per-op check could not run"
+            )
+            raise ModelBlasterError(
+                f"the kernels in {resolved} were selected WITHOUT verification "
+                f"({why}).\n"
+                "\n"
+                "ModelBlaster only takes a curated kernel if it passes a per-op "
+                "check against the scalar reference. Without that gate a kernel "
+                "is trusted on its declared accuracy class, which is something "
+                "its author wrote rather than something anyone measured. A bench "
+                "run in this state produced DroNet outputs wrong by 13 LSB with "
+                "every checkpoint green, and 3 LSB even under "
+                "MAX_ACCURACY_CLASS=bit_exact.\n"
+                "\n"
+                "Fix it (preferred): make spike reachable in the Zephyr "
+                "environment and re-run `rb modelblaster generate`.\n"
+                "Or use a scalar target, whose reference kernels need no gate:\n"
+                f"    rb modelblaster generate --model {model} --quant {quant} "
+                "--target scalar\n"
+                "\n"
+                "To proceed anyway, knowing the numbers may be wrong:\n"
+                "    RB_ALLOW_UNVERIFIED_KERNELS=1 rb ..."
+            )
+        print(
+            "rb: WARNING building from UNVERIFIED kernels "
+            "(RB_ALLOW_UNVERIFIED_KERNELS=1). Results may be numerically wrong."
         )
     return (
         ("MODEL_DIR", str(resolved)),
