@@ -42,7 +42,7 @@ design space.
 | --- | --- | --- | --- | --- |
 | `RocketArty200TDroneGemminiSaturnFp16At35Config` | Gemmini 16×16 + Saturn V128D64 fp16 | **FP16 only** | 35 MHz | WNS +0.150 ns, 92.8% LUT |
 | `RocketArty200TDroneSaturn40Config` | Saturn V128D128 fp16 | full | 40 MHz | WNS +0.422 ns, 90.1% LUT |
-| `RocketArty200TDroneGemmini16At40Config` | Gemmini 16×16 | full | 40 MHz | 70.45% LUT, and see below |
+| `RocketArty200TDroneGemmini16At40Config` | Gemmini 16×16 | full | 40 MHz | 70.34% LUT, WNS 0.000 ns |
 
 Periphery on all three is byte-for-byte `RocketArty200TDroneFullDDRDmaUartConfig`
 — DDR3, camera OSPI with capture DMA, I2C, PMW3901 SPI, control GPIO, both motor
@@ -148,6 +148,17 @@ RB_IMPL_DIRECTIVE=explore make -C backends/chipyard/fpga SUB_PROJECT=arty200t \
 Unset is the default and reproduces the numbers above. When it is set, `rb-impl`
 says so on the console, because a result obtained with extra effort is real but
 is not comparable with one that was not.
+
+**With `explore` it closes**: 94,117 LUT (70.34%), 511 DSP, 276 BRAM,
+`All user specified timing constraints are met`, **WNS 0.000 ns**. That is the
+published bitstream.
+
+Read that slack for what it is. Zero is met-with-nothing-to-spare, and the same
+design missed by 91 ps on default effort — a gap smaller than the spread between
+directives. The honest summary is that this shell sits *exactly* at 40 MHz rather
+than comfortably inside it. If margin matters more than the round number,
+`RB_IMPL_DIRECTIVE=aggressive` or a lower fabric clock are the levers, and both
+are cheaper than they sound because the synthesis checkpoint is reused.
 
 ## Two things that will bite, both found the hard way
 
