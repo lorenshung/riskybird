@@ -861,15 +861,25 @@ def harness_defines(
     # guards against is a run that passes every checkpoint and returns wrong
     # numbers -- which is exactly what happened on the bench.
     status = verification_status(resolved)
-    if status is not None and not status.get("verified"):
+    # No marker is NOT a pass. A directory with no record of how its kernels
+    # were chosen is exactly the state every directory was in before this
+    # existed, including the ones that produced wrong numbers on the bench --
+    # so absence has to refuse too, or the gate is trivially bypassed by
+    # pointing --gen-dir at anything.
+    if status is None or not status.get("verified"):
         if os.environ.get("RB_ALLOW_UNVERIFIED_KERNELS") != "1":
-            why = (
-                "verification was disabled by "
-                + ", ".join(status["verification_disabled_by"])
-                if status.get("verification_disabled_by")
-                else "spike is not on PATH in the Zephyr environment, so the "
-                "per-op check could not run"
-            )
+            if status is None:
+                why = (
+                    "there is no .rb-codegen.json recording how these kernels "
+                    "were selected, so whether they were checked at all is "
+                    "unknown"
+                )
+            elif status.get("verification_disabled_by"):
+                why = ("verification was disabled by "
+                       + ", ".join(status["verification_disabled_by"]))
+            else:
+                why = ("spike is not on PATH in the Zephyr environment, so the "
+                       "per-op check could not run")
             raise ModelBlasterError(
                 f"the kernels in {resolved} were selected WITHOUT verification "
                 f"({why}).\n"
@@ -884,9 +894,9 @@ def harness_defines(
                 "\n"
                 "Fix it (preferred): make spike reachable in the Zephyr "
                 "environment and re-run `rb modelblaster generate`.\n"
-                "Or use a scalar target, whose reference kernels need no gate:\n"
-                f"    rb modelblaster generate --model {model} --quant {quant} "
-                "--target scalar\n"
+                "Or build from published, already-verified sources:\n"
+                "    rb modelblaster build --gen-dir "
+                "artifacts/modelblaster/dronet/int8/gemmini_q31 ...\n"
                 "\n"
                 "To proceed anyway, knowing the numbers may be wrong:\n"
                 "    RB_ALLOW_UNVERIFIED_KERNELS=1 rb ..."

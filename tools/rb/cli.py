@@ -1099,16 +1099,32 @@ def zephyr_build(
             zephyr_build_dir(target, workload, mode, ram_console)
         )
         if marker is not None:
+            # Name the DIRECTORY, not just the three names. The earlier
+            # version printed a correct-looking target while silently building
+            # from a different directory, so the line read as reassurance at
+            # the exact moment it should have been alarming.
             print(
-                f"rb: reusing this build's ModelBlaster selection "
-                f"(model={marker['model']} quant={marker['quant']} "
-                f"target={marker['target']}); "
-                f"`rb modelblaster build` changes it"
+                f"rb: reusing this build's ModelBlaster selection\n"
+                f"      model={marker['model']} quant={marker['quant']} "
+                f"target={marker['target']}\n"
+                f"      sources={marker.get('gen_dir', '(default path)')}\n"
+                f"    `rb modelblaster build` changes it"
             )
         defaults = modelblaster.harness_defines(
             marker["model"] if marker else workload.name,
             quant=marker["quant"] if marker else modelblaster.DEFAULT_QUANT,
             target=marker["target"] if marker else modelblaster.DEFAULT_TARGET,
+            # The DIRECTORY, not just the three names it is usually derived
+            # from. Round-tripping (model, quant, target) and rebuilding the
+            # default path from them looks right and is not: a build made with
+            # --gen-dir pointing at published, verified sources was rebuilt
+            # against whatever local codegen happened to sit at the default
+            # path, while the reassuring "reusing this build's selection" line
+            # named the correct target. That swapped a verified conv2d for one
+            # the gate rejects at max_abs_err 56, and only a diff of
+            # compile_commands.json caught it.
+            gen_dir=Path(marker["gen_dir"]) if marker and marker.get("gen_dir")
+            else None,
             gemmini_config=board.config if board is not None else None,
         )
         if board is not None:
@@ -3044,7 +3060,7 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
             if args.tick_hz:
                 tick_hz = args.tick_hz
                 evidence += f", tick rate overridden to {args.tick_hz:g} Hz"
-        gen_dir = Path(args.gen_dir) if args.gen_dir else (
+        gen_dir = Path(args.gen_dir).resolve() if args.gen_dir else (
             modelblaster.generated_dir(args.model, args.quant, args.target)
         )
         run = modelblaster.parse_capture(
@@ -3076,7 +3092,12 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
         board = BOARDS[args.board].with_config(args.config)
         target = get_target(args.board)
         workload = get_workload("dronet")
-        gen_dir = Path(args.gen_dir) if args.gen_dir else (
+        # resolve(): CMake is given this verbatim and resolves a relative path
+        # against the harness source directory, not the caller's cwd, so
+        # `--gen-dir artifacts/...` became
+        # backends/modelblaster/harness/artifacts/... and failed as "not a
+        # directory". Every documented invocation of this flag was relative.
+        gen_dir = Path(args.gen_dir).resolve() if args.gen_dir else (
             modelblaster.generated_dir(args.model, args.quant, args.target)
         )
         if not gen_dir.is_dir():

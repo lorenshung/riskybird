@@ -8,13 +8,13 @@
     .globl  model_dronet_test_input
     .type   model_dronet_test_input, @object
 model_dronet_test_input:
-    .incbin "/scratch2/loren/riskybird-dev-setup/backends/modelblaster/examples/dronet/int8/generated/gemmini_q31/test_input.bin"
+    .incbin "test_input.bin"
     .size   model_dronet_test_input, . - model_dronet_test_input
     .align 4
 
     .globl  model_dronet_test_golden
     .type   model_dronet_test_golden, @object
 model_dronet_test_golden:
-    .incbin "/scratch2/loren/riskybird-dev-setup/backends/modelblaster/examples/dronet/int8/generated/gemmini_q31/test_golden.bin"
+    .incbin "test_golden.bin"
     .size   model_dronet_test_golden, . - model_dronet_test_golden
     .align 4
