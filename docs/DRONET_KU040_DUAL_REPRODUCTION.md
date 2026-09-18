@@ -2,10 +2,21 @@
 
 End-to-end grayscale int8 DroNet running **across both harts** of the KU040 dual-core
 SoC on real silicon: hart0 = Rocket + Saturn V128 (RVV) + FcRoCC, hart1 = Rocket +
-Q0.31 **32×32** Gemmini. **~18–20 fps**, gemmini-bound, int8-mvout accuracy
-`max_abs_err = 2` (2 LSB) vs the model's own reference.
+Q0.31 **32×32** Gemmini. **~24–27 fps** (NHWC, canonical), gemmini-bound, int8-mvout
+accuracy `max_abs_err = 3` (3 LSB) vs the model's own reference.
 
-Deployable ELF: `lorenshung_elf/ku040/ku040.dronet_gray_dual_2hart.elf`.
+Deployable ELF (canonical, NHWC): `lorenshung/elf` → `ku040/ku040.dronet_gray_dual_2hart_nhwc.elf`.
+NCHW baseline (superseded): `ku040/ku040.dronet_gray_dual_2hart.elf` (~18–20 fps, err=2).
+
+**NHWC vs NCHW (on-board, why NHWC is canonical):** the NCHW `tiled_conv` kernels pay a
+brutal per-conv layout-conversion penalty on the NHWC-native 32×32 Gemmini. Running the
+convs native NHWC (with 8 explicit relayout ops at the island boundaries) collapses
+conv1–9 from 1,587K→**174K** cycles (9×) and conv0 from 934K→**602K** (matches the 586K
+standalone ubench); gemmini total drops 2,521K→**1,429K (−43%)** even after paying 654K
+for the relayouts. E2E wall −26% → **~24–27 fps** (from ~18–20). Accuracy `max_abs_err`
+2→3 (still within the int8-mvout envelope). The NHWC deploy is a two-backend build with
+the `gemmini_q31` kind mapped to the `gemmini_q31_rvv` backend (which holds the
+`*_nhwc` conv + `gemmini_blocked_tb32` relayout kernels), relayouts pinned to hart1.
 
 ## Config / bitstream
 - Chisel config `RocketKU040DroneDualConfig` (`Q31Ws32x32AccGemminiConfig`, DIM=32,
@@ -26,15 +37,17 @@ capability across the two harts (no solver needed — capability-driven):
   `rvv_frm_rmm`, sigmoid → `rvv_memo_lut_gather`. Every V-using op stays on hart0.
 
 ## Measured (rdcycle @ 50 MHz, on-board)
-| op | cycles |
-|---|---:|
-| conv0 (fused conv+pool, IC=1) | 934K (37% of gemmini time) |
-| conv1–9 (tiled_conv int8-mvout) | 72K–404K each |
-| **gemmini total (hart1)** | **2.52M ≈ 50.4 ms** — the bottleneck |
-| rvv total (hart0) | 0.53M ≈ 10.6 ms (mostly idle, waiting on gemmini) |
+| op | NHWC (canonical) | NCHW (baseline) |
+|---|---:|---:|
+| conv0 (fused conv+pool, IC=1) | 602K | 934K |
+| conv1–9 (native NHWC / tiled_conv) | 174K total (6K–39K each) | 1,587K total |
+| relayouts (8, island boundaries, hart1) | 654K | 0 |
+| **gemmini total (hart1)** | **1.43M ≈ 28.6 ms** | 2.52M ≈ 50.4 ms |
+| rvv total (hart0) | 0.50M ≈ 10.1 ms | 0.53M ≈ 10.6 ms |
+| **throughput** | **~24–27 fps** | ~18–20 fps |
 
-`MODELBLASTER_VERIFY max_abs_err=2` (int8-mvout drift; conv0 path A is exact),
-output `[115, 127]`.
+NHWC: `MODELBLASTER_VERIFY max_abs_err=3`, output `[114,127]`. NCHW: err=2, `[115,127]`
+(both within the int8-mvout envelope; conv0 path A is exact).
 
 ## Deploy steps
 1. SRAM-load the bitstream (FPGA config JTAG):
@@ -71,8 +84,10 @@ full env recipe (DIM=32 / `MODELBLASTER_GEMMINI_CONFIG=q31ws_32x32_acc`,
 `RISCV_V_KERNEL_ONLY`, soft-float, and the `ZEPHYR_TOOLCHAIN_VARIANT`/SDK/`ZEPHYR_BASE`
 env gotchas).
 
-## Next optimization (track a)
-conv0 is 934K here but 586K standalone in NHWC — the deploy graph is NCHW so the gemmini
-kernels pay a layout-conversion penalty. Restore the NHWC island (`assign_layouts`, with
-relayouts on the gemmini hart) to pull conv0 toward 586K and lift fps; the load-once
-DIM=32 rewrite (→456K) is a further step.
+## Next optimization
+NHWC (done) already claimed the big win. Remaining levers on the gemmini hart:
+- The 2 relayouts bracketing the first batchnorm (`relayout_out.maxpool1` 190K +
+  `relayout_in.relu_modules_0` 187K, both C=32 27×27) are now the 2nd-biggest gemmini
+  cost — fusing bn0 into the NHWC island (run it NHWC on the gemmini hart) or a cheaper
+  relayout would claw back ~350K.
+- conv0 load-once DIM=32 rewrite (pixel-pack the resident input) → ~456K (from 602K).
