@@ -628,7 +628,7 @@ SYS_INIT(park_motors_before_main, APPLICATION, 0);
 
 static void stage_motors(void)
 {
-	unsigned int ready = 0, parked = 0;
+	unsigned int ready = 0, parked = 0, written = 0;
 
 	/* Re-park before reporting as a second line of defense. */
 	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
@@ -654,9 +654,11 @@ static void stage_motors(void)
 	}
 
 	printf("\n"
-	       "  Motors are parked. Spinning them needs the battery connected and\n"
-	       "  the propellers OFF -- USB-C alone will not turn a motor, so a\n"
-	       "  silent motor here means the battery, not a fault.\n");
+	       "  Motors run from +BATT; keep the propellers OFF for this sweep.\n"
+	       "  On USB alone with no battery, +BATT is only weakly cap-charged,\n"
+	       "  so individual motors may barely move or move unevenly. This is a\n"
+	       "  partial, per-motor symptom, not an all-or-nothing battery check.\n"
+	       "  This stage checks PWM comparator writes, not physical rotation.\n");
 
 	for (int left = BOOTUP_MOTOR_WARN_SEC; left > 0; left--) {
 		printf("  sweeping in %d ... (Ctrl-C to stop)\n", left);
@@ -669,10 +671,10 @@ static void stage_motors(void)
 	 * board the four MOTOR nets are driven by the ESP32-C6 as well as the
 	 * FPGA -- both land on the same MOSFET gates with no arbitration -- so a
 	 * motor that is already turning when this starts is not evidence about
-	 * this output. Naming each one before it moves is what separates "this
-	 * output works" from "something else is driving that net".
+	 * this output. Naming each command lets an operator correlate an observed
+	 * response, but no rotation feedback contributes to this stage's verdict.
 	 */
-	printf("         watch which motor moves as each line prints:\n");
+	printf("         observe any response as each PWM comparator is written:\n");
 	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
 		printf("         motor%u -> %u%% for %u ms ... ", (unsigned)i + 1U,
 		       (unsigned)BOOTUP_MOTOR_DUTY_PCT, (unsigned)BOOTUP_MOTOR_PULSE_MS);
@@ -680,12 +682,22 @@ static void stage_motors(void)
 			printf("PWM WRITE FAILED\n");
 			continue;
 		}
+		written++;
 		k_msleep(BOOTUP_MOTOR_PULSE_MS);
 		(void)pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0);
-		printf("stopped\n");
+		printf("active comparator write succeeded\n");
 		k_msleep(700);
 	}
-	finish(S_MOTORS, OK, "4/4 driven to %u%% in turn and returned to 0%%",
+	if (written != ARRAY_SIZE(motors)) {
+		finish(S_MOTORS, BAD,
+		       "%u/%u PWM comparator writes succeeded at %u%% duty",
+		       written, (unsigned)ARRAY_SIZE(motors),
+		       (unsigned)BOOTUP_MOTOR_DUTY_PCT);
+		return;
+	}
+	finish(S_MOTORS, OK,
+	       "%u/%u PWM comparator writes succeeded at %u%% duty; rotation not verified",
+	       written, (unsigned)ARRAY_SIZE(motors),
 	       (unsigned)BOOTUP_MOTOR_DUTY_PCT);
 }
 
