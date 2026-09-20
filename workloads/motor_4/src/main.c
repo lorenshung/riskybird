@@ -130,6 +130,21 @@ volatile uint32_t motor_updates;
  * tests/test_pwm.py::test_harness_inverts_each_comparator_at_the_top_level
  * checks against the generated Verilog.
  */
+/*
+ * The probe reads the SiFive PWM blocks directly, and those exist only on the
+ * FPGA targets. This same workload also builds for the ESP32-C6, which reaches
+ * the identical four MOSFET gates through LEDC at completely different
+ * addresses -- so on that target the first probe load faults before main()
+ * reaches the console loop, and the image is dead on arrival:
+ *
+ *     mcause: 5, Load access fault
+ *      mtval: 10050010          <- PWM0_BASE + PWM_S
+ *
+ * Measured on an esp32c6 build 2026-09-16, which is why the ESP-side motor
+ * test appeared to do nothing at all: no console, no keystrokes, no motors.
+ */
+#define HAVE_PWM_PROBE  DT_HAS_COMPAT_STATUS_OKAY(sifive_pwm0)
+
 #define PWM0_BASE       0x10050000UL
 #define PWM1_BASE       0x10051000UL
 #define PWM_CFG         0x00
@@ -216,6 +231,10 @@ static inline uint32_t pwm_rd(uint32_t block, uint32_t offset)
  */
 static void probe_liveness(void)
 {
+	if (!HAVE_PWM_PROBE) {
+		return;
+	}
+
 	for (uint32_t block = 0; block < 2; block++) {
 		uint32_t previous = pwm_rd(block, PWM_S);
 		uint32_t low = previous, high = previous, wraps = 0;
@@ -244,6 +263,13 @@ static void probe_liveness(void)
 static void probe_waveform(void)
 {
 	uint32_t period[2];
+
+	if (!HAVE_PWM_PROBE) {
+		/* Sets state to DONE and bumps the run counter, so a script
+		 * breaking on it still gets a deterministic stop. */
+		motor_probe_done();
+		return;
+	}
 
 	motor_probe_state = MOTOR_PROBE_RUNNING;
 

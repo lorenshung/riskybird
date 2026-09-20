@@ -12,6 +12,23 @@
 #include <zephyr/dt-bindings/pwm/pwm.h>
 
 / {
+	/*
+	 * Console on the native USB Serial/JTAG unit, as motor_safe.overlay
+	 * already does. The board default is uart0 (esp32c6_devkitc_hpcore.dts
+	 * chooses it), which is not reachable over the same USB cable used to
+	 * flash -- so "use console UART (same USB as the board)" above was not
+	 * true for this image: the port stayed silent and keystrokes reached
+	 * nothing. Measured 2026-09-16.
+	 *
+	 * This redirects input as well as output: UART_NODE in
+	 * workloads/motor_4/src/main.c falls back to DT_CHOSEN(zephyr_console)
+	 * when no motor_uart alias exists, and this overlay defines none.
+	 */
+	chosen {
+		zephyr,console = &usb_serial;
+		zephyr,shell-uart = &usb_serial;
+	};
+
 	aliases {
 		pwm-0 = &ledc0;
 		pwm-motor0 = &pwm_motor0;
@@ -84,4 +101,9 @@
 		reg = <0x3>;
 		timer = <0>;
 	};
+};
+
+/* Carries the console and the keystrokes, over the same cable used to flash. */
+&usb_serial {
+	status = "okay";
 };
