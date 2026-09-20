@@ -29,6 +29,7 @@
  */
 
 #include <zephyr/dt-bindings/pinctrl/esp32c6-pinctrl.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
 
 / {
 	chosen {
@@ -43,6 +44,27 @@
 		 * care which UART a future board revision uses. */
 		fpga-uart = &uart0;
 	};
+};
+
+/*
+ * The ESP and FPGA share each motor gate net through their own 47R resistor.
+ * Keep the ESP side as pulled-down inputs while the FPGA owns the motors: if
+ * both sides drive, the 47R/47R divider parks the gate near half rail.
+ */
+&gpio0 {
+	riskybird_motor_safe_hog: riskybird-motor-safe-hog {
+		gpio-hog;
+		gpios = <21 GPIO_PULL_DOWN>,
+			<20 GPIO_PULL_DOWN>,
+			<23 GPIO_PULL_DOWN>,
+			<22 GPIO_PULL_DOWN>;
+		input;
+		line-name = "RiskyBird shared motor nets";
+	};
+};
+
+&ledc0 {
+	status = "disabled";
 };
 
 &usb_serial {
