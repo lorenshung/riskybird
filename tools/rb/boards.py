@@ -645,9 +645,16 @@ WORKLOADS = {
         # cannot drift apart. What a mode declares is what the application
         # compiles in -- `default` has no `motors` alias and therefore contains
         # no code path to a motor at all.
-        modes=("default", "flow", "motors", "autoflight"),
+        modes=("default", "telem", "flow", "motors", "autoflight"),
         targets=("arty200t",),
         summary="RoSE flight controller: estimator + control cascade + sensors",
+        # Every full-drone-shell mode gets the esp-uart alias, and main.cpp's
+        # guarded telemetry writer opens it while leaving the console on uart0.
+        # The SiFive driver does not instantiate DT instance 1 from devicetree
+        # alone, so omitting this makes non-telem modes fail at link time with
+        # an undefined __device_dts_ord_* reference. flight_controller-telem.conf
+        # repeats the setting so the console-moving mode remains self-contained.
+        cmake_defines=(("CONFIG_UART_SIFIVE_PORT_1", "y"),),
         # Per-mode, because these are CMake cache variables: a .conf fragment
         # cannot reach them, and a mode that cannot set them is a mode whose
         # defining feature has to be remembered as a -D on the command line.
@@ -656,6 +663,19 @@ WORKLOADS = {
         # always-armed bench path, which is the trap FLIGHT_BUILD.md warns
         # about and the reason this is declarative rather than documented.
         cmake_defines_by_mode=(
+            (
+                "telem",
+                (
+                    # The flight build used ROSE_TELEM=0 because an undrained
+                    # 115200 console busy-waits and stalls the control loop.
+                    # This mode deliberately turns it on: the ESP bridge drains
+                    # uart1 continuously and forwards each complete line.
+                    ("ROSE_TELEM", "1"),
+                    # At a 1 kHz loop this is ~50 Hz: about 7 kB/s for a
+                    # ~140-byte line on an 11.5 kB/s UART, leaving ~40% headroom.
+                    ("ROSE_TELEM_DIV", "20"),
+                ),
+            ),
             (
                 "autoflight",
                 (
