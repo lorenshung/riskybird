@@ -47,9 +47,45 @@ static unsigned int park_esp_motor_pins(bool verbose)
 	return safe;
 }
 
+/*
+ * Read the gate nets back, using the parked pins as logic probes.
+ *
+ * Each MOTOR gate is driven by the ESP through a 47R AND by the FPGA through a
+ * second 47R, with a 10k pulldown holding the SI2302 off until something drives
+ * it. While this image holds the ESP side high-impedance, that same pin sits on
+ * the gate and can be read -- which measures what the FPGA is actually
+ * DELIVERING. No FPGA-side register read can establish that: the comparator can
+ * be perfectly programmed while nothing reaches the ball.
+ *
+ * Sampled rather than read once, because the FPGA drives 20 kHz PWM and a
+ * single read lands at an arbitrary phase. Counting highs over many samples
+ * recovers the duty as it appears at the gate, so an FPGA channel driving 15%
+ * should read ~150 per mille here. A channel reading 0 while its comparator
+ * says otherwise is an open between the FPGA ball and the gate.
+ */
+#define GATE_SAMPLES 2000U
+
+static void report_gate_levels(void)
+{
+	unsigned int high[ARRAY_SIZE(motor_pins)] = { 0 };
+
+	for (unsigned int s = 0U; s < GATE_SAMPLES; s++) {
+		for (size_t i = 0; i < ARRAY_SIZE(motor_pins); i++) {
+			if (gpio_pin_get_dt(&motor_pins[i]) == 1) {
+				high[i]++;
+			}
+		}
+	}
+
+	printk("MOTOR GATE duty per mille: M1=%u M2=%u M3=%u M4=%u\n",
+	       high[0] * 1000U / GATE_SAMPLES, high[1] * 1000U / GATE_SAMPLES,
+	       high[2] * 1000U / GATE_SAMPLES, high[3] * 1000U / GATE_SAMPLES);
+}
+
 int main(void)
 {
 	unsigned int safe = park_esp_motor_pins(true);
+	unsigned int tick = 0U;
 
 	printk("MOTOR SAFE: %u/4 ESP drivers high-impedance with pull-downs\n", safe);
 	if (safe != ARRAY_SIZE(motor_pins)) {
@@ -57,9 +93,16 @@ int main(void)
 	}
 
 	for (;;) {
-		k_sleep(K_SECONDS(5));
-		safe = park_esp_motor_pins(false);
-		printk("MOTOR SAFE heartbeat: %u/4 inputs+pulldowns\n", safe);
+		/* 250 ms, not 5 s: the FPGA sweep drives each motor for as
+		 * little as 1 s, and a slow probe would sample between pulses
+		 * and report a dead gate for a working one. */
+		k_sleep(K_MSEC(250));
+		report_gate_levels();
+
+		if (++tick % 20U == 0U) {
+			safe = park_esp_motor_pins(false);
+			printk("MOTOR SAFE heartbeat: %u/4 inputs+pulldowns\n", safe);
+		}
 	}
 
 	return 0;
