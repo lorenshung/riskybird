@@ -82,10 +82,60 @@ static void report_gate_levels(void)
 	       high[2] * 1000U / GATE_SAMPLES, high[3] * 1000U / GATE_SAMPLES);
 }
 
+/*
+ * Test the instrument before trusting it.
+ *
+ * report_gate_levels() reads these four pins to decide what the FPGA is
+ * delivering to each motor gate, and a whole diagnosis was built on one of its
+ * readings: M4 reporting 0 while M1-M3 reported ~146 per mille. That is only
+ * evidence if GPIO22's INPUT path works. Its OUTPUT path is proven -- driving it
+ * spins motor 4 -- and GPIO21/20/23 clearly read correctly, but a stuck-low
+ * input buffer on GPIO22 alone would produce exactly the observed result while
+ * meaning nothing at all about the FPGA.
+ *
+ * So drive each pin high and read it back through its own input buffer. A pin
+ * that reads 1 while driving 1 has a working input. A pin that reads 0 is lying,
+ * and every gate measurement from it must be discarded.
+ *
+ * Driven for 2 ms, which is far too short to turn a brushed motor through any
+ * meaningful angle, and each pin is returned to parked before the next is
+ * touched -- never more than one gate live at a time.
+ */
+static void probe_self_test(void)
+{
+	printk("PROBE SELFTEST: verifying each pin can read back its own drive\n");
+
+	for (size_t i = 0; i < ARRAY_SIZE(motor_pins); i++) {
+		int rc = gpio_pin_configure_dt(&motor_pins[i],
+					       GPIO_OUTPUT_HIGH | GPIO_INPUT);
+		int readback = -1;
+
+		if (rc == 0) {
+			k_busy_wait(2000);   /* 2 ms: settle the node, barely move the rotor */
+			readback = gpio_pin_get_dt(&motor_pins[i]);
+		}
+
+		/* Park it again before touching the next one. */
+		(void)gpio_pin_configure_dt(&motor_pins[i], GPIO_INPUT);
+
+		printk("PROBE SELFTEST M%u (GPIO%u): configure=%d readback=%d -- %s\n",
+		       (unsigned)i + 1U, (unsigned)motor_pins[i].pin, rc, readback,
+		       (rc != 0)        ? "CANNOT drive+read this pin; test inconclusive"
+		       : (readback == 1) ? "input path OK, gate readings trustworthy"
+					 : "READS LOW WHILE DRIVEN HIGH -- this pin's gate readings are WORTHLESS");
+		k_msleep(250);
+	}
+}
+
 int main(void)
 {
-	unsigned int safe = park_esp_motor_pins(true);
+	unsigned int safe;
 	unsigned int tick = 0U;
+
+	(void)park_esp_motor_pins(false);   /* park first, then self-test one pin at a time */
+	probe_self_test();
+
+	safe = park_esp_motor_pins(true);
 
 	printk("MOTOR SAFE: %u/4 ESP drivers high-impedance with pull-downs\n", safe);
 	if (safe != ARRAY_SIZE(motor_pins)) {
