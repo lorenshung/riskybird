@@ -210,22 +210,50 @@ ACK PING
 
 Finally, the new `--mode telem` on `workloads/flight_controller` moved its
 existing telemetry line to uart1; the bridge forwarded it unchanged and
-`riskybird_panel.py` served the dashboard from that same UDP stream:
+`riskybird_panel.py` served the dashboard from that same UDP stream. The first
+capture recorded this:
 
 ```console
 flight_controller: it=200 dt=34ms roll=-0.1 pitch=0.3 yaw=-0.0 z=0.0 tofv=1
 ```
+
+That was a real ~29 Hz measurement, but of the wrong controller: the mode had
+silently inherited the sample's `ROSE_USE_PID=0` default and built TinyMPC. The
+mode now declares `ROSE_USE_PID=1` and `ROSE_USE_EKF=1`, and disables RISC-V
+linker relaxation because that larger image otherwise truncates a GP-relative
+relocation against `_kernel`.
+
+The controller swap is **verified** on hardware. The image identified itself as
+the PID cascade at boot and the forwarded stream then reported 1 ms samples:
+
+```console
+flight_controller: estimator=EKF (Mahony + per-axis Kalman) + controller=hierarchical PID (cascaded) ready (real target), single-loop
+flight_controller: it=600 dt=1ms roll=0.23 pitch=0.29 yaw=0.0 z=0.0 tofv=1 duty=[0.0 0.0 0.0 0.0]
+```
+
+The direct `dt` histogram over one capture was 765 x 1 ms, 636 x 5 ms,
+9 x 11 ms and 8 x 10 ms. Independently, the WiFi receiver recorded 540
+datagrams at 38.5 Hz, with a 25.0 ms median gap, 66.4 ms maximum and no gap
+over 75.0 ms (three times the median). At the declared `ROSE_TELEM_DIV=20`,
+that telemetry rate implies a ~770 Hz control loop: about 26x the TinyMPC rate,
+back near the 1 kHz design target and consistent with the 2.97 ms previously
+recorded in this file. The ~770 Hz figure is inferred from the datagram rate and
+divisor; the histogram is the direct loop-time measurement.
+
+The image is also **verified** by symbol, not just by its boot string: TinyMPC
+0, `tiny_solve` 0, PID 7, EKF 9 and motor 0. `CTRL_ITERS=0` is declared by the
+telem mode so it runs until stopped. The sample default of 5000 iterations took
+minutes at 29 Hz but only about six seconds at the corrected rate; returning
+from `main()` then left an idle core that looked exactly like a dead link.
 
 No framing layer was needed: the bridge is a line pipe and the existing line is
 already the ground station's wire format.
 
 Two items remain **open**:
 
-- The measured `dt=34ms` is only ~29 Hz, against 2.97 ms recorded elsewhere
-  and the 1 kHz design target. `tofv=1` says the down-facing ToF returned a
-  valid sample on every iteration; that is consistent with a blocking VL53L1X
-  read dominating the loop at the observed order of magnitude, but it is a
-  lead, not a confirmed cause.
+- The alternating 5 ms `dt` samples remain unexplained. They are consistent
+  with the VL53L1X worker at priority 8 preempting main at priority 11 while it
+  busy-waits on I2C, but that is a lead, not a confirmed cause.
 - The remote-ESTOP round trip over this link is still unmeasured. `ACK PING`
   proves that the bridge delivered an uplink line toward the FPGA, not that an
   ESTOP took effect in the controller. A measured end-to-end ESTOP remains the
