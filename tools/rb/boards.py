@@ -675,9 +675,17 @@ WORKLOADS = {
                     # This mode deliberately turns it on: the ESP bridge drains
                     # uart1 continuously and forwards each complete line.
                     ("ROSE_TELEM", "1"),
-                    # At a 1 kHz loop this is ~50 Hz: about 7 kB/s for a
-                    # ~140-byte line on an 11.5 kB/s UART, leaving ~40% headroom.
-                    ("ROSE_TELEM_DIV", "20"),
+                    # Sized against the WIRE, not the loop. With the v1.1 tail
+                    # (x/y/vx/vy/vz/zsp/vbat/st) the line is ~240 bytes rather
+                    # than ~150, and printk busy-waits on this carrier because
+                    # CONFIG_UART_INTERRUPT_DRIVEN is off -- so every byte over
+                    # the 11.5 kB/s link is charged to the control loop. At the
+                    # ~770 Hz the PID cascade actually achieves, a divisor of 30
+                    # is ~25 Hz: about 6 kB/s, a bit over half the link. A
+                    # divisor of 20 would be ~77% and would start stealing loop
+                    # time to no benefit -- 25 Hz is already twice what a
+                    # dashboard can usefully show.
+                    ("ROSE_TELEM_DIV", "30"),
                     # Run until stopped. The sample defaults to 5000
                     # iterations, which was minutes of telemetry while the
                     # loop crawled at 29 Hz under TinyMPC and is SIX SECONDS
