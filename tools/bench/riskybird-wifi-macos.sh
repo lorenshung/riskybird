@@ -66,6 +66,7 @@ DRONE_NET="192.168.4."
 TELEM_PORT=14550
 CMD_PORT=14551
 LEASE_TIMEOUT=25
+REACH_TIMEOUT=15
 VERIFY_SECONDS=10
 
 STATE_DIR="${TMPDIR:-/tmp}/riskybird-wifi-macos"
@@ -210,6 +211,9 @@ try:
 except socket.timeout:
     print("(no reply)")
     sys.exit(1)
+except OSError as exc:
+    print(f"(socket error: {exc})")
+    sys.exit(1)
 finally:
     s.close()
 PY
@@ -219,7 +223,7 @@ PY
 # two benches are comparable: rate, loss proxy, and worst inter-arrival gap.
 udp_listen() {
 	python3 - "$TELEM_PORT" "$1" <<'PY'
-import socket, sys, time
+import socket, statistics, sys, time
 port, secs = int(sys.argv[1]), float(sys.argv[2])
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -246,8 +250,15 @@ if n == 0:
 span = (last - first) if (first and last and last > first) else secs
 rate = (n - 1) / span if span > 0 else 0.0
 worst = max(gaps) * 1000 if gaps else 0.0
-over = sum(1 for g in gaps if g > 0.100)
-print(f"  {n} datagrams, {rate:.1f} Hz, max gap {worst:.1f} ms, {over} gap(s) > 100 ms")
+if gaps:
+    median = statistics.median(gaps) * 1000
+    gap_threshold = 3.0 * median
+    over = sum(1 for g in gaps if g * 1000 > gap_threshold)
+    print(f"  {n} datagrams, {rate:.1f} Hz, median gap {median:.1f} ms, "
+          f"max gap {worst:.1f} ms, {over} gap(s) > {gap_threshold:.1f} ms (3x median)")
+else:
+    print(f"  {n} datagram, {rate:.1f} Hz, median gap n/a, max gap {worst:.1f} ms "
+          "(need at least 2 datagrams for adaptive gap reporting)")
 PY
 }
 
@@ -401,17 +412,18 @@ cmd_up() {
 
 	# 4. Join the drone.
 	#
-	# Power first. `-setairportnetwork` on a radio that is switched off fails
-	# with "You cannot join a network when Wi-Fi power is off", and the run then
-	# burns the whole lease timeout before reporting a missing lease -- which
-	# reads as a drone problem and is a host one. Turning the radio on needs no
-	# privilege, unlike the service-order step above.
-	if [ "$("$NETWORKSETUP" -getairportpower "$WIFI_IFACE" 2>/dev/null | awk '{print $NF}')" != "On" ]; then
-		info "${WIFI_IFACE} radio is off -- switching it on"
-		"$NETWORKSETUP" -setairportpower "$WIFI_IFACE" on >/dev/null 2>&1 \
-			|| die "could not power on ${WIFI_IFACE}"
-		sleep 3
-	fi
+	# Always associate fresh. A cached DHCP lease is worse than no lease here:
+	# after a drone reboot, ping can succeed with the host's old address while
+	# the bridge's fresh DHCP server has no lease to enumerate, so unicast
+	# telemetry is silently sent to zero clients. `ipconfig set en0 DHCP` is the
+	# direct way to force a renew but needs root; a radio cycle does not.
+	info "cycling ${WIFI_IFACE} radio to force a fresh association and DHCP lease"
+	"$NETWORKSETUP" -setairportpower "$WIFI_IFACE" off >/dev/null 2>&1 \
+		|| die "could not power off ${WIFI_IFACE}"
+	sleep 2
+	"$NETWORKSETUP" -setairportpower "$WIFI_IFACE" on >/dev/null 2>&1 \
+		|| die "could not power on ${WIFI_IFACE}"
+	sleep 3
 
 	info "joining ${SSID} on ${WIFI_IFACE}..."
 	"$NETWORKSETUP" -setairportnetwork "$WIFI_IFACE" "$SSID" \
@@ -442,12 +454,42 @@ cmd_up() {
 	fi
 	grn "default route still on ${drdev} ($(service_for_device "$drdev"))"
 
-	# 7. Prove the link carries UDP both ways, not just that a lease exists.
+	# 7. A lease can appear before macOS installs the scoped interface route or
+	# resolves ARP. Wait for both the route and an ICMP reply before probing UDP.
+	local reach_deadline route_dev="" reachable=0
+	reach_deadline=$((SECONDS + REACH_TIMEOUT))
+	info "waiting up to ${REACH_TIMEOUT}s for ${DRONE_IP} via ${WIFI_IFACE}..."
+	while [ "$SECONDS" -lt "$reach_deadline" ]; do
+		route_dev="$(route -n get "$DRONE_IP" 2>/dev/null | awk '/interface:/{print $2; exit}')"
+		if [ "$route_dev" = "$WIFI_IFACE" ] \
+			&& ping -c 1 -t 1 "$DRONE_IP" >/dev/null 2>&1; then
+			reachable=1
+			break
+		fi
+		[ "$SECONDS" -lt "$reach_deadline" ] && sleep 1
+	done
+	if [ "$reachable" -ne 1 ]; then
+		red "${DRONE_IP} did not become reachable via ${WIFI_IFACE} (route: ${route_dev:-none})"
+		die "associated and leased, but the drone did not become reachable within ${REACH_TIMEOUT}s"
+	fi
+	grn "drone reachable via ${WIFI_IFACE}"
+
+	# Prove the link carries UDP both ways. Retry because one lost datagram on a
+	# fresh association is not enough evidence that the bridge is down.
 	info "probing the bridge (PING -> :${CMD_PORT})..."
-	local ack
-	if ack="$(udp_ping)"; then
-		grn "bridge replied: ${ack}"
-	else
+	local ack="" udp_attempt udp_ok=0
+	for udp_attempt in 1 2 3; do
+		if ack="$(udp_ping)"; then
+			udp_ok=1
+			grn "bridge replied: ${ack}"
+			break
+		fi
+		if [ "$udp_attempt" -lt 3 ]; then
+			ylw "no ACK (attempt ${udp_attempt}/3); retrying..."
+			sleep 1
+		fi
+	done
+	if [ "$udp_ok" -ne 1 ]; then
 		red "no ACK from ${DRONE_IP}:${CMD_PORT}"
 		die "associated and leased, but the bridge is not answering"
 	fi
