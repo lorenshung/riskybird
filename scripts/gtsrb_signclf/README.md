@@ -8,7 +8,7 @@ SoC to detect STOP/YIELD (and the full 43-class GTSRB set) for demos.
 | Model | input | float top-1 | int8 top-1 (faithful) | STOP recall | notes |
 |---|---|---|---|---|---|
 | **heavy grayscale (deploy)** | 48×48×1 | **99.0%** | **98.97%** (−0.06 pp) | **100%** | int8 verify max\|diff\|=0; int8↔float agree 99.71% |
-| heavy RGB | 48×48×3 | 98.6% | ~98.6% (bit-exact) | 100% | *lower* than grayscale |
+| heavy RGB | 48×48×3 | 98.6% | 98.28% (bit-exact, agree 99.47%) | 100% | *lower* than grayscale on both float & int8 |
 | lite grayscale/RGB | 48×48 | ~95–99% val / 95.3% test | — | 99.3% | smaller/faster tradeoff |
 
 **Grayscale is the deploy choice** — it beats RGB (signs are shape-distinct), so the
