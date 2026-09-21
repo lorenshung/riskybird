@@ -8,7 +8,8 @@ Evidence levels use the repo vocabulary: **verified** (run here, output quoted),
 (observed elsewhere, reproduced from someone else's log), **declared** (asserted by code or
 docs, never run), **blocked**.
 
-Started 2026-09-04. Nothing in the flight sections is verified yet.
+Started 2026-09-04. The Phase 3 wireless path is verified below; every other
+flight item retains its per-item status.
 
 ---
 
@@ -109,16 +110,17 @@ The only ESP-specific dependency in the entire application is `flightlog.c`, whi
 | `flow` (PMW3901) | SPI2, soft CS | `spi@10031000` | **declared** — `pmw3901_test` exists |
 | `motors` | LEDC ×4, 20 kHz | `pwm@10050000` ch1-3 + `pwm@10051000` ch1 | **declared** |
 | console | USB serial | `uart@10020000` | **verified** |
-| telemetry | on-chip WiFi | **`uart@10021000` → ESP as a modem** | **verified** link only |
+| telemetry | on-chip WiFi | **`uart@10021000` → ESP as a modem** | **verified** end to end (Phase 3) |
 
 ### The architectural difference that matters
 
 On the ESP, the flight controller and the WiFi stack are *the same chip*. On the FPGA they are
 not: Rocket runs the flight controller, and the ESP32-C6 becomes a **WiFi modem reached over
 uart1** (E13/F14, PLIC 11). That link is already proven bidirectional at 115200
-(`workloads/esp_uart`). It means the ground station work is not a port — the telemetry
-producer and the radio now sit on opposite sides of a serial link, and need a framing protocol
-and ESP-side firmware that does not exist yet.
+(`workloads/esp_uart`). `workloads/esp_bridge` is the ESP-side modem. It is deliberately a
+dumb line pipe rather than a framing protocol: the flight controller's existing telemetry line
+already matches the ground station parser, so each newline-terminated UART line can become one
+UDP datagram unchanged.
 
 ### Bug found in our existing overlay
 
@@ -185,12 +187,49 @@ Each phase has a verification criterion. No phase is "done" on a successful buil
     altitude tracks a hand-held height change.
 
 ### Phase 3 — wireless link
-11. ESP-side firmware: UART↔WiFi bridge. The ESP is currently boot-looping with erased flash
-    and enumerates as `303a:1001` on `ttyACM0`, so it is flashable.
-12. Framing protocol over uart1 at 115200 (or faster — rate is untested above 115200).
-13. Port the ground station to consume the bridged stream.
-14. **Verify:** telemetry at ~50 Hz to a laptop, and a **remote ESTOP round-trip measured**
-    before any motor spins.
+
+The data path is **verified** on hardware on 2026-09-20, in this order.
+`workloads/esp_bridge` first brought up the radio and both UDP endpoints:
+
+```console
+esp_bridge: SSID riskybird-5674, ch 6, open; telemetry -> UDP :14550
+esp_bridge: commands on UDP :14551
+```
+
+FPGA → ESP was then isolated with `workloads/esp_uart`:
+
+```console
+esp_bridge: line #1 (21 B), 0 client(s): RISKYBIRD-FPGA-PROBE
+```
+
+The UDP uplink was then exercised by sending `PING` to `192.168.4.1:14551`:
+
+```console
+ACK PING
+```
+
+Finally, the new `--mode telem` on `workloads/flight_controller` moved its
+existing telemetry line to uart1; the bridge forwarded it unchanged and
+`riskybird_panel.py` served the dashboard from that same UDP stream:
+
+```console
+flight_controller: it=200 dt=34ms roll=-0.1 pitch=0.3 yaw=-0.0 z=0.0 tofv=1
+```
+
+No framing layer was needed: the bridge is a line pipe and the existing line is
+already the ground station's wire format.
+
+Two items remain **open**:
+
+- The measured `dt=34ms` is only ~29 Hz, against 2.97 ms recorded elsewhere
+  and the 1 kHz design target. `tofv=1` says the down-facing ToF returned a
+  valid sample on every iteration; that is consistent with a blocking VL53L1X
+  read dominating the loop at the observed order of magnitude, but it is a
+  lead, not a confirmed cause.
+- The remote-ESTOP round trip over this link is still unmeasured. `ACK PING`
+  proves that the bridge delivered an uplink line toward the FPGA, not that an
+  ESTOP took effect in the controller. A measured end-to-end ESTOP remains the
+  gate before any motor is allowed to spin in flight.
 
 ### Phase 4 — actuation (battery required, props off)
 15. `motors` alias onto pwm0 ch1-3 + pwm1 ch1; resolve the harness-inversion question first —
@@ -460,8 +499,9 @@ Both env vars must be on the `rb debug` line — it rebuilds.
 - **Down-ToF** (`tof` alias): their Zephyr commit with xtalk-comp, tunable timing budget and
   `calibrate()` is unpublished. Unchanged.
 - **The IMU remap is inherited from the ESP and unverified here** — that is what Phase 1a is for.
-- **Phase 3 (wireless) has no code yet.** Rocket runs the flight controller and the ESP has to
-  become a UART-attached modem; the ESP-side firmware and the framing protocol do not exist.
+- **Phase 3's wireless data path is verified.** `esp_bridge` is the UART-attached modem and no
+  framing protocol was needed. The loop-rate lead and remote-ESTOP measurement listed under
+  Phase 3 remain open.
 - **The motor-pin idle level is resolved: the pins idle LOW.** `pwmcfg=0xf0000000`
   at reset means the raw comparators are all asserted, but every motor output is
   inverted in the generated Verilog (`assign motorN = ~_chiptop0_pwm_*_gpio_*`,

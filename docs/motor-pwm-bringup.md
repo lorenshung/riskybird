@@ -1,7 +1,7 @@
 # Motor PWM bring-up
 
-Four ESC/motor drive outputs on the TE0712 drone carrier, from the two sifive
-PWM blocks the drone periphery already elaborated.
+Four brushed-motor gate-drive outputs on the TE0712 drone carrier, from the two
+sifive PWM blocks the drone periphery already elaborated.
 
 The bitstream is built, loaded, and measured on the real board. Nobody was in
 the room and no motors are attached, which shaped the work rather than limiting
@@ -117,14 +117,11 @@ The J1 positions come from the Trenz board file and carry a warning:
 
 ![RiskyBird signals on the TE0712 J1 header](figures/te0712_j1_signal_map.svg)
 
-Every signal proven on this bench — JTAG, I2C, the PMW3901 SPI — is on an
-**even** J1 pin. The one dead signal, the console UART, is on J1_41 and J1_43,
-both **odd**. The board file shows odd pins are ordinary user I/O (35 of them
-are assigned), so the split is not a property of the module; it is a property of
-this ribbon or this carrier. Motors 1 and 3 inherit that risk and motors 2 and 4
-do not, which makes the first bench test a discriminating experiment rather than
-a pass/fail: **if exactly motors 1 and 3 are dead, the answer is the ribbon, not
-the PWM.**
+The earlier odd/even lead is false. The gate measurement below found FPGA PWM
+at motors 1–3 and none at motor 4, although motor 4 is on the **even** J1_100
+pin. Bank membership does not split the result either: motors 1, 2 and 4 are
+all in bank 16, while motor 3 is in bank 14. Connector parity and I/O-bank
+membership therefore explain neither this failure nor which motor is at risk.
 
 ## How this was verified, with nobody looking at the board
 
@@ -327,20 +324,12 @@ Reading that out:
 The 984 rather than 1000 in bin 0 is the wrap: four samples of 263 straddled the
 counter reset, where the comparator is briefly high.
 
-### What is still unverified
+### What remains open
 
-- **The last inverter and the pad.** The probe reads `pwmcmpXip`, which is one
-  gate upstream of the pin. The inversion between them is verified in the
-  generated Verilog (`assign motor1 = ~_chiptop0_pwm_0_gpio_1;`) and the
-  placement in the post-route I/O report, but nothing has put a meter on E22.
-- **The ribbon.** Everything above proves the FPGA drives the right waveform on
-  the right ball. Whether that ball reaches the ESC connector is exactly what
-  the odd/even split above puts in doubt.
-- **The ESCs.** 20 kHz with a 0-100% duty is a brushed-motor/MOSFET signal, not
-  a 1000-2000 us servo-pulse ESC protocol. If these motors are brushless with
-  conventional ESCs, the period and the mapping both change -- the RTL and the
-  binder do not, only `MOTOR_PERIOD_NSEC` and the throttle mapping in the
-  workload.
+- **The physical location of motor 4's open.** The ESP gate probe below closes
+  the path through the gate node: motors 1–3 receive FPGA PWM and motor 4 does
+  not. A meter still has to split the remaining F13-to-gate path between the
+  carrier-side 47R/trace/JB1 pin and the module-side ball/seating.
 
 ### Two ways the probe itself was wrong first
 
@@ -462,23 +451,49 @@ request, so a renewal has to be an actual write.
 
 ## Bench procedure, for whoever is next in the room
 
-Steps 1 and 2 are the only ones left that need a person present. Everything else
-in this document has already been done remotely and can be re-run at any time
-with `hardware/pwm/probe.gdb`. Propellers off throughout.
+Only step 2 remains open. The gate measurement no longer needs a person or a
+meter; `motor_safe` turns the parked ESP pins into four logic probes. Propellers
+off throughout.
 
-1. **A meter on the four pins, nothing else attached.** This is the one link the
-   probe cannot close: it reads the comparator, one gate upstream of the pad.
-   With `motor_4` running and stopped, all four should read 0 V. Then arm at
-   10% over GDB -- at 20 kHz a meter averages the waveform, so 10% of 3.3 V is
-   ~0.33 V. It does not take a scope to tell 10% from 90%, which is the failure
-   this is looking for.
-2. **Expect motors 1 and 3 to be the ones at risk.** They are on odd J1 pins,
-   like the dead console UART. If exactly those two read 0 V while 2 and 4
-   track the command, it is the ribbon; re-pin onto even J1 positions rather
-   than touching the RTL.
-3. **ESCs powered, motors unbolted or propellers removed.** Only then, and only
-   after confirming the ESC protocol -- see the ESC note under "What is still
-   unverified".
+1. **Measure the gate nodes from the ESP — verified 2026-09-20.** `motor_safe` keeps
+   GPIO21, GPIO20, GPIO23 and GPIO22 as pulled-down inputs and samples them
+   2,000 times every 250 ms, reporting the fraction high in per mille. Each
+   gate is connected to the ESP through one 47R resistor and to the FPGA
+   through another 47R, with a 10k pulldown, so a high-impedance ESP input reads
+   the real SI2302 gate node rather than a signal upstream of the FPGA pad.
+
+   Driving all four FPGA comparators at 15% simultaneously measured:
+
+   ```console
+   MOTOR GATE duty per mille: M1=145 M2=145 M3=144 M4=0
+   ```
+
+   Direct JTAG writes to comparator 1 of `pwm1`, with register readback
+   confirming each write, then the same write to `pwm0` as a control, measured:
+
+   ```console
+   pwm1 cmp1 = 375  (0x177) -> M4 gate 0
+   pwm1 cmp1 = 2500 (0x9c4) -> M4 gate 0
+   pwm0 cmp1 = 2500 (control) -> M1 gate 1000
+   ```
+
+   Both PWM blocks read `pwmcfg = 0xe0001200`, `pwmcmp0 = 0x9c4`, with their
+   counters advancing. The result was the same on both
+   `RocketArty200TDroneFullDDRConfig` and `RocketArty200TMotorSpadConfig`.
+   **Recorded:** motor 4 spins when the ESP drives GPIO22 through LEDC with
+   `samples/riskybird/actuator_bringup`, so the gate net, SI2302 and motor are
+   good. Together, the verified gate measurements place the fault between the
+   FPGA's F13 ball and the gate.
+2. **Split the remaining motor 4 path with a meter — open.** Measure J1_100 and
+   use working motor 1 at J1_31 as the reference. That distinguishes the
+   carrier-side 47R/trace/JB1 pin from the module-side F13 ball/seating; neither
+   the ESP gate probe nor JTAG can close that last split. The board owner
+   reports that motor 4 previously worked from the FPGA, so this is
+   **recorded** as a fault that developed over time, not a design error.
+3. **For any further spin test, power +BATT and remove the propellers.** These
+   are brushed motors switched directly by low-side SI2302 FETs. There is no
+   ESC to arm or latch and no ESC-provided locked-rotor protection; those
+   diagnoses describe hardware this drone does not have.
 
 ## Files
 
