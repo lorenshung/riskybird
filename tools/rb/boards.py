@@ -666,6 +666,10 @@ WORKLOADS = {
             (
                 "telem",
                 (
+                    # CMake defaults to TinyMPC, which is not what flies and
+                    # measured ~34 ms of loop time here; select the flight stack.
+                    ("ROSE_USE_PID", "1"),
+                    ("ROSE_USE_EKF", "1"),
                     # The flight build used ROSE_TELEM=0 because an undrained
                     # 115200 console busy-waits and stalls the control loop.
                     # This mode deliberately turns it on: the ESP bridge drains
@@ -674,6 +678,16 @@ WORKLOADS = {
                     # At a 1 kHz loop this is ~50 Hz: about 7 kB/s for a
                     # ~140-byte line on an 11.5 kB/s UART, leaving ~40% headroom.
                     ("ROSE_TELEM_DIV", "20"),
+                    # Run until stopped. The sample defaults to 5000
+                    # iterations, which was minutes of telemetry while the
+                    # loop crawled at 29 Hz under TinyMPC and is SIX SECONDS
+                    # at the ~770 Hz the PID cascade actually achieves -- the
+                    # stream simply stopped, main() returned, and the core sat
+                    # in the idle thread looking like a dead link. A bench
+                    # telemetry mode has no flight log to flush, so the
+                    # finite-iteration argument that applies to autoflight
+                    # does not apply here.
+                    ("CTRL_ITERS", "0"),
                 ),
             ),
             (
