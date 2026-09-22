@@ -19,3 +19,23 @@ elfs/
 
 # Verilator build output for hardware/pwm
 hardware/pwm/obj_dir/
+
+# Per-run camera captures. hardware/ospi/bootup-capture.gdb dumps the frame and
+# its PNG into whatever directory rb debug was invoked from, which is normally
+# the repo root -- so following the camera docs otherwise leaves the tree dirty
+# every single run. The keepable frames live in docs/figures/.
+bootup-frame.raw
+bootup-frame.png
+bootup-frame-colour.png
+
+# Vivado outputs for the bare-metal pad tests. The Verilog, XDC, TCL and the
+# build/verify logs ARE tracked -- they are the evidence that F13's output
+# driver is dead -- but the 9.9 MB bitstreams and checkpoints are not.
+hardware/padtest/out/
+hardware/padtest/*/out/
+
+# Per-session telemetry CSVs from tools/bench/riskybird-dash.py, which defaults
+# to ./riskybird-logs -- i.e. the repo root, since that is where the bring-up
+# guide runs it from. Same reasoning as the camera captures above: a tool you run
+# every bench session must not dirty the tree every bench session.
+riskybird-logs/

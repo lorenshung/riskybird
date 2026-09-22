@@ -645,7 +645,7 @@ WORKLOADS = {
         # cannot drift apart. What a mode declares is what the application
         # compiles in -- `default` has no `motors` alias and therefore contains
         # no code path to a motor at all.
-        modes=("default", "telem", "flow", "motors", "autoflight"),
+        modes=("default", "telem", "flow", "motors", "esp-motors", "autoflight"),
         targets=("arty200t",),
         summary="RoSE flight controller: estimator + control cascade + sensors",
         # Every full-drone-shell mode gets the esp-uart alias, and main.cpp's
@@ -695,6 +695,136 @@ WORKLOADS = {
                     # telemetry mode has no flight log to flush, so the
                     # finite-iteration argument that applies to autoflight
                     # does not apply here.
+                    ("CTRL_ITERS", "0"),
+                ),
+            ),
+            (
+                # Motors offloaded to the ESP32-C6. FPGA ball F13 -- motor4's
+                # gate -- is dead as an OUTPUT: a bare-metal bitstream driving
+                # the four pads at 4/8/12/16 % reads back M1=40 M2=80 M3=120
+                # M4=0 per mille at the gates, while the same ball as an INPUT
+                # reads the carrier's 10k pulldown. Net intact, driver dead, no
+                # RTL repair. So the FPGA stops driving gates entirely and sends
+                # duty frames to the ESP, which owns all four.
+                #
+                # It used to match `--mode motors` in every other respect, so
+                # that the only variable under test was where the PWM is
+                # generated. That A/B is finished: the link is proven -- 1212
+                # frames, zero CRC/noise/loss, and all four motors cut 120 ms
+                # after the core halts. What is left is the mode that actually
+                # commands the drone, so it now declares the flight stack
+                # instead of inheriting the sample's CMake defaults, which are
+                # TinyMPC, no optical flow and a Crazyflie's mass. See the
+                # per-knob notes below. `--mode motors` is deliberately left on
+                # the defaults: it is a PWM-pin bring-up, not a flight mode.
+                "esp-motors",
+                (
+                    ("ROSE_ESP_MOTORS", "1"),
+                    # The wire format is one header shared with
+                    # workloads/esp_motors. The sample is built in place from a
+                    # submodule and cannot guess where this checkout is, so the
+                    # path is passed rather than assumed; its CMakeLists fails
+                    # the build outright if it is missing.
+                    (
+                        "ROSE_MOTOR_LINK_DIR",
+                        str(ROOT / "integration" / "zephyr" / "motor_link"),
+                    ),
+                    # ---- the stack that has actually flown this airframe ----
+                    #
+                    # docs/FLIGHT_BUILD.md in the sample records the build used
+                    # for the untethered hops as PID + EKF + flow, and `--mode
+                    # telem` already declares the first two for the same reason.
+                    # This mode inherited neither. Verified by symbol on the
+                    # image this replaces: tiny_solve 1, HierarchicalPid 0.
+                    #
+                    # TinyMPC here is not merely "not what flies", it is unsafe.
+                    # Its gains are baked for a ~30 g Crazyflie at 50 Hz while
+                    # this airframe is ~60 g at ~71 % hover duty, and its solver
+                    # gets 10 ADMM iterations -- nowhere near enough to satisfy
+                    # its own input box constraint from a bench-sized altitude
+                    # error. Measured on the host with this exact problem data:
+                    # the returned command is 1.28 against a bound of 0.417. It
+                    # also runs at ~35 ms/iteration against the PID cascade's
+                    # ~1.3 ms, and the offload run that tilted to 90 degrees
+                    # with nothing cutting the motors was the slow one (see
+                    # docs/flight-safety-bench-procedure.md section 2.3).
+                    ("ROSE_USE_PID", "1"),
+                    # Already the CMakeLists default; stated anyway because the
+                    # comment sitting directly above that default still claims
+                    # the complementary filter is what gets selected. A default
+                    # whose own documentation disagrees with it is one edit away
+                    # from silently changing the estimator under a mode that
+                    # commands motors.
+                    ("ROSE_USE_EKF", "1"),
+                    # Optical flow -> horizontal velocity into the estimator.
+                    # FLIGHT_TUNING_LOG.md entry 15: the build that flew before
+                    # this one had ROSE_FLOW=0, so horizontal velocity was pure
+                    # accel dead-reckoning and drifted by construction.
+                    #
+                    # This takes THREE things that are easy to get individually
+                    # right and collectively wrong, so all three are asserted
+                    # here rather than left to the operator:
+                    #
+                    #  1. the bus, from devicetree --
+                    #     flight_controller-esp-motors.overlay includes
+                    #     flight_controller-flow.overlay, which sets
+                    #     `flow-spi = &spi0` and enables spi0/gpio0.
+                    #     flight_controller.conf already carries CONFIG_SPI and
+                    #     CONFIG_GPIO for every mode.
+                    #  2. the code, from this knob. Without it main.cpp emits
+                    #     "flow-spi alias present but ROSE_FLOW=0" and compiles
+                    #     no flow path at all.
+                    #  3. the chip-select, below.
+                    ("ROSE_FLOW", "1"),
+                    # gpio0 pin 0, not the ESP32-C6's 19.
+                    #
+                    # The FPGA carrier's DroneLogic GPIO block is a different
+                    # controller with its own numbering; pmw3901_test.overlay
+                    # wires the flow CS to index 0, and that is the wiring the
+                    # standalone PMW3901 bring-up reads the chip ID through. Get
+                    # this wrong and every other part of the flow path is
+                    # correct and useless: flow_init() drives the wrong pin, the
+                    # chip-ID read fails, and after five 50 ms retries it prints
+                    # "PMW3901 not detected -- flow disabled" and the estimator
+                    # silently falls back to the dead-reckoning that entry 15
+                    # was about. ~250 ms of boot spent proving nothing.
+                    #
+                    # Reachable only as of this change, and it took TWO fixes:
+                    # flow.c's default is now #ifndef'd (a bare #define quietly
+                    # won the argument against the -D that
+                    # flight_controller-flow.overlay and docs/flight-on-fpga.md
+                    # both tell the operator to pass), and CMakeLists.txt now
+                    # declares CS_GPIO_PIN and lists it in
+                    # target_compile_definitions, without which a -D of this
+                    # name sets a cache variable nothing reads.
+                    ("CS_GPIO_PIN", "0"),
+                    # Mass feedforward for the PID altitude loop, which has no
+                    # integrator -- so this MUST match the real weight or the
+                    # loop cannot reach hover thrust. 0.060 kg is riskybird v3,
+                    # measured; the source default is 0.032 kg, a Crazyflie.
+                    #
+                    # Reachable only because CMakeLists.txt now declares
+                    # PID_MASS_KG as a cache variable AND lists it in
+                    # target_compile_definitions. It previously existed solely
+                    # as an #ifndef inside controller_pid.cpp, so a -D of this
+                    # name was silently ignored and FLIGHT_BUILD.md had to smuggle
+                    # it through EXTRA_CPPFLAGS -- exactly the remembered-flag
+                    # trap this table exists to remove.
+                    ("PID_MASS_KG", "0.060f"),
+                    # Run until stopped. NOT an independent choice: it is forced
+                    # by ROSE_USE_PID above. The sample's 5000-iteration default
+                    # was ~175 s of bench time at TinyMPC's 35 ms/iter and is
+                    # ~6.5 s at the PID cascade's 1.3 ms. Every step of
+                    # docs/flight-safety-bench-procedure.md part A -- tilt the
+                    # frame past 40 degrees by hand, drop-test free fall, halt
+                    # the core and watch the ESP failsafe cut within 125 ms,
+                    # wait out the 5 s commitment window -- needs the loop alive
+                    # for minutes, and a committed flight test is given a 60 s
+                    # motor budget that a 6.5 s run would end for it. What
+                    # bounds motor time in this mode is the commitment gate (5 s
+                    # uncommitted, 60 s committed) and the envelope guard,
+                    # neither of which is an iteration count. Same reasoning
+                    # `--mode telem` records for the same cause.
                     ("CTRL_ITERS", "0"),
                 ),
             ),
@@ -819,6 +949,29 @@ WORKLOADS = {
             "Park the shared ESP32-C6 motor pins as high-impedance inputs "
             "with pull-downs"
         ),
+    ),
+    # The other half of `flight_controller --mode esp-motors`. FPGA ball F13 is
+    # dead as an OUTPUT -- a bare-metal bitstream driving the four pads at
+    # 4/8/12/16 % reads back M1=40 M2=80 M3=120 M4=0 per mille, and F13 as an
+    # input reads the carrier's 10k pulldown, so the net is intact and the
+    # driver is not. Motor4 therefore cannot be driven from the FPGA at all.
+    #
+    # This moves ALL FOUR motors onto the ESP, which reaches every gate through
+    # its own 47R, and leaves the FPGA driving none -- which also removes the
+    # dual-driver contention on the other three gates rather than working around
+    # one pin.
+    #
+    # Directly opposed to motor_safe, which parks the same four pins as
+    # pulled-down inputs: flashing this REPLACES the gate probe that every motor
+    # measurement in this investigation was made with.
+    "esp_motors": _workload(
+        "esp_motors",
+        targets=("esp32c6",),
+        summary=(
+            "Drive all four motor gates from the FPGA's duty frames, with a "
+            "receive-timeout failsafe"
+        ),
+        safety="propellers-off",
     ),
     "pmw3901_test": _workload(
         "pmw3901_test",

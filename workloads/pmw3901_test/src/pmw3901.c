@@ -317,18 +317,30 @@ int pmw3901_read_motion_burst(const struct device *dev, motionBurst_t *motion)
         .count = 1,
     };
 
+    /*
+     * Timing matched to the flight controller's copy of this driver
+     * (rose_flight_controller/src/pmw3901.c), so a calibration captured here is
+     * captured through the same read path that flies.
+     *
+     * The three k_msleep(1) calls this replaces cost ~3 ms per read and capped
+     * the poll rate near 300 Hz. The datasheet's motion-burst delay (t_SRAD) is
+     * ~35 us; busy_wait_us(100) clears it with margin and makes one read ~285 us.
+     * For a SUM of counts the rate does not change the answer -- the sensor
+     * accumulates between reads -- but a faster read keeps each interval's delta
+     * small, which is what keeps it away from int16 saturation.
+     */
     cs_assert(dev);
-    k_msleep(1);
+    busy_wait_us(50);
 
-    /* Send address */
+    /* Send burst-read address */
     spi_write_dt(&config->spi, &tx_bufs);
-    k_msleep(1);
+    busy_wait_us(100);
 
     /* Read motion burst data */
     spi_read_dt(&config->spi, &rx_bufs);
 
     cs_deassert(dev);
-    k_msleep(1);
+    busy_wait_us(50);
 
     memcpy(motion, rx_buffer, sizeof(motionBurst_t));
 

@@ -1,0 +1,189 @@
+
+****** Vivado v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:04:56 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source /scratch2/loren/riskybird-dev/hardware/padtest/verify.tcl
+# set d /scratch2/loren/riskybird-dev/hardware/padtest
+# open_checkpoint $d/out/post_route.dcp
+Command: open_checkpoint /scratch2/loren/riskybird-dev/hardware/padtest/out/post_route.dcp
+
+Starting open_checkpoint Task
+
+Time (s): cpu = 00:00:00.02 ; elapsed = 00:00:00.03 . Memory (MB): peak = 2304.555 ; gain = 5.938 ; free physical = 1705 ; free virtual = 83132
+INFO: [Device 21-403] Loading part xc7a200tfbg484-2
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 2848.355 ; gain = 0.000 ; free physical = 1414 ; free virtual = 81985
+INFO: [Netlist 29-17] Analyzing 11 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-479] Netlist was created with Vivado 2023.1
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Timing 38-478] Restoring timing data from binary archive.
+INFO: [Timing 38-479] Binary timing data restore complete.
+INFO: [Project 1-856] Restoring constraints from binary archive.
+INFO: [Project 1-853] Binary constraint restore complete.
+Reading XDEF placement.
+Reading placer database...
+Reading XDEF routing.
+Read XDEF Files: Time (s): cpu = 00:00:00.04 ; elapsed = 00:00:00.05 . Memory (MB): peak = 3564.660 ; gain = 8.906 ; free physical = 1022 ; free virtual = 80357
+Restored from archive | CPU: 0.050000 secs | Memory: 1.148079 MB |
+Finished XDEF File Restore: Time (s): cpu = 00:00:00.04 ; elapsed = 00:00:00.05 . Memory (MB): peak = 3564.660 ; gain = 8.906 ; free physical = 1022 ; free virtual = 80357
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 3564.660 ; gain = 0.000 ; free physical = 1022 ; free virtual = 80357
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+INFO: [Project 1-604] Checkpoint was created with Vivado v2023.1 (64-bit) build 3865809
+open_checkpoint: Time (s): cpu = 00:00:13 ; elapsed = 00:00:17 . Memory (MB): peak = 3564.660 ; gain = 1269.012 ; free physical = 1022 ; free virtual = 80357
+# puts "===== PADTEST POST-ROUTE PAD VERIFICATION ====="
+===== PADTEST POST-ROUTE PAD VERIFICATION =====
+# puts [format "%-8s %-6s %-11s %-4s %-24s %-10s %-9s %s" \
+#       PORT PIN IOSTANDARD PULL OBUF_CELL OBUF_LOC DRIVER_REF DRIVER_CELL/INIT]
+PORT     PIN    IOSTANDARD  PULL OBUF_CELL                OBUF_LOC   DRIVER_REF DRIVER_CELL/INIT
+# foreach p {motor1 motor2 motor3 motor4} {
+#   set port [get_ports $p]
+#   set pin  [get_property PACKAGE_PIN  $port]
+#   set std  [get_property IOSTANDARD   $port]
+#   set pull [get_property PULLTYPE     $port]
+#   set dir  [get_property DIRECTION    $port]
+# 
+#   # the OBUF actually driving this port
+#   set obuf [get_cells -quiet -of_objects [get_nets -quiet -of_objects $port]]
+#   set obuf [get_cells -quiet -filter {PRIMITIVE_TYPE =~ I/O.*.OBUF* || REF_NAME =~ OBUF*} $obuf]
+#   set obuf_name [get_property NAME     $obuf]
+#   set obuf_ref  [get_property REF_NAME $obuf]
+#   set obuf_loc  [get_property LOC      $obuf]
+#   set obuf_site [get_property SITE     $obuf]
+#   set obuf_bel  [get_property BEL      $obuf]
+# 
+#   # the cell driving the OBUF input
+#   set ipin [get_pins -quiet $obuf_name/I]
+#   set inet [get_nets -quiet -of_objects $ipin]
+#   set drv_pin [get_pins -quiet -of_objects $inet -filter {DIRECTION == OUT}]
+#   set drv  [get_cells -quiet -of_objects $drv_pin]
+#   set drv_ref [get_property REF_NAME $drv]
+#   set drv_init [get_property INIT $drv]
+#   set drv_loc  [get_property LOC  $drv]
+#   set drv_bel  [get_property BEL  $drv]
+# 
+#   puts "PAD $p:"
+#   puts "    PACKAGE_PIN = $pin   IOSTANDARD = $std   PULLTYPE = $pull   DIRECTION = $dir"
+#   puts "    OBUF        = $obuf_name  REF_NAME = $obuf_ref"
+#   puts "    OBUF LOC    = $obuf_loc   SITE = $obuf_site   BEL = $obuf_bel"
+#   puts "    DRIVER      = [get_property NAME $drv]  REF_NAME = $drv_ref  INIT = $drv_init"
+#   puts "    DRIVER LOC  = $drv_loc   BEL = $drv_bel"
+#   puts "    ROUTE       = [get_property ROUTE_STATUS $inet]"
+#   puts ""
+# }
+PAD motor1:
+    PACKAGE_PIN = E22   IOSTANDARD = LVCMOS33   PULLTYPE = PULLDOWN   DIRECTION = OUT
+    OBUF        = motor1_OBUF_inst  REF_NAME = OBUF
+    OBUF LOC    = IOB_X0Y206   SITE = IOB_X0Y206   BEL = IOB33.OUTBUF
+    DRIVER      = motor1_q_reg  REF_NAME = FDRE  INIT = 1'b0
+    DRIVER LOC  = OLOGIC_X0Y206   BEL = OLOGICE2.OUTFF
+    ROUTE       = ROUTED
+
+PAD motor2:
+    PACKAGE_PIN = B20   IOSTANDARD = LVCMOS33   PULLTYPE = PULLDOWN   DIRECTION = OUT
+    OBUF        = motor2_OBUF_inst  REF_NAME = OBUF
+    OBUF LOC    = IOB_X0Y218   SITE = IOB_X0Y218   BEL = IOB33.OUTBUF
+    DRIVER      = motor2_q_reg  REF_NAME = FDRE  INIT = 1'b0
+    DRIVER LOC  = OLOGIC_X0Y218   BEL = OLOGICE2.OUTFF
+    ROUTE       = ROUTED
+
+PAD motor3:
+    PACKAGE_PIN = R17   IOSTANDARD = LVCMOS33   PULLTYPE = PULLDOWN   DIRECTION = OUT
+    OBUF        = motor3_OBUF_inst  REF_NAME = OBUF
+    OBUF LOC    = IOB_X0Y101   SITE = IOB_X0Y101   BEL = IOB33.OUTBUF
+    DRIVER      = motor3_q_reg  REF_NAME = FDRE  INIT = 1'b0
+    DRIVER LOC  = OLOGIC_X0Y101   BEL = OLOGICE2.OUTFF
+    ROUTE       = ROUTED
+
+PAD motor4:
+    PACKAGE_PIN = F13   IOSTANDARD = LVCMOS33   PULLTYPE = PULLDOWN   DIRECTION = OUT
+    OBUF        = motor4_OBUF_inst  REF_NAME = OBUF
+    OBUF LOC    = IOB_X0Y248   SITE = IOB_X0Y248   BEL = IOB33.OUTBUF
+    DRIVER      = motor4_q_reg  REF_NAME = FDRE  INIT = 1'b0
+    DRIVER LOC  = OLOGIC_X0Y248   BEL = OLOGICE2.OUTFF
+    ROUTE       = ROUTED
+
+# puts "===== all OBUF/IOB cells in the design ====="
+===== all OBUF/IOB cells in the design =====
+# foreach c [get_cells -hierarchical -filter {PRIMITIVE_GROUP == IO}] {
+#   puts [format "  %-28s %-8s LOC=%-12s BEL=%s" \
+#         [get_property NAME $c] [get_property REF_NAME $c] \
+#         [get_property LOC $c] [get_property BEL $c]]
+# }
+  ibufds_sys_clock             IBUFDS   LOC=IOB_X1Y176   BEL=IOB33M.INBUF_EN
+  motor1_OBUF_inst             OBUF     LOC=IOB_X0Y206   BEL=IOB33.OUTBUF
+  motor2_OBUF_inst             OBUF     LOC=IOB_X0Y218   BEL=IOB33.OUTBUF
+  motor3_OBUF_inst             OBUF     LOC=IOB_X0Y101   BEL=IOB33.OUTBUF
+  motor4_OBUF_inst             OBUF     LOC=IOB_X0Y248   BEL=IOB33.OUTBUF
+# puts ""
+
+# puts "===== reset-state check: INIT of every flop in the output path ====="
+===== reset-state check: INIT of every flop in the output path =====
+# foreach c [get_cells -hierarchical -filter {REF_NAME =~ FD*}] {
+#   puts [format "  %-28s %-8s INIT=%s" [get_property NAME $c] [get_property REF_NAME $c] [get_property INIT $c]]
+# }
+  armed_reg                    FDRE     INIT=1'b0
+  motor1_q_reg                 FDRE     INIT=1'b0
+  motor2_q_reg                 FDRE     INIT=1'b0
+  motor3_q_reg                 FDRE     INIT=1'b0
+  motor4_q_reg                 FDRE     INIT=1'b0
+  pwm_cnt_reg[0]               FDRE     INIT=1'b0
+  pwm_cnt_reg[10]              FDRE     INIT=1'b0
+  pwm_cnt_reg[11]              FDRE     INIT=1'b0
+  pwm_cnt_reg[1]               FDRE     INIT=1'b0
+  pwm_cnt_reg[2]               FDRE     INIT=1'b0
+  pwm_cnt_reg[3]               FDRE     INIT=1'b0
+  pwm_cnt_reg[4]               FDRE     INIT=1'b0
+  pwm_cnt_reg[5]               FDRE     INIT=1'b0
+  pwm_cnt_reg[6]               FDRE     INIT=1'b0
+  pwm_cnt_reg[7]               FDRE     INIT=1'b0
+  pwm_cnt_reg[8]               FDRE     INIT=1'b0
+  pwm_cnt_reg[9]               FDRE     INIT=1'b0
+  startup_cnt_reg[0]           FDRE     INIT=1'b0
+  startup_cnt_reg[10]          FDRE     INIT=1'b0
+  startup_cnt_reg[11]          FDRE     INIT=1'b0
+  startup_cnt_reg[12]          FDRE     INIT=1'b0
+  startup_cnt_reg[13]          FDRE     INIT=1'b0
+  startup_cnt_reg[14]          FDRE     INIT=1'b0
+  startup_cnt_reg[15]          FDRE     INIT=1'b0
+  startup_cnt_reg[16]          FDRE     INIT=1'b0
+  startup_cnt_reg[17]          FDRE     INIT=1'b0
+  startup_cnt_reg[18]          FDRE     INIT=1'b0
+  startup_cnt_reg[19]          FDRE     INIT=1'b0
+  startup_cnt_reg[1]           FDRE     INIT=1'b0
+  startup_cnt_reg[20]          FDRE     INIT=1'b0
+  startup_cnt_reg[21]          FDRE     INIT=1'b0
+  startup_cnt_reg[22]          FDRE     INIT=1'b0
+  startup_cnt_reg[23]          FDRE     INIT=1'b0
+  startup_cnt_reg[24]          FDRE     INIT=1'b0
+  startup_cnt_reg[25]          FDRE     INIT=1'b0
+  startup_cnt_reg[2]           FDRE     INIT=1'b0
+  startup_cnt_reg[3]           FDRE     INIT=1'b0
+  startup_cnt_reg[4]           FDRE     INIT=1'b0
+  startup_cnt_reg[5]           FDRE     INIT=1'b0
+  startup_cnt_reg[6]           FDRE     INIT=1'b0
+  startup_cnt_reg[7]           FDRE     INIT=1'b0
+  startup_cnt_reg[8]           FDRE     INIT=1'b0
+  startup_cnt_reg[9]           FDRE     INIT=1'b0
+# puts ""
+
+# puts "===== port-level inversion check (should be none) ====="
+===== port-level inversion check (should be none) =====
+# puts "  IS_INVERTED on OBUF inputs:"
+  IS_INVERTED on OBUF inputs:
+# foreach p {motor1 motor2 motor3 motor4} {
+#   set obuf [get_cells -quiet -filter {REF_NAME =~ OBUF*} [get_cells -quiet -of_objects [get_nets -quiet -of_objects [get_ports $p]]]]
+#   puts "    $p -> [get_property NAME $obuf] IS_INVERTED(I) = [get_property IS_INVERTED [get_pins [get_property NAME $obuf]/I]]"
+# }
+    motor1 -> motor1_OBUF_inst IS_INVERTED(I) = 0
+    motor2 -> motor2_OBUF_inst IS_INVERTED(I) = 0
+    motor3 -> motor3_OBUF_inst IS_INVERTED(I) = 0
+    motor4 -> motor4_OBUF_inst IS_INVERTED(I) = 0
+# puts "PADTEST_VERIFY_OK"
+PADTEST_VERIFY_OK
+INFO: [Common 17-206] Exiting Vivado at Mon Sep 21 15:25:17 2026...

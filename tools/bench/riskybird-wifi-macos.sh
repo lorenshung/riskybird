@@ -52,6 +52,7 @@
 #   riskybird-wifi-macos.sh up      [--ssid S] [--iface en0] [--internet-service NAME]
 #   riskybird-wifi-macos.sh down
 #   riskybird-wifi-macos.sh verify  [--seconds N]
+#   riskybird-wifi-macos.sh dash    [--http 8080] [extra riskybird-dash.py args...]
 #
 # `up` may need sudo, but ONLY when the service order actually has to change;
 # it checks first and tells you rather than prompting from inside a loop.
@@ -65,6 +66,7 @@ DRONE_IP="192.168.4.1"
 DRONE_NET="192.168.4."
 TELEM_PORT=14550
 CMD_PORT=14551
+HTTP_PORT=8080
 LEASE_TIMEOUT=25
 REACH_TIMEOUT=15
 VERIFY_SECONDS=10
@@ -221,9 +223,21 @@ PY
 
 # Listen on :14550 and report the same figures the Linux soak reports, so the
 # two benches are comparable: rate, loss proxy, and worst inter-arrival gap.
+#
+# It ALSO classifies what arrives, which matters on this carrier and did not on
+# the ESP-native one. `flight_controller --mode telem` moves the WHOLE CONSOLE to
+# the ESP link, so most of what the bridge forwards is boot banners, sensor
+# chatter and the "  flow: ..." continuation line -- not telemetry. A datagram
+# count alone therefore says "the radio works" while saying nothing about whether
+# ROSE_TELEM is even on, which is a real and confusing failure. Three buckets:
+# telemetry lines, the ESP's own RBLINK health line, everything else.
 udp_listen() {
 	python3 - "$TELEM_PORT" "$1" <<'PY'
-import socket, statistics, sys, time
+import re, socket, statistics, sys, time
+TELEM = re.compile(r"it=-?\d+\s+dt=-?\d+ms\s+roll=")
+RBLINK = re.compile(r"RBLINK v1 ")
+n_telem = n_rblink = n_other = 0
+sample_other = ""
 port, secs = int(sys.argv[1]), float(sys.argv[2])
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -237,9 +251,18 @@ while time.time() - t0 < secs:
         continue
     now = time.time()
     n += 1
+    text = data.decode("utf-8", "replace").strip()
+    if TELEM.search(text):
+        n_telem += 1
+    elif RBLINK.search(text):
+        n_rblink += 1
+    else:
+        n_other += 1
+        if not sample_other:
+            sample_other = text[:90]
     if first is None:
         first = now
-        print(f"  first datagram from {src[0]}: {data[:80].decode('utf-8','replace').strip()}")
+        print(f"  first datagram from {src[0]}: {text[:80]}")
     if last is not None:
         gaps.append(now - last)
     last = now
@@ -259,6 +282,15 @@ if gaps:
 else:
     print(f"  {n} datagram, {rate:.1f} Hz, median gap n/a, max gap {worst:.1f} ms "
           "(need at least 2 datagrams for adaptive gap reporting)")
+tel_rate = n_telem / span if span > 0 else 0.0
+print(f"  of those: {n_telem} telemetry ({tel_rate:.1f} Hz), {n_rblink} RBLINK, "
+      f"{n_other} other console line(s)")
+if n_telem == 0:
+    print("  NO TELEMETRY LINES. The radio is fine; the flight controller is not")
+    print("  emitting them. Check ROSE_TELEM and that the mode puts the console on")
+    print("  uart1. First non-telemetry line that did arrive:")
+    print(f"    {sample_other}")
+    sys.exit(1)
 PY
 }
 
@@ -498,8 +530,29 @@ cmd_up() {
 	info ""
 	grn "UP. drone ${DRONE_IP} reachable on ${WIFI_IFACE}; internet on ${idev}."
 	info "    telemetry: $0 verify"
-	info "    panel:     python3 backends/zephyr-chipyard-sw/samples/rose_flight_controller/tools/groundstation/riskybird_panel.py --drone ${DRONE_IP}"
+	info "    dashboard: $0 dash        (tools/bench/riskybird-dash.py, stdlib only)"
 	info "    when done: $0 down"
+}
+
+# --------------------------------------------------------------------- dash --
+# The dashboard, started against this drone, with the arguments already right.
+# Separate from `verify` on purpose: verify answers "is the link carrying
+# telemetry", in ten seconds, with numbers; dash is the thing you then leave open.
+cmd_dash() {
+	local here dash ip
+	here="$(cd "$(dirname "$0")" && pwd)"
+	dash="${here}/riskybird-dash.py"
+	[ -f "$dash" ] || die "dashboard not found at ${dash}"
+
+	ip="$(iface_ipv4 "$WIFI_IFACE")"
+	case "$ip" in
+		"$DRONE_NET"*) info "on the drone network as ${ip}" ;;
+		*) ylw "NOT on the drone network (${WIFI_IFACE} is '${ip:-down}')." ;
+		   ylw "Run '$0 up' first, or use --source serial for the tethered view." ;;
+	esac
+	info "dashboard -> http://127.0.0.1:${HTTP_PORT}   (Ctrl-C to stop)"
+	exec python3 "$dash" --drone "$DRONE_IP" --telem-port "$TELEM_PORT" \
+		--cmd-port "$CMD_PORT" --http "$HTTP_PORT" "$@"
 }
 
 # -------------------------------------------------------------------- down --
@@ -598,25 +651,35 @@ cmd_verify() {
 	if udp_listen "$VERIFY_SECONDS"; then
 		grn "  downlink alive"
 	else
-		ylw "  nothing on :${TELEM_PORT}."
+		# udp_listen fails for TWO different reasons and has already printed
+		# which one: no datagrams at all, or datagrams that carry no telemetry
+		# line. Both land the same place -- the radio is not the problem -- so
+		# the advice below is the same; the wording must not claim silence when
+		# console lines were in fact arriving.
+		ylw "  no telemetry on :${TELEM_PORT} (see the classification above)."
 		ylw "  Expected when the FPGA is not transmitting: esp_bridge only forwards"
-		ylw "  what arrives on its UART. Load esp_uart or a telemetry-emitting"
-		ylw "  flight_controller build on the FPGA first. The PING above already"
-		ylw "  proves the radio, the lease and both UDP directions."
+		ylw "  what arrives on its UART. The PING above already proves the radio, the"
+		ylw "  lease and both UDP directions, so the missing piece is on the FPGA:"
+		ylw "    rb build flight_controller --target arty200t --mode telem \\"
+		ylw "      --config RocketArty200TDroneFullDDRDmaFlowConfig"
+		ylw "  See docs/wireless-telemetry-bringup.md for the ordered bring-up."
 	fi
 }
 
 # -------------------------------------------------------------------- main --
 CMD=""
+PASSTHRU=()
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		status|up|down|verify) CMD="$1"; shift ;;
+		status|up|down|verify|dash) CMD="$1"; shift ;;
 		--ssid)             [ "$#" -ge 2 ] || die "--ssid requires a value"; SSID="$2"; shift 2 ;;
 		--iface)            [ "$#" -ge 2 ] || die "--iface requires a value"; WIFI_IFACE="$2"; shift 2 ;;
 		--internet-service) [ "$#" -ge 2 ] || die "--internet-service requires a value"; INTERNET_SERVICE="$2"; shift 2 ;;
 		--seconds)          [ "$#" -ge 2 ] || die "--seconds requires a value"; VERIFY_SECONDS="$2"; shift 2 ;;
+		--http)             [ "$#" -ge 2 ] || die "--http requires a value"; HTTP_PORT="$2"; shift 2 ;;
+		--)                 shift; PASSTHRU=("$@"); break ;;
 		-h|--help) sed -n '2,/^set -u$/p' "$0" | sed '/^set -u$/d; s/^# \{0,1\}//'; exit 0 ;;
-		*) die "unknown argument: $1" ;;
+		*) die "unknown argument: $1 (arguments for riskybird-dash.py go after --)" ;;
 	esac
 done
 [ -z "$CMD" ] && { sed -n '/^# usage:/,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
@@ -626,4 +689,5 @@ case "$CMD" in
 	up)     cmd_up ;;
 	down)   cmd_down ;;
 	verify) cmd_verify ;;
+	dash)   cmd_dash ${PASSTHRU[@]+"${PASSTHRU[@]}"} ;;
 esac
