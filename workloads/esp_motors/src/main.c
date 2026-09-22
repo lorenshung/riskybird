@@ -85,15 +85,34 @@
  *     Bluetooth adapters, never by WiFi. esp_timer is priority 3, also
  *     preemptive. The system workqueue defaults to -1. All of those are
  *     outranked by K_PRIO_COOP(0) = -16.
- *   - The one that is NOT outranked: the networking traffic-class RX/TX
- *     threads. CONFIG_NET_TC_THREAD_TYPE has no explicit default, so
- *     NET_TC_THREAD_COOPERATIVE wins, and net_tc.c creates them at
- *     K_PRIO_COOP(base) with base 0 -- the same -16 as this thread. Equal
- *     cooperative priority means neither preempts the other, but whichever is
- *     running holds the CPU until it blocks, so a long RX burst CAN delay the
- *     failsafe. Merging esp_bridge's radio into this image therefore needs
- *     CONFIG_NET_TC_THREAD_PRIO_CUSTOM with NET_TC_RX/TX_THREAD_BASE_PRIO
- *     pushed down, or this thread is no longer the most urgent thing running.
+ *   - The networking traffic-class threads. AN EARLIER VERSION OF THIS COMMENT
+ *     GOT THIS WRONG IN BOTH DIRECTIONS AND ITS ADVICE WOULD HAVE MADE THINGS
+ *     WORSE, so here is what the tree actually says.
+ *
+ *     Default is NET_TC_THREAD_COOPERATIVE, and net_tc.c takes
+ *     BASE_PRIO_RX = CONFIG_NET_TC_NUM_PRIORITIES - 1, which Kconfig defaults
+ *     to NUM_COOP_PRIORITIES when cooperative. So the RX thread is
+ *     K_PRIO_COOP(NUM_COOP_PRIORITIES - 1) = **-1**, not -16: it is the LOWEST
+ *     cooperative priority, not the highest, and this thread already outranks
+ *     it. CONFIG_NET_TC_TX_COUNT defaults to 0, so there is no TX thread at all.
+ *
+ *     The old advice -- turn on CONFIG_NET_TC_THREAD_PRIO_CUSTOM -- would have
+ *     CREATED the collision it was meant to prevent: NET_TC_RX_THREAD_BASE_PRIO
+ *     defaults to 0, so switching PRIO_CUSTOM on without also setting the bases
+ *     moves the RX thread from -1 to K_PRIO_COOP(0) = -16, level with this one.
+ *
+ *     It would also not have helped even if the priorities HAD collided,
+ *     because relative priority among cooperative threads does not govern
+ *     preemption at all: a cooperative thread is never preempted by another
+ *     thread, whatever its priority (see should_preempt() in kthread.h). What
+ *     matters is only that a coop thread holds the CPU until it blocks. The fix
+ *     that actually works is to stop them being cooperative:
+ *
+ *         CONFIG_NET_TC_THREAD_PREEMPTIVE=y
+ *         CONFIG_SYSTEM_WORKQUEUE_PRIORITY=1
+ *
+ *     None of this applies to THIS image, which has no networking. It matters
+ *     only if the radio is ever merged into the motor receiver.
  *   - ISRs preempt everything, and the WiFi MAC does a lot of work in interrupt
  *     context. That is the realistic source of jitter here, not scheduling.
  *

@@ -160,6 +160,15 @@ raising limits in a hurry.
   not a broken source tree — check for another `west build` before believing a build failure.
   [BUILT: hit twice on this machine and cleared by retrying once the other build finished.]
 - **Motors need the battery.** Nothing useful happens on USB-C alone.
+- **There is NO remote kill in this build.** Every `rose_cmd_*` hook in `main.cpp` — `estop`,
+  `disarm`, `reset` — is inside `#if defined(CONFIG_WIFI)` [CODE, lines 2599–2636], and
+  `--mode esp-motors` does not enable `CONFIG_WIFI`, so none of them is compiled in. A
+  ground-station ESTOP/DISARM button does nothing on this carrier; a dashboard that appears to ACK
+  is the bridge fabricating the ACK itself. **Do not plan around a remote stop you do not have.**
+  See 6.3.
+- **Console telemetry costs control-loop time, and that time lands on the motor link.** The FPGA
+  console is a polled 115200 FTDI link (`CONFIG_UART_INTERRUPT_DRIVEN` is off), so every byte
+  `printk` writes busy-waits *inside the control loop*. See 4.3a before turning telemetry up.
 
 ---
 
@@ -443,6 +452,54 @@ At step 2, note what `\|a\|` does with props spinning, and watch `accskip=`. [BE
 accelerometer tilt test — see 6.1 for what that does and does not mean. **It is information, and
 it is the measurement this project is missing**, not by itself an abort. Write the number down.
 
+### 4.3a Telemetry rate — check it before you raise it
+
+The console telemetry line is the thing you will be reading for the whole attempt, so it is worth
+knowing what it costs and what it does *not* cost.
+
+**What it does not cost: the motor link's bandwidth.** In `--mode esp-motors` the console stays on
+**uart0** and the binary duty frames go out on **uart1**. Only `--mode telem` moves the console
+onto uart1 [CODE: `flight_controller-telem.overlay` is the only overlay that sets
+`zephyr,console = &uart1`]. The two do not share a wire in this mode, and anything that tells you
+they do is describing `--mode telem`.
+
+**What it does cost: control-loop time, which is the same thing in the end.** `printk` on this
+carrier busy-waits, so a telemetry iteration stalls the loop for as long as the write takes, and
+`send_control()` — and therefore the next motor frame — waits behind it. At 115200, the
+`it=`/`flow:` pair is roughly **290 bytes ≈ 25 ms of busy-wait** on the iteration that prints it.
+
+**The number that matters is the worst-case gap between motor frames, against the ESP's 120 ms
+failsafe.** It is `loop period + polled-write time`, so:
+
+```
+worst gap ≈ dt + 25 ms        (on the iteration that prints)
+```
+
+Read `dt=` off the telemetry line itself. On this build it has been **28–29 ms**, so the worst gap
+is ≈ **55 ms against a 120 ms failsafe** — about 2× margin. That is adequate, and it is the
+configuration the rest of this document assumes.
+
+**The rate is `dt × ROSE_TELEM_DIV`, and `--mode esp-motors` sets neither knob**, so it inherits
+`ROSE_TELEM=1`, `ROSE_TELEM_DIV=10` from the CMake defaults. At `dt = 29 ms` that is one line every
+~290 ms (~3.4 Hz), which is exactly what you want to watch by eye.
+
+**Where this bites:** `DIV` is an *iteration* count, not a time. If the loop ever gets faster —
+a build without the down-ToF or without flow, for example — `DIV=10` is 77 Hz and ~22 kB/s of
+busy-wait against a link that carries 11.5 kB/s, and the loop simply stops being a control loop.
+So:
+
+- **Check `dt=` on the console before trusting any `DIV`.** If `dt` is a few milliseconds rather
+  than a few tens, raise `DIV` to keep the line rate near 3–5 Hz (`DIV ≈ 0.25 s / dt`).
+- **Never raise the telemetry rate for a flight attempt.** More lines is strictly less margin
+  against the failsafe, and the failure it produces — spurious `cuts=` on the ESP — looks like a
+  link fault or a flaky receiver rather than like a console you turned up.
+- If you want more data, turn telemetry *off* (`-DROSE_TELEM=0`) and use the flight log, which is
+  a background thread into RAM and costs the loop nothing. You lose the live view that Part 5 is
+  built around, so this is a trade, not an upgrade.
+- **Keep `rb console` attached.** An *undrained* polled console fills the TX FIFO and
+  `poll_out` spins on it — measured 30–60 ms stalls, ~22 % of a flight, which also corrupts the
+  estimator's `dt`. The console being attached is not just for you to read.
+
 ### 4.4 The uncommitted run — 5 seconds, free
 
 Load and `continue`. The controller commands thrust immediately (it regulates to `TARGET_Z` and
@@ -502,9 +559,12 @@ ESP console, every 250 ms:
 
 ```
 MOTOR CMD duty per mille: M1=735 M2=742 M3=731 M4=739
-  link=UP seq=87 flags=0x21[ARMED COMMITTED ] frames=2140 gap=29ms lost=0 stale=0 crcerr=0 noise=0 cuts=0 pwmerr=0
+  ceil=80% link=UP seq=87 flags=0x21[ARMED COMMITTED ] frames=2140 gap=29ms lost=0 stale=0 crcerr=0 noise=0 cuts=0 pwmerr=0
 ```
 
+`ceil=80%` is the ESP's own ceiling, repeated on every status line so it is visible for the whole
+run and not only in a boot banner that has scrolled away. `gap=29ms` is the **measured** interval
+between motor frames — this is the number to watch against the 120 ms failsafe (4.3a).
 `flags=0x21` is `ARMED | COMMIT`. All four duties within a few per mille of each other while
 level; they should *split* fore/aft on a pitch disturbance and left/right on a roll one — that is
 the attitude differential and it is the thing you are actually testing.
@@ -512,7 +572,12 @@ the attitude differential and it is the thing you are actually testing.
 ### 5.2 Abort — pull the battery
 
 - Any of `lost`, `stale`, `crcerr`, `noise`, `pwmerr` leaving 0.
-- `gap` above ~60 ms, or `cuts` incrementing while you did not ask for it.
+- `gap` above ~60 ms, or `cuts` incrementing while you did not ask for it. (Expected worst case is
+  ~54 ms on a telemetry iteration — see 4.3a. Sustained values above that mean the control loop is
+  being stalled by something, and the 120 ms failsafe is closer than it looks.)
+- `accskip=` climbing fast enough to track the iteration count — the accelerometer tilt test is
+  then effectively off and only `est-tilt` is guarding attitude (6.1). Not an instant abort;
+  a reason to come down and write the number down.
 - `flags` not `0x21` while you expect thrust.
 - One motor's duty per mille persistently unlike the other three (a gate not being driven).
 - `tilt=` reading something your eyes disagree with.
@@ -797,6 +862,30 @@ Ordered **fastest and least setup first**. This is the order to use them in.
 | 4 | **Stop the frame stream** — unplug the uart1 ribbon, reset the FPGA, or halt the core | ≤ 125 ms (120 ms failsafe + 5 ms tick) | None for the ribbon/reset | Pull the ribbon or hit reset | ESP: `link=DOWN -- MOTORS OFF (failsafe)` and `cuts=` increments [BENCH: `cuts=1`] |
 | 5 | **`estop.gdb`** | One control tick (~30 ms) **once attached** | **Debugger attached** | Run the script | `=== ESTOP LATCHED ===`, then `flags=0x02[ESTOP ]` on the ESP |
 | 6 | **`stop.gdb`** | ~30 ms + 300 ms + halt | **Debugger attached** | Run the script | estop frame, then core halted, then `cuts=1` on the ESP |
+| — | **Ground-station / dashboard ESTOP** | — | — | — | **DOES NOT EXIST IN THIS BUILD. Do not count on it.** See below. |
+
+**THE REMOTE KILL DOES NOT EXIST, and it is the exact class of thing this audit is for: a control
+that appears to work and does nothing.** Every `rose_cmd_*` entry point — `rose_cmd_estop`,
+`rose_cmd_disarm`, `rose_cmd_reset` — is compiled only under `CONFIG_WIFI` [CODE]:
+
+```c
+#if defined(CONFIG_WIFI)
+...
+extern "C" void rose_cmd_estop(void) { g_estop = true; }   /* latched remote kill */
+...
+#endif /* CONFIG_WIFI */
+```
+
+`--mode esp-motors` does not enable `CONFIG_WIFI`, and `telem_wifi.c` is not in this checkout at
+all, so none of those symbols is in the image. A dashboard that sends `ESTOP`, `DISARM`, `HOVER_Z`
+or `PING` and shows an acknowledgement is being acknowledged **by the bridge, which fabricates the
+ACK itself** — nothing reaches the flight controller. `hardware/flight/arm-enable.gdb` already
+records the same fact from the other direction: with WiFi off, `--gc-sections` drops
+`rose_cmd_reset` and `nm` cannot find it, which is why that script writes `g_arm_enabled` directly.
+
+A merged `esp_bridge --mode motors` image implements a real ESP-side kill, but **it has never been
+flashed** and is not what you are running. Treat a remote stop as not existing until you have
+watched one cut a motor.
 
 **Latency reasoning.** #2: `SAFE_DEBOUNCE_MS` 120 ms (40 ms for free-fall/impact) plus one control
 tick to transmit — and the transmit is *not* delayed by the 50 Hz rate limiter, because a flags
@@ -837,6 +926,13 @@ physical, both are instant, and both are why your hand belongs on the connector.
 - **Whether pulling the battery leaves the logic alive.** Depends on how the board is powered on
   the day.
 - **The new boot banner lines** are in the ELF [BUILT] but have never been seen on a console.
+- **The worst-case frame gap under telemetry.** 54 ms is computed (29 ms measured loop + 25.3 ms of
+  polled write for a 292-byte telemetry pair at 115200), not observed. The ESP prints the real
+  interval as `gap=`; **read it and compare.** If `gap` ever approaches 120 ms, telemetry is
+  costing more than this arithmetic says.
+- **The ESP's collective ceiling.** The change from a per-motor clamp to a collective cut compiles
+  and its arithmetic was checked on the host, but no duty above the ceiling has been commanded on
+  real hardware, so the cut has never actually fired on the ESP.
 
 ---
 
@@ -845,11 +941,12 @@ physical, both are instant, and both are why your hand belongs on the connector.
 | File | Change |
 |---|---|
 | `backends/zephyr-chipyard-sw/samples/rose_flight_controller/src/main.cpp` | `#error` refusing `ROSE_THREADED=1` on a real target (the threaded blocks never call `safety_violation()`); boot banner now states whether `g_armed` is compile-time true, names the accel-tilt suspension band and what it does *not* affect, warns when `AUTOFLIGHT_MAX_DUTY` is below the measured hover duty, and prints this side's duty ceiling plus a pointer to the ESP's; corrected the `MOTOR_MAX_DUTY` comment (it is a scale, not a clamp) and the `MOTOR_BREAKAWAY_DUTY` comment (no ESCs exist — brushed motors on low-side SI2302 FETs, the hazard is thermal; and 0.15 is an FPGA-path number); corrected the `AUTOFLIGHT_MAX_DUTY` "hover~0.15" comment. |
-| ... `src/main.cpp` (2) | Added `MOTOR_DUTY_CEILING` — the bench path's anti-saturation ceiling, previously a hard-coded `1.0f`, so there is a duty **cap** that is not the `MOTOR_MAX_DUTY` **scale**. Default `1.0f`, so every existing build is bit-identical. Added a `DUTY CHAIN` boot banner printing the ceiling, the scale and the resulting worst-case duty, plus a loud `NO MEANINGFUL POWER CAP` line when the worst case exceeds 0.85. Added `g_guard_acc_skips`, printed as `accskip=`. `static_assert`s on both duty knobs. |
-| ... `CMakeLists.txt` | Declared `MOTOR_DUTY_CEILING` as a cache variable and wired it into `target_compile_definitions`, so `RB_CMAKE_ARGS` reaches it. Corrected the `MOTOR_BREAKAWAY_DUTY` comment (no ESCs; the hazard is thermal). |
+| ...the same `main.cpp`, power | Added `MOTOR_DUTY_CEILING` — the bench path's anti-saturation ceiling, previously a hard-coded `1.0f`, so there is a duty **cap** that is not the `MOTOR_MAX_DUTY` **scale**. Default `1.0f`, so every existing build is bit-identical. Added a `DUTY CHAIN` boot banner printing the ceiling, the scale and the resulting worst-case duty, plus a loud `NO MEANINGFUL POWER CAP` line when the worst case exceeds 0.85. Added `g_guard_acc_skips`, printed as `accskip=`. `static_assert`s on both duty knobs. |
+| `...rose_flight_controller/CMakeLists.txt` | Declared `MOTOR_DUTY_CEILING` as a cache variable and wired it into `target_compile_definitions`, so `RB_CMAKE_ARGS` reaches it. Corrected the `MOTOR_BREAKAWAY_DUTY` comment (no ESCs; the hazard is thermal). |
 | `workloads/esp_motors/src/main.c` | The independent duty ceiling is now a **collective**, differential-preserving cut instead of a per-motor clamp — a clamp flattened four commands into four equal numbers (zero attitude torque) exactly when the vehicle was asking for the most thrust. Final per-motor clamp kept as a by-inspection invariant. `BUILD_ASSERT` on the percentage. Status line now carries `ceil=NN%`. |
 | `workloads/esp_motors/CMakeLists.txt` | Declared `ESP_MOTORS_MAX_DUTY_PCT` and `ESP_MOTORS_TIMEOUT_MS` as cache variables and wired them into `target_compile_definitions`, because `RB_EXTRA_CFLAGS` is silently dropped for `esp32c6` targets and the ceiling could not otherwise be raised. |
 | `hardware/flight/guard-check.gdb` | Prints `g_guard_acc_skips` and explains what a rising count means. |
+| ...the same `esp_motors/src/main.c`, docs | Corrected the networking thread-priority note in the header. It claimed the net traffic-class threads run at `K_PRIO_COOP(0)` = −16 and recommended `CONFIG_NET_TC_THREAD_PRIO_CUSTOM`. Verified in-tree: with the default cooperative type `BASE_PRIO_RX = NET_TC_NUM_PRIORITIES − 1`, which Kconfig defaults to `NUM_COOP_PRIORITIES`, so the RX thread is **−1** (the lowest coop priority, already outranked), and `NET_TC_TX_COUNT` defaults to 0 so there is no TX thread. Turning `PRIO_CUSTOM` on without setting the bases defaults them to 0 and **creates** the −16 collision it was meant to prevent. Relative coop priority does not govern preemption anyway; the fix that works is `CONFIG_NET_TC_THREAD_PREEMPTIVE=y` + `CONFIG_SYSTEM_WORKQUEUE_PRIORITY=1`. Moot for this image, which has no networking. |
 | `docs/tethered-flight-attempt.md` | This document. |
 
 A note on one change that was made and then reversed during this audit, recorded so it is not

@@ -79,6 +79,16 @@ relax them to make something work:
          workloads/motor_duty is a standalone image with no commit gate. Do not
          assume "motors always latch off after 5 s" across every workload.
 
+     (d) IF YOU ENABLE TELEMETRY, PASS ROSE_TELEM_DIV=80 OR HIGHER. The binary
+         motor frames and the ASCII telemetry line share uart1 at 115200
+         (11520 B/s). With ROSE_FLOW=1 a telemetry iteration is 286 B / 24.8 ms.
+         `--mode esp-motors` sets no telemetry knobs, so it inherits DIV=10
+         ~= 77 Hz ~= 22 kB/s -- nearly TWICE the wire. The console write is
+         POLLED and busy-waits, so a saturated wire directly delays motor
+         frames: worst-case gap is about 80 ms against the 120 ms ESP failsafe.
+         Push the rate up and you can cause spurious failsafe cuts mid-flight,
+         which look like a flaky link rather than what they are.
+
   3. EMERGENCY STOPS ARE ALWAYS AVAILABLE. Fastest first: pull the battery
      (instant); stop sending frames, which makes the ESP cut all four in 120 ms
      (measured); halt the Rocket core, same effect; then the gdb stop scripts.
@@ -137,6 +147,13 @@ expected, not as a new mystery:
     weight -- say so rather than working around it.
   - PID + EKF + flow together have never been run on hardware in this mode.
   - hover duty and break-away duty through the ESP path are unmeasured.
+  - THE GROUND-STATION / DASHBOARD ESTOP BUTTON DOES NOTHING in the current
+    build. Every rose_cmd_* hook in main.cpp is inside `#if defined(CONFIG_WIFI)`
+    and telem_wifi.c is not in this checkout, so the bridge fabricates the "ACK"
+    itself. DISARM / HOVER_Z / PING are inert. You do NOT have a remote kill.
+    Do not let anyone believe otherwise. (A merged esp_bridge --mode motors
+    image implements a real ESP-side kill, but it has never been flashed, so
+    meter the gates the first time it is used.)
   - the camera returns no colour. Three investigations agree no Bayer mosaic
     arrives; where the defect physically originates is CONTESTED and unresolved.
     A software repair ships in `hardware/ospi/frame-to-png.py`. The owner
