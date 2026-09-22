@@ -79,15 +79,17 @@ relax them to make something work:
          workloads/motor_duty is a standalone image with no commit gate. Do not
          assume "motors always latch off after 5 s" across every workload.
 
-     (d) IF YOU ENABLE TELEMETRY, PASS ROSE_TELEM_DIV=80 OR HIGHER. The binary
-         motor frames and the ASCII telemetry line share uart1 at 115200
-         (11520 B/s). With ROSE_FLOW=1 a telemetry iteration is 286 B / 24.8 ms.
-         `--mode esp-motors` sets no telemetry knobs, so it inherits DIV=10
-         ~= 77 Hz ~= 22 kB/s -- nearly TWICE the wire. The console write is
-         POLLED and busy-waits, so a saturated wire directly delays motor
-         frames: worst-case gap is about 80 ms against the 120 ms ESP failsafe.
-         Push the rate up and you can cause spurious failsafe cuts mid-flight,
-         which look like a flaky link rather than what they are.
+     (d) LEAVE ROSE_TELEM_DIV AT ITS DEFAULT OF 10. The binary motor frames
+         and the ASCII telemetry line share uart1 at 115200. The rule is
+         DIV ~= 0.25 s / dt, and the measured loop is dt ~= 29 ms, so 10 is
+         already right (~3.4 lines/s). DIV=80 would give one line every 2.3 s
+         AND would not help: printk here is POLLED and busy-waits inside the
+         control loop, so a divisor makes the long gap RARER, not SHORTER --
+         and the ESP failsafe fires on the WORST gap, not the average. What
+         actually fixes it is already in the build: a duty-frame keepalive
+         either side of the telemetry write, taking the worst gap from ~89 ms
+         to ~39 ms against the 120 ms failsafe. Watch the ESP's own `gap=`
+         field; it should read tens of ms, never ~90.
 
   3. EMERGENCY STOPS ARE ALWAYS AVAILABLE. Fastest first: pull the battery
      (instant); stop sending frames, which makes the ESP cut all four in 120 ms
