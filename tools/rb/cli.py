@@ -44,6 +44,7 @@ from .boards import (
     BOARDS,
     CHIPYARD,
     FP16_SCALAR_FPU_CONFIGS,
+    INT_NOPERMUTE_VECTOR_CONFIGS,
     FPGA_ZEPHYR_BOARD,
     MODELBLASTER,
     ROOT,
@@ -823,26 +824,26 @@ def generated_fpu_conf(board: Board) -> Path | None:
     for any FPU at all.
 
     Turning CONFIG_FPU off is what makes the ISA gcc targets match the ISA the
-    shell implements. The vector unit is unaffected: RISCV_ISA_EXT_V is a
-    separate symbol and Zephyr initialises mstatus.VS in its own right
-    (arch/riscv/core/thread.c), so Saturn stays reachable on a no-FPU image.
+    shell implements.
+
+    THIS FRAGMENT MUST NOT ALSO SET CONFIG_RISCV_ISA_EXT_V. It used to, so that
+    Saturn would be "reachable", and that silently undid the line above:
+    Zephyr appends a bare "v" to the global -march for RISCV_ISA_EXT_V, and GCC
+    expands "v" to zve64d, which implies "d" and "f". The image was built
+    -march=rv64imacv_zicsr_zifencei -mabi=lp64, i.e. soft-float CALLING
+    CONVENTION with hardware float ARITHMETIC: the DroNet gemmini_q31_softfp
+    image for RocketArty200TDroneGemminiSaturnFp16At35Config carried 80
+    fadd/fcvt/flw/fsw in main() and three kernels, every one of which traps on a
+    shell with misa.F = 0. A workload that wants the vector unit asks for it
+    itself, as the ModelBlaster harness's gemmini_q31_rvv_softfp overlay does:
+    CONFIG_RISCV_ISA_EXT_V=y together with CONFIG_RISCV_V_KERNEL_ONLY=y, which
+    keeps "v" out of the global -march, while kernels.c gets
+    -march=rv64imac_zve64x -- integer vector, nothing floating-point implied.
 
     Float still works, in software. picolibc's soft-float is what the harness's
     %g output and any fp32 left in a model go through, which costs cycles and
     changes no answers.
     """
-    # Read the shell's own ISA string. Same source as dts_timebase_hz, and for
-    # the same reason: what the shell elaborated is a property of the build, not
-    # something to infer from a config name.
-    vector = False
-    dts = board.generated_dts
-    if dts.is_file():
-        tree = fingerprint.parse_dts(dts.read_text())
-        for node in tree.find("cpu@"):
-            isa = node.string("riscv,isa")
-            if isa and fingerprint.parse_isa(isa).has_vector:
-                vector = True
-                break
     if board.config not in FP16_SCALAR_FPU_CONFIGS:
         return None
     path = GENERATED_CONF_DIR / f"{board.name}.{board.config}.fpu.conf"
@@ -856,17 +857,11 @@ def generated_fpu_conf(board: Board) -> Path | None:
         "# execute. Off, the compiler targets the ISA that actually exists and\n"
         "# float goes through picolibc's soft-float instead.\n"
         "#\n"
-        "# The vector unit is a separate symbol and is NOT disabled by this.\n"
+        "# Deliberately NOT CONFIG_RISCV_ISA_EXT_V=y: Zephyr turns it into a\n"
+        "# global \"v\" in -march, which GCC expands to imply f and d -- hardware\n"
+        "# float again. Workloads that use the vector unit enable it themselves\n"
+        "# with CONFIG_RISCV_V_KERNEL_ONLY=y (see tools/rb/cli.py).\n"
         "CONFIG_FPU=n\n"
-        + (
-            "\n# This shell elaborated a vector unit (the devicetree's riscv,isa\n"
-            "# carries v/zve/zvl), so ask Zephyr for it explicitly. Without this\n"
-            "# the compiler never emits a vector instruction and Saturn sits\n"
-            "# idle while everything runs scalar -- which looks like a slow\n"
-            "# model rather than an unused accelerator.\n"
-            "CONFIG_RISCV_ISA_EXT_V=y\n"
-            if vector else ""
-        )
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.is_file() or path.read_text() != body:
@@ -1307,8 +1302,87 @@ def zephyr_build(
     elf = zephyr_elf(target, workload, mode, ram_console)
     if not elf.is_file():
         raise RbError(f"west completed but ELF was not found: {elf}")
+    if board is not None and (
+        board.config in FP16_SCALAR_FPU_CONFIGS
+        or board.config in INT_NOPERMUTE_VECTOR_CONFIGS
+    ):
+        _check_isa_contract(board, elf)
     print(elf)
     return elf
+
+
+def _check_isa_contract(board: Board, elf: Path) -> None:
+    """Refuse an image containing instructions this shell decodes as illegal.
+
+    FP16 shells (FP16_SCALAR_FPU_CONFIGS): no scalar F/D/Q/Zfh opcode at all.
+    CONFIG_FPU=n is necessary and not sufficient. Anything that puts "f" or "d"
+    back into a translation unit's -march -- a global "v" (GCC expands it to
+    zve64d, which implies d and f), a per-file -march from a kernel flag table,
+    a prebuilt object -- produces hardware float that links cleanly and traps on
+    the first execution, because Zephyr leaves mstatus.FS off on a no-FPU image
+    and the shell's misa has neither F nor D.
+
+    Integer no-permute shells (INT_NOPERMUTE_VECTOR_CONFIGS): no vector FP and
+    no vslide*/vfslide*/vrgather*/vcompress/vmv<n>r.v. The last is the one that
+    bites: GCC emits vmv4r.v for an ordinary register copy, and DroNet's RVV
+    linear_s8 kernel carried one on its main path.
+
+    The only evidence that settles either is the binary, so read the binary.
+    """
+    fp16 = board.config in FP16_SCALAR_FPU_CONFIGS
+    noperm = board.config in INT_NOPERMUTE_VECTOR_CONFIGS
+    objdump = ZEPHYR_GNU_BIN / "riscv64-zephyr-elf-objdump"
+    if not objdump.is_file():
+        print(f"rb: WARNING cannot check {elf.name} against {board.config}: {objdump} missing")
+        return
+    listing = subprocess.run(
+        [str(objdump), "-d", "--no-show-raw-insn", str(elf)],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    permute = ("vslide", "vfslide", "vrgather", "vcompress",
+               "vmv1r", "vmv2r", "vmv4r", "vmv8r")
+    offences: dict[str, dict[str, int]] = {}
+    function = "?"
+    for line in listing.splitlines():
+        header = re.match(r"^[0-9a-f]+ <(.+)>:$", line)
+        if header:
+            function = header.group(1)
+            continue
+        fields = line.split("\t")
+        if len(fields) < 2 or not fields[0].strip().endswith(":"):
+            continue
+        mnemonic = fields[1].split()[0] if fields[1].split() else ""
+        kind = None
+        if fp16 and mnemonic.startswith(("f", "c.f")) and not mnemonic.startswith("fence"):
+            kind = "scalar floating point"
+        elif noperm and mnemonic.startswith("vf"):
+            kind = "vector floating point"
+        elif noperm and mnemonic.startswith(permute):
+            kind = "vector permute / whole-register move"
+        if kind:
+            per = offences.setdefault(kind, {})
+            key = f"{function}: {mnemonic}"
+            per[key] = per.get(key, 0) + 1
+    if offences:
+        lines = []
+        for kind, per in offences.items():
+            lines.append(f"{sum(per.values())} {kind}:")
+            for key, count in sorted(per.items(), key=lambda kv: -kv[1])[:12]:
+                lines.append(f"  {count:5d}  {key}")
+        raise RbError(
+            f"{elf} contains instructions {board.config} decodes as ILLEGAL"
+            + (" (FP16-only FPU, mstatus.FS off on a CONFIG_FPU=n image)" if fp16 else "")
+            + (" (Saturn intOnlyParams + noPermute)" if noperm else "")
+            + ":\n" + "\n".join(lines) + "\n"
+            "Find what put them there (compile_commands.json): a global \"v\" from "
+            "CONFIG_RISCV_ISA_EXT_V without CONFIG_RISCV_V_KERNEL_ONLY, a kernel "
+            "flag table naming v/f/d (use zve64x for integer vector), or a "
+            "kernel whose codegen needs a permute -- drop that kernel for this "
+            "shell rather than hoping the path is never taken."
+        )
+    print(f"rb: {elf.name}: no instructions {board.config} decodes as illegal "
+          f"({'scalar FP' if fp16 else ''}{' / ' if fp16 and noperm else ''}"
+          f"{'vector FP, permutes, vmv<n>r' if noperm else ''} checked)")
 
 
 def cmd_zephyr(args: argparse.Namespace) -> int:

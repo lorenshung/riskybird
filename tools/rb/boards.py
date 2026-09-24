@@ -46,6 +46,18 @@ FP16_SCALAR_FPU_CONFIGS = frozenset({
     "RocketArty200TDroneGemminiSaturnFp16Config",
     "RocketArty200TDroneGemminiSaturnFp16At35Config",
 })
+# Shells whose Saturn is VectorParams.intOnlyParams.copy(noPermute = true):
+# integer-only vector (zve64x -- no vector FP) with the PermuteUnit removed, so
+# vslide*/vfslide*/vrgather*/vcompress and the whole-register moves vmv<n>r.v are
+# not in Saturn's supported_ex_insns and decode as illegal instructions. GCC
+# emits vmv<n>r.v on its own for register copies, so a kernel written without a
+# single permute intrinsic can still contain one. rb scans every image built for
+# these shells. Keep in sync with AccelConfigs.scala.
+INT_NOPERMUTE_VECTOR_CONFIGS = frozenset({
+    "RocketArty200TDroneGemminiSaturnIntConfig",
+    "RocketArty200TDroneGemminiSaturnIntAt40Config",
+    "RocketArty200TDroneGemminiSaturnIntAt35Config",
+})
 CHIPYARD = ROOT / "backends" / "chipyard"
 ZEPHYR_BACKEND = ROOT / "backends" / "zephyr-chipyard-sw"
 # The PyTorch -> quantized -> Zephyr/RISC-V compilation pipeline behind
