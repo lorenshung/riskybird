@@ -171,6 +171,27 @@ def _engine_from_text(text: str) -> str | None:
     return None
 
 
+def _engine_from_source(path: str) -> str | None:
+    """The engine a curated kernel file actually drives, read from its C.
+
+    Needed because the backend DIRECTORY names the target, not the engine: on
+    gemmini_q31_rvv every curated file lives under kernels/gemmini_q31_rvv/, so
+    the name table called DroNet's scalar integer add_s8 "direct" and its RVV
+    batchnorm "Gemmini", and a per-op Gantt from the combined shell painted
+    the whole frame one colour. Gemmini is reached through its RoCC macros,
+    Saturn through RVV intrinsics; a file with neither is scalar.
+    """
+    try:
+        text = Path(path).read_text(errors="replace")
+    except OSError:
+        return None
+    if re.search(r"\b(tiled_conv\w*|tiled_matmul\w*|tiled_resadd\w*|gemmini_\w+\s*\(|ROCC_INSTRUCTION\w*)", text):
+        return "gemmini"
+    if "__riscv_v" in text or "riscv_vector.h" in text:
+        return "vector"
+    return "scalar"
+
+
 def load_kernel_picks(gen_dir: Path | None) -> dict[str, str]:
     """Map op name -> engine, from ModelBlaster's own kernel_picks.json.
 
@@ -192,6 +213,12 @@ def load_kernel_picks(gen_dir: Path | None) -> dict[str, str]:
     out: dict[str, str] = {}
     for op, pick in picks.items():
         if not isinstance(pick, dict):
+            continue
+        # The kernel's own source is the best evidence when it is still on
+        # disk; the names are the fallback.
+        path = pick.get("path")
+        if isinstance(path, str) and (engine := _engine_from_source(path)):
+            out[op] = engine
             continue
         # algorithm and path both name the implementation; either identifies
         # the engine, and a curated kernel may carry only one of them.
