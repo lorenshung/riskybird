@@ -1,6 +1,14 @@
 # Is the fitted HM01B0 mono or colour? An adversarial re-analysis
 
-**Verdict: the fitted sensor is MONOCHROME. Confidence: high (~95%) from data alone.**
+> **READ PART III FIRST (end of file, 2026-09-22 evening).** The verdict line
+> immediately below is PART I and is superseded in its reasoning, though not in
+> its direction. Part II broke its central argument; Part III settles the phase
+> puzzle, moves the fault out of the capture core for good, and restates what the
+> pixels support. Where Part I argues "the deficit slides with brightness,
+> therefore not a dye", that argument is **invalid** — see II.1 and III.4 — and
+> must not be reused.
+
+**PART I verdict: the fitted sensor is MONOCHROME. Confidence: high (~95%) from data alone.**
 There is no colour mosaic in any captured frame. The faint tint the renderer produces is
 a capture-path defect that corrupts exactly one of the four 2x2 pixel phases, and that
 same defect is present — at the same phase, with the same transfer function — in a frame
@@ -499,3 +507,632 @@ illumination in which the spread of the three undamaged phases exceeds 5%, or in
 red/blue illuminant-swap differential `|D|` exceeds 0.30. Nothing short of that should
 move anyone off "mono" — and a 30-second look at the module's part number would settle it
 faster than any capture.
+
+---
+
+# PART II — 2026-09-22: the central argument does not hold, and the case reopens
+
+**Summary: Part I's verdict is NOT safe. Its strongest argument — section 4(a),
+"a dye's ratio cannot fall as the DN rises" — is arithmetically wrong, because
+raw DN carries a ~38 DN black pedestal that a dye cannot attenuate. Once the
+pedestal is accounted for, the suspect phase's behaviour is EXACTLY a colour
+filter's. Two of Part I's arguments do survive, so the answer is not "colour"
+either. It is genuinely undecided, and two cheap bench runs decide it.**
+
+Two new negative results are also recorded below, and one real software bug in
+the renderer is fixed.
+
+---
+
+## II.1 The affine fit cannot tell a defect from a dye. They are the same equation.
+
+Part I fits the suspect phase as `low = alpha*true + beta` and reads it as
+"the capture path averages this phase with a held black-level register".
+
+A colour filter that transmits a fraction `t` of the light gives, on a sensor
+whose black pedestal is `K`:
+
+    low = K + t*(E - K) = t*E + K*(1 - t)
+
+which is the **same affine map**, with `alpha = t` and `beta = K*(1 - t)`. The
+pedestal is not attenuated because it is not light.
+
+So the fit does not choose between the two readings. What it does do is test
+which *parameterisation* is right, through `beta/(1 - alpha)`, which must equal
+the black floor under the dye reading, and `2*beta`, which must equal it under
+the "averaged with black" reading. Measured:
+
+| frame | alpha | beta | `beta/(1-alpha)` | `2*beta` | measured black floor |
+|---|---|---|---|---|---|
+| B | 0.7131 | 9.520 | **33.2** | 19.0 | 40 |
+| C | 0.5238 | 17.701 | **37.2** | 35.4 | 38 |
+| CTRL | 0.5460 | 25.970 | **57.2** | 51.9 | 55 |
+
+`beta/(1-alpha)` tracks the black floor in all three. `2*beta` only does when
+`alpha` happens to be near 0.5 — and **frame B's alpha is 0.713**, which the
+"one-bit right shift with a stale pedestal" mechanism cannot produce at all.
+The dye parameterisation fits every frame; the shift parameterisation fits two
+of three. (`frame-to-png.py` already printed `implied pedestal` and already
+noticed it matched the floor. What was missed is that this is the *dye's*
+prediction.)
+
+### The DN-dependence in section 4(a) is the dye's own signature
+
+Part I calls this "fatal to the colour hypothesis" and "much stronger" than the
+earlier reasoning. Take frame A's own numbers and fit `ratio = t + K(1-t)/E`:
+from the measured 0.906 at E=48 and 0.729 at E=96, `K(1-t) = 17.0` and
+`t = 0.552`, hence **K = 37.9** — frame A's black floor is 36-38.
+
+The ratio of RAW DN *must* fall with DN for a dye, at exactly the observed rate.
+Section 4(a) compares the right quantity in the wrong space.
+
+Measured directly, the deficit **above black** is flat, which is what a fixed
+multiplicative attenuation — a dye, or any fixed gain — looks like:
+
+| E (DN) | 48 | 56 | 64 | 72 | 80 | 88 | 96 | 104 |
+|---|---|---|---|---|---|---|---|---|
+| B, raw ratio | 0.916 | 0.861 | 0.811 | 0.782 | 0.762 | 0.741 | 0.721 | 0.714 |
+| B, **above black** | 0.436 | 0.496 | 0.490 | 0.508 | 0.521 | 0.524 | 0.518 | 0.532 |
+| C, raw ratio | 0.896 | 0.842 | 0.798 | 0.770 | 0.747 | 0.728 | 0.707 | 0.692 |
+| C, **above black** | 0.502 | 0.502 | 0.501 | 0.508 | 0.518 | 0.521 | 0.514 | 0.504 |
+
+Frame C holds 0.50-0.52 across its whole usable range. That is a constant
+transmission, not a code-value-dependent corruption.
+
+### The channel response, stated the way a CFA sets it
+
+Phase means minus the fitted pedestal, normalised to the brightest phase:
+
+| frame | r0c0 | r0c1 | r1c0 | r1c1 |
+|---|---|---|---|---|
+| B (clipping, p99 237) | **0.665** | 1.000 | 0.996 | 0.993 |
+| C | **0.520** | 0.987 | 1.000 | 0.974 |
+| CTRL (pre-swap) | **0.547** | 0.994 | 1.000 | 0.985 |
+
+## II.2 What still stands against colour
+
+Part I's conclusion loses its headline argument but keeps two, and they are not
+weak:
+
+1. **Three-alike-one-low is not an RGGB Bayer response.** Reading r0c0 as red,
+   frame C needs `B/G = 0.974` and `G/G = 0.987`. Under any ordinary illuminant
+   an uncorrected Bayer part gives `B/G` in the 0.4-0.8 range. Infrared does not
+   rescue this: IR passes all dyes alike, so raising the IR fraction `f` pushes
+   *every* channel toward 1 — with `R_obs = 0.520` fixed, `f = 0.3` would need
+   `r_R = 0.314` while `r_B` stays at 0.963. IR makes the required response
+   *less* plausible, not more. A mosaic producing one-different-three-alike is
+   RCCC / RCCB / RGBW geometry, which is not what "it is a colour sensor"
+   normally means and is not a known HM01B0 SKU.
+2. **The pre-swap frame shows the same thing on the same phase.** CTRL's
+   `alpha = 0.546` against C's 0.524 — under the dye reading, *nothing changed
+   across the module swap*. If that module was genuinely mono, a 0.5x
+   attenuation of one 2x2 phase is a property of this board.
+
+Point 2 is now the whole case, and it rests on a datasheet
+(`HM01B0-ANA-00FT870`, "Color Filter Array: Monochrome") being the right
+datasheet for the *previously fitted* part — which Part I's own section 6 flags
+as an assumption that should carry no weight when applied to the current part.
+
+## II.3 Two new negative results (both free, both from the existing frames)
+
+**The capture core does not blend horizontally adjacent samples.** This was
+worth excluding because a 2-tap horizontal blend averages `R,G,R,G` into
+`(R+G)/2` everywhere and destroys a mosaic outright — the single most plausible
+way for a colour part to deliver mono-looking data. Two independent tests:
+
+- *The line edge.* Each line begins with two `0x00` dummy bytes, so under a
+  blend the first active column would read half its neighbours. Measured on
+  undamaged rows, `col2 / mean(col4, col6)` = **0.982 / 1.004 / 1.022** for
+  B / C / CTRL. A blend predicts 0.5.
+- *Directional noise autocorrelation*, computed on defect-free subsets (odd
+  rows for horizontal, odd columns for vertical) so the suspect phase cannot
+  contaminate it. `rho_H(1) - rho_V(1)` = **-0.047 / -0.107 / -0.031**. The same
+  frames with a synthetic horizontal 2-tap blend injected read **+0.452 /
+  +1.389 / +0.612**.
+
+No vertical blend either; the two directions agree throughout.
+
+**The suspect phase's deficit has no spatial structure beyond the estimator's
+own.** Per-16x16-tile alpha maps are strongly autocorrelated (Moran's I +0.60,
++15.7 sigma against a shuffled null) — but so is the identical statistic run on
+each of the three *clean* phases (+0.75/+0.69/+0.81, +18 to +20 sigma). The
+structure is the neighbour-average estimator biasing at scene curvature, not
+chroma. The suspect phase's map is in fact the *least* structured of the four.
+This bounds spatial chroma at roughly <5%, but the scene is a grey lab bench
+(see the rendered frame) so it is weak evidence either way.
+
+## II.4 A real bug in the renderer, fixed
+
+`demosaic()` applied the grey-world gains as `v * gain` on raw values that still
+carried the ~38 DN pedestal. A red gain of 1.85 therefore turned a neutral 38 DN
+of black into 70 DN of red. The visible result is hue that tracks BRIGHTNESS —
+darks red, highlights cyan — which is precisely the artifact this file's header
+and the `ARTIFACT RENDER` banner attribute to the capture defect. Most of it was
+this arithmetic.
+
+Fixed: the black level (the fitted pedestal, which is now computed even under
+`--no-repair`) is subtracted before white balance, grey-world is estimated on
+black-subtracted sample means, and the correction is `(v - black)*gain + black`.
+
+Measured R/G swing across the luma range of frame C, rendered RGGB:
+
+| render | before | after |
+|---|---|---|
+| `--no-repair` | 1.315x | **1.019x** |
+| `--no-repair --stretch` | 1.171x | **1.053x** |
+| `--stretch` | 1.171x | 1.068x |
+
+This is correct regardless of how the mono/colour question resolves, and if the
+part is colour it is a prerequisite for the picture looking right at all.
+
+## II.5 The two runs that decide it
+
+A new tool, `hardware/ospi/colour-decide.py`, computes every statistic below and
+prints the verdict. It takes the `.raw` files directly.
+
+### RUN 1 — the sensor's own test pattern (no human, no scene, no phone)
+
+    cd /scratch2/loren/riskybird-dev
+    RB_EXTRA_CPPFLAGS=-DRB_CAMERA_TEST_PATTERN=1 \
+    ./rb debug bootup_check --target arty200t \
+        --config RocketArty200TDroneFullDDRConfig --usb-location 7-1.1.4.3 \
+        --gdb-script hardware/ospi/bootup-capture.gdb
+
+    python3 hardware/ospi/colour-decide.py --pattern bootup-frame.raw
+
+`RB_EXTRA_CPPFLAGS` is read from the ENVIRONMENT by `tools/rb/cli.py`, not as a
+command-line argument, and it must be on the `rb debug` line because `rb debug`
+rebuilds -- a flag given only to an earlier `rb build` is silently reverted. It
+lands in the build fingerprint (`.rb-build-inputs`), so changing it forces a
+pristine rebuild automatically; no `--pristine always` is needed. Run it from
+`/scratch2/loren/riskybird-dev`, which is the checkout that carries the
+`readout:` line and the `RB_CAMERA_FULL_READOUT` path -- `riskybird-dev-setup`
+has an older `integration/zephyr/camera/src/camera.c` without them.
+
+`TEST_PATTERN_MODE` is generated **after the analog column path and after the
+CFA**, and emits only powers of two. So:
+
+- **any phase whose values are not powers of two** is being corrupted by the
+  capture path, downstream of any filter -> the comb is (at least partly) a
+  capture defect, and Part I's mechanism is right;
+- **all four phases clean powers of two** -> the capture path delivers one
+  digital sample per pixel intact on every phase, so the 2x attenuation seen in
+  photographs happens upstream of the bus. An optical 2x attenuation of one 2x2
+  phase is a colour filter array.
+
+What a clean pattern does NOT prove on its own: it narrows the comb's origin to
+"optics or analog column path", not to "CFA". The reason that still points hard
+at a CFA is the comb's *geometry*: it depends on BOTH row parity and column
+parity. A column-parallel analog readout produces column-periodic faults, not
+row-dependent ones, so a 2x2-periodic analog fault is difficult to construct,
+whereas 2x2 periodicity is what a Bayer mosaic is. And a clean pattern plus a
+clean photograph would mean mono. Read it with the photographic statistics.
+
+One caveat on the pattern itself: `hm01b0.h` marks the walking-1s encoding as
+datasheet recall, not established on this machine. If the values that come back
+are not powers of two on ANY phase, check first that the pattern is what we
+think before reading it as corruption -- `colour-decide.py --pattern` prints the
+distinct values and their per-phase distribution so that is visible immediately.
+
+### RUN 2 — the illuminant swap (needs a person with a phone)
+
+Two captures, room lights off, matte white card filling the frame:
+phone screen at full brightness showing full-screen pure red (255,0,0) about
+10 cm from the card, then pure blue (0,0,255). Phone primaries are narrow-band
+and carry no IR, which matters: an IR-rich source (incandescent, halogen,
+sunlight) is the one condition that can legitimately wash out a mosaic on a part
+with no IR-cut filter. Let AE settle; frame mean 60-140 DN, p99 below 220, the
+two frames within ~15 DN of each other.
+
+    python3 hardware/ospi/colour-decide.py --compare red.raw blue.raw
+
+**The discriminator is `alpha`, not the three-clean-phase statistic.** Part I
+proposed `D = r(RED) - r(BLUE)` over the three undamaged phases. That is the
+right *backstop*, but if the suspect phase is the colour channel then it is the
+one place the signal actually lives, and `alpha` moves by a factor of several
+where `r` moves by a fraction. `alpha` is a dye's transmission — the scene's
+colour — and must swing with the illuminant. It is fixed silicon if it is a
+capture gain, and cannot.
+
+| `alpha(RED)/alpha(BLUE)` | reading |
+|---|---|
+| > 1.5 | **colour** |
+| < 1.10 | **mono** |
+
+Today's grey frames give alpha = 0.524 (C) and 0.546 (CTRL) — a ratio of 1.04
+between two different modules and two different scenes, which is what "fixed
+silicon" looks like, and also what "same dye, same grey scene" looks like.
+Saturated red against saturated blue removes that ambiguity.
+
+If the suspect phase *moves* to a different 2x2 position between the two
+captures, that is colour outright: a fixed hardware gain cannot move.
+
+### Also worth one line, and nearly free
+
+`bootup_check` prints a `readout:` line that has never been read on this bench:
+
+    readout: x_odd_inc=0x.. y_odd_inc=0x.. binning=0x.. qvga_win=N
+
+Any of `binning != 0x00`, `x_odd_inc != 0x01`, `y_odd_inc != 0x01` means the
+sensor is averaging or skipping CFA sites on the die and no photographic test is
+valid until it is cleared (`RB_EXTRA_CPPFLAGS=-DRB_CAMERA_FULL_READOUT=1` writes
+the full-readout configuration and the same line reads it back). It comes free
+with any default `rb debug bootup_check` run.
+
+## II.6 If RUN 1 or RUN 2 says colour
+
+`frame-to-png.py` must stop applying the algebraic repair to the suspect phase:
+`true = (v - beta)/alpha` is exactly the inverse of a dye, so it divides the
+colour channel back out and returns a grey picture. The repair is currently ON
+by default and reports itself as a "KNOWN CAPTURE-PATH DEFECT". Under a colour
+verdict it becomes a colour-destroying step and `--no-repair` becomes the
+correct default, with the demosaic pattern chosen so the suspect phase lands on
+whichever channel the illuminant made it bright.
+
+## II.7 Honest standing
+
+Part I said **mono, ~95%**. On the evidence as it now stands that number is not
+defensible: one of its three load-bearing arguments is wrong, and the remaining
+two both depend on assumptions about a module nobody has looked at. The
+strongest single fact in the whole investigation is still the one nobody has
+collected — **the part number on the flex, or a 10x look at the die for an
+iridescent colour grid** — and it takes ten seconds.
+
+---
+
+# PART III — 2026-09-22 evening: RUN 1 came back, and it answers a different question than expected
+
+Two hardware results landed: the readout registers read off the live part for the
+first time, and the sensor test pattern captured and analysed. Both are in hand.
+Neither settles mono-vs-colour. Together they move the fault out of the digital
+capture path for good, and they close the phase puzzle that looked like the crux.
+
+## III.0 The two new inputs
+
+**Readout registers, off the live part:**
+
+```
+readout: x_odd_inc=0x01 y_odd_inc=0x01 binning=0x00 qvga_win=0
+```
+
+Full-width, unbinned, unsubsampled readout. The "the sensor is averaging CFA
+sites on the die before the data ever leaves it" hypothesis is dead. A mosaic
+would have survived this readout mode intact.
+
+**Test pattern**, `RB_CAMERA_TEST_PATTERN=1` verified on the compile line,
+captured to `bootup-frame.raw` (md5 `80134943ec6e18bfdf848d6128529aad`):
+
+```
+311 lines anchored at byte 1092
+most common values: 0x24 x59666, 0xff x36998, 0x2e x4100     3 distinct values overall
+per 2x2 phase:  r0c0 109.427   r0c1 109.427   r1c0 139.083   r1c1 109.430
+```
+
+Three phases identical to three decimals, one 27% high, on synthetic data with
+no optics involved. That reads as capture-path evidence. **It is not.**
+
+## III.1 THE PHASE PUZZLE, SETTLED. Both halves, and neither is what it looked like
+
+Two things had to be explained: the pattern's odd phase is `r1c0` where the
+photographs' is `r0c0` (different position), and the pattern's odd phase is HIGH
+where the photographs' is LOW (opposite direction).
+
+### (a) The position. Row parity is not a measurable quantity on this bench
+
+The byte-1092 anchoring was the right first suspect, but not for the stated
+reason. `1092 mod 326 = 114`, an even offset — and in any case the offset is
+irrelevant to column parity, because both `colour-decide.py:load()` and
+`frame-to-png.py:find_line_phase()` re-anchor on the sensor's own `00 00` line
+marker and cut every line at its own boundary. Column 0 of the reconstructed
+image is always the first active pixel. **c0 and c1 mean the same thing in every
+capture regardless of start offset**, and the docstring in `load()` that claimed
+an odd offset swaps them was wrong and has been corrected.
+
+What *is* arbitrary is ROW parity. The core arms mid-frame, so the first complete
+line sits at an unknown absolute sensor row and `r0`/`r1` are coin flips per
+capture. Tabulated:
+
+| frame | start byte | low/odd phase | column parity |
+|---|---|---|---|
+| A (photo) | 0 | r0c0 | **c0** |
+| B (photo) | 155 | r1c0 | **c0** |
+| C (photo) | 0 | r0c0 | **c0** |
+| CTRL (pre-swap photo) | 0 | r0c0 | **c0** |
+| PATTERN | 1092 | r1c0 | **c0** |
+
+Every capture ever taken on this bench, pattern included, puts the odd phase on
+**column parity c0**. The row label flips and means nothing. Part I section 2
+already noted this for frame B; it applies identically to the pattern. There is
+no position discrepancy to explain.
+
+### (b) The direction. The pattern's "odd phase" is the pattern
+
+`TEST_PATTERN_MODE=1` does **not** emit walking 1s. `hm01b0.h` flagged that
+expectation UNVERIFIED and it is now disproven. Measured, run-length encoded off
+the frame, it emits a **one-pixel-period column stripe of 0xff on the black
+level** — three byte values in the whole frame and exactly four distinct row
+patterns, one for even rows and one for odd, repeated:
+
+```
+even rows:  0x24 x109, then ff,24,ff,24 ... to the end of the line   (108 stripes)
+odd  rows:  0x24 x54,  then ff,24,ff,24 ... with two phase slips
+            and a 45-pixel run of solid 0xff at the end             (130 stripes)
+```
+
+Those stripes sit **exactly at the Nyquist frequency of the 2x2 phase grid**, so
+a per-phase mean does nothing but count where the 0xff landed:
+
+| | 0xff on even columns | on odd columns |
+|---|---|---|
+| even rows | 7884 | 7884 |
+| odd rows | **11020** | 7830 |
+
+The even rows' stripes split 54/54 between the two column parities — which is why
+`r0c0` and `r0c1` come out equal **to three decimal places by construction**,
+and that suspiciously exact agreement was itself the clue. The odd rows' two
+phase slips and the 45-pixel solid run break the balance 11020 to 7830, and
+`139.083 / 109.430 = 1.271` is precisely that ratio.
+
+**The single high phase is the picture. It is not a defect, and it never was.**
+Any statistic that reads 2x2 phase structure off a Nyquist-rate column stripe is
+measuring the stripe. `colour-decide.py --pattern` now refuses to print phase
+means at all and says why.
+
+So the two halves of the puzzle are not related and neither needed a theory: the
+position difference is an unmeasurable row label, and the direction difference is
+the pattern's own geometry.
+
+## III.2 What the test pattern DOES prove, and it is worth more than the phase means
+
+The pattern arrives **bit-exact**.
+
+* The entire 311x324 frame contains **exactly three distinct byte values** —
+  0x24 (the black level), 0x2e (the black level of the next frame, where the
+  capture buffer wrapped mid-stream), and 0xff.
+* **All three are present on all four 2x2 phases.**
+* All **59889** adjacent-column transitions land on an emitted code, and all
+  **28092** full-scale `0x24 -> 0xff` steps reach 0xff exactly.
+
+The falsification is sharp. The affine map fitted on the photographs is
+`alpha ~= 0.58, beta ~= 15.6`. If the capture path applied that to one phase, an
+0xff arriving on that phase would be written as `0.58*255 + 15.6 = 163 = 0xa3` —
+a fourth value, on one phase and no other. **There is no fourth value anywhere in
+the frame.** And because the pattern alternates black-to-full-scale on *adjacent
+columns*, the bus is proven clean at the maximum possible transition rate, which
+is exactly the condition an under-settled sample would fail first.
+
+> **The one-phase attenuation is UPSTREAM of the digital bus.** Sensor analog
+> path, pixel, microlens or CFA. It is not the capture core, not the wiring, and
+> not a sampling-edge or settling problem. No RTL change to the capture core will
+> remove it.
+
+This is the opposite of the standing assumption. `frame-to-png.py` described the
+attenuation as a "KNOWN CAPTURE-PATH DEFECT ... delete this once the RTL fix
+lands" — that label was wrong and has been removed from the source.
+
+## III.3 The "the defect ate the colour" theory, tested and refuted
+
+The theory: the corrupted phase IS a CFA colour channel, the capture defect
+attenuates it by ~0.5, that produces the three-alike-one-low geometry everyone
+has read as mono, and `frame-to-png.py`'s repair then divides the recovered
+colour back out and reports the collapsed spread as success.
+
+It is a good theory and it is wrong on both legs.
+
+**Leg 1 fails: there is no capture defect to do the eating.** Section III.2. The
+capture path is bit-exact on all four phases.
+
+**Leg 2 fails: the mosaic is absent BEFORE the repair, not just after.** Run
+side by side on the post-swap photograph (frame B):
+
+| statistic | repair ON | `--no-repair` |
+|---|---|---|
+| 2x2 phase spread | 0.30% | 15.36% |
+| rms column-parity / row-parity / checkerboard | 0.057 / 0.070 / 0.031 | 0.158 / 0.168 / 0.156 |
+| checker / parity | 0.49 | **0.96** |
+| **excess checkerboard energy** | **-8.8 sigma** | **-1.5 sigma** |
+| the three phases the low one does not touch | — | **agree within 0.33%** |
+| mosaic verdict | not a mosaic | **not a mosaic** |
+
+The excess-checkerboard statistic is the phase-drift-immune one, calibrated so a
+1.5% colour separation reads +12 sigma and a real CFA reads hundreds. Unrepaired,
+it reads **-1.5 sigma**: not merely below threshold, but on the wrong side of
+zero. There is no chroma before the repair for the repair to remove.
+
+And the decisive geometric point needs no repair analysis at all. **The three
+phases the attenuation does not touch agree within 0.33% on the post-swap frame
+and 0.10% on the pre-swap control.** If a Bayer mosaic were present and the
+attenuation ate exactly one of the four sites, the remaining three would still be
+two greens and either a red or a blue — separated by tens of percent (measured at
+20.2% to 50.4% with a synthetic CFA laid over these very frames). They are
+separated by a third of one percent. **Whatever the fourth phase is, the other
+three are photometrically the same channel.**
+
+Per 16x16 tile, renormalised among themselves, on 302 tiles carrying signal:
+
+```
+frame B   r0c1 0.9905 +/- 0.057    r1c0 1.0010 +/- 0.049    r1c1 1.0086 +/- 0.075
+CTRL      r0c1 0.9898 +/- 0.035    r1c0 1.0073 +/- 0.027    r1c1 1.0030 +/- 0.026
+```
+
+The scatter is symmetric noise with no systematic separation, and the known-mono
+control shows the same scatter at the same size. A mosaic offsets the *means*; it
+does not merely widen the scatter.
+
+## III.4 (b) Is the attenuation a dye? The data prefers a constant transmission — and that does not choose
+
+The previous round's correction stands and is now measured directly by the tool.
+Raw DN carries a pedestal K of 36-40 DN, a dye attenuates light and not the
+pedestal, so a filtered site reads `low = K + t*(E-K) = t*E + K*(1-t)` and its
+RAW ratio `t + K*(1-t)/E` **must** slide from 1.0 at E=K towards t as E rises.
+"The ratio slides with brightness, therefore not a dye" is invalid and is now
+deleted from `frame-to-png.py`'s docstring, its printed verdict, and the boolean
+criterion that used to depend on the level correlation.
+
+`frame-to-png.py` now prints both rows. Same tiles, same bins:
+
+```
+frame B, --no-repair
+  raw-DN ratio:              42->0.973  45->0.925  54->0.858  86->0.766   (corr -0.80)
+  SAME BINS ABOVE BLACK:     42->0.742  45->0.611  54->0.564  86->0.592
+
+CTRL (pre-swap, known mono)
+  raw-DN ratio:              58->0.991  59->0.986  61->0.973  65->0.940   (corr -0.98)
+  SAME BINS ABOVE BLACK:                           61->0.566  65->0.547
+```
+
+Above black the transmission is **flat at t ~= 0.57** on frame B (the 42 bin is
+5 DN above black and is noise) and **flat at t ~= 0.55** on the control. So: the
+answer to "does the data prefer a dye or a digital corruption" is **a constant
+transmission**, which is what a dye does — and equally what a fixed analog gain,
+a fill-factor difference or a microlens defect does. It does not choose between
+them.
+
+**But the pre-swap control is the thing to look at.** `t = 0.55` on the
+known-mono part before the swap and `t = 0.57` on the part fitted after it. Same
+phase, same column parity, same transmission to two points in the second decimal.
+A dye on the newly fitted module cannot explain an identical attenuation measured
+on the module that came off. Either both modules are the same part, or the
+attenuation is not a dye. Part I section 3's "the defect got 6x deeper at the
+swap" objection also finally dissolves here: it never got deeper, the raw-DN
+framing made a pedestal difference look like one, and above black the two numbers
+are the same number.
+
+## III.5 What the frames say, stated plainly
+
+Four captures, two modules, one bench:
+
+1. One 2x2 site in four is attenuated to t ~= 0.55, constant above black.
+2. It is on column parity c0 in every capture; the row label is unmeasurable.
+3. The other three sites are photometrically identical, to 0.10-0.33%.
+4. It is upstream of the digital bus (III.2) and it is not the readout mode (III.0).
+5. The same signature, same parity, same t, is present on the pre-swap module.
+6. The 2D FFT shows energy at the three 2x2 Nyquist harmonics *and nowhere else*
+   — `(0,1/2) 0.338, (1/2,0) 0.348, (1/2,1/2) 0.343` on frame B, with nothing at
+   1/3 or 1/4 (all < 0.02). Three Nyquist corners carrying **equal** energy is the
+   signature of exactly one anomalous phase. An RGGB mosaic puts most of its
+   energy in `(1/2,1/2)` (green against red-and-blue) and comparatively little in
+   the other two (red against blue). There is also no 4x4 structure, so no
+   quad-Bayer and no X-Trans.
+
+**That geometry is one filtered site in four with three clear ones — RCCC — and
+it is not RGGB.** And an RCCC array does not yield a colour photograph: three of
+the four samples carry identical spectral information, so there is no second
+chromatic axis to demosaic against.
+
+**Goal 1 — colour photos — cannot be delivered from these frames.** Not because
+the renderer is wrong, and not because a repair erased anything, but because the
+chroma is not in the bytes. That is a clear negative and it is the honest one.
+
+The owner states the fitted part is colour. The single experiment that can
+overturn everything above is in III.6, and it is the same one as before.
+
+## III.6 The next capture: still the illuminant swap, and it still needs a person
+
+**Is it still necessary? Yes, and more so.** Everything free has now been spent.
+The readout mode is read, the test pattern is captured and analysed, the FFT
+shows no other periodicity, the pre/post-swap comparison is done, and the repair
+has been tested both ways. Every remaining human-free experiment measures the
+same photons through the same fixed geometry and cannot separate a dye from a
+fixed attenuation — that separation is *definitionally* about the illuminant's
+spectrum, and nothing on the board can change it.
+
+What makes the swap sharper than it was: the three "clear" phases agree to 0.33%.
+If the part is truly RGGB, **those three cannot stay together under coloured
+light** — two of them are greens and one is a red or a blue. So the swap now has
+two independent readouts, and the second one does not depend on the suspect phase
+at all.
+
+### Do this first (one capture, no coloured light needed)
+
+Every frame analysed so far carries only **5 to 49 DN above black**. Every ratio
+in this document is computed on that. Before spending a person's time on the
+coloured-light run, get one properly exposed frame of a scene with obvious
+colour in it — a colour print, a fruit bowl, anything not grey:
+
+```
+./rb debug bootup_check --target arty200t \
+    --config RocketArty200TDroneFullDDRConfig \
+    --usb-location 7-1.1.4.1 \
+    --gdb-script hardware/ospi/bootup-capture.gdb
+cp bootup-frame.raw frames/exposed.raw
+/usr/bin/python3 hardware/ospi/colour-decide.py frames/exposed.raw
+```
+
+Wanted: frame mean 90-150 DN, p99 below 230 (`colour-decide.py` warns on both).
+If the three non-suspect phases still agree within 1% on a well-exposed,
+genuinely colourful scene, that is close to the end of the colour case.
+
+### Then the swap (needs a person, ~3 minutes)
+
+White card filling the frame at ~10 cm, room lights OFF, phone screen as the only
+source, same pose and same distance for all three. Phone brightness at maximum
+and **auto-brightness off**, or the two frames get different exposures.
+
+```
+# 1) phone showing FULL RED (255,0,0)
+./rb debug bootup_check --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --usb-location 7-1.1.4.1 --gdb-script hardware/ospi/bootup-capture.gdb
+cp bootup-frame.raw frames/red.raw
+
+# 2) phone showing FULL BLUE (0,0,255) -- do not move the camera
+./rb debug bootup_check --target arty200t --config RocketArty200TDroneFullDDRConfig \
+    --usb-location 7-1.1.4.1 --gdb-script hardware/ospi/bootup-capture.gdb
+cp bootup-frame.raw frames/blue.raw
+
+# 3) optional, room lights on, white card
+cp bootup-frame.raw frames/white.raw
+
+/usr/bin/python3 hardware/ospi/colour-decide.py --compare frames/red.raw frames/blue.raw frames/white.raw
+```
+
+**Expected numbers, written down before the run so neither answer can be fitted
+to afterwards:**
+
+| | if RGGB colour | if a fixed attenuation |
+|---|---|---|
+| `alpha` (suspect phase transmission), red vs blue | differ by **>2x** (a red site under blue light transmits almost nothing) | **within 10%**; both near 0.55 |
+| the three non-suspect phases, above black | **split by 20-60%** under at least one illuminant | stay together within ~2%, as they do now |
+| which phase is lowest | **may move** between the two frames | fixed, c0, in both |
+| `r = P_opp / mean(P_adj)` | `|D| > 0.30` | `|D| < 0.02` |
+
+The three-phase split is the one to watch. It is the statistic that does not go
+through the suspect phase, it is currently pinned at 0.33%, and no argument in
+this document can explain it away if it opens up.
+
+## III.7 Changes made to the tools in this round
+
+* `hardware/ospi/frame-to-png.py`
+  * The module docstring no longer calls the attenuation a capture-core defect;
+    it records the bit-exact test-pattern result and says the fault is upstream.
+  * **The repair is auto-DECLINED on any frame whose mosaic test fires before the
+    repair is applied.** `true = (v-beta)/alpha` is the exact algebraic inverse of
+    a dye, so on a real CFA it would divide the colour out and then report the
+    collapsed 2x2 spread as success. It prints why it stood down. `--force-repair`
+    overrides, for use only with independent proof. (On every frame here the test
+    does not fire either way, so behaviour is unchanged — the guard is there so
+    the tool cannot lie in the one direction nobody would check.)
+  * "A colour filter holds one ratio at every level" is **deleted** — from the
+    docstring, from the printed verdict, and from the `defect` boolean, which no
+    longer depends on the level correlation at all. The verdict now rests only on
+    the geometry (one phase low, three equal), which is the sound argument.
+  * New printed row: the same brightness bins **above black**, which is the only
+    one that can be read as a transmission. Both rows are shown together, with the
+    reason the raw one must slide.
+  * New synthetic-frame guard: a frame with <= 24 distinct pixel values gets **no
+    mosaic verdict**. The test pattern fired every mosaic test at +14.9 sigma and
+    was rendered as a confident GBRG colour PNG — a Nyquist column stripe reads as
+    a perfect checkerboard to a 2x2 parity test.
+* `hardware/ospi/colour-decide.py`
+  * `--pattern` rewritten on the measured pattern. It reports the per-phase
+    **value set** and Nyquist transition fidelity, and **deliberately refuses** to
+    print per-phase means, with the reason in the docstring.
+  * `load()`'s docstring corrected: the start offset does not swap column parity
+    (the marker re-anchoring prevents it); ROW parity is the unmeasurable one.
+* `workloads/camera_bringup/src/hm01b0.h` — the walking-1s expectation is
+  replaced by the measured pattern description and the two traps it sets.
+* `workloads/camera_bringup/src/main.c` — the walking-1s content check is
+  replaced by a distinct-value count and a full-scale-step count, which are the
+  quantities that say whether the bus carried the pattern intact.
+* `integration/zephyr/camera/src/camera.c` — the test-pattern comment records
+  the result and warns against reading phase means off a pattern frame.

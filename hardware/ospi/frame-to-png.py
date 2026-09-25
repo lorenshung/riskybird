@@ -37,13 +37,29 @@ bench, the invented chroma correlates -0.72, -0.80 and -0.96 with local
 luminance. Such a picture is worse than no picture because it is believable, so
 the warning is not optional and is not a footnote.
 
-One 2x2 sampling phase comes off this capture path as `alpha * true + beta`
-with alpha near a half -- a KNOWN HARDWARE DEFECT, present in captures from
-before the camera module was swapped, so it is the capture core and not the
-sensor. It is undone on the way to the PNG, per frame and per pixel, before
-anything else looks at the data; fit_phase_defect() carries the measurements and
+One 2x2 sampling phase reads low, as `alpha * true + beta` with alpha near a
+half. It is present in captures from before the camera module was swapped, so
+it is a property of this bench and not of the fitted part.
+
+WHERE IT IS NOT: the capture core. The sensor's own TEST_PATTERN_MODE=1 frame
+(2026-09-22, `bootup-frame.raw`) is generated after the ADC and driven out over
+the same bus, and it arrives BIT-EXACT: the whole 311x324 frame contains exactly
+three distinct byte values (0x24, 0x2e, 0xff) and all three appear on all four
+2x2 phases. An affine map with alpha 0.58 would turn an 0xff on the damaged
+phase into 0xa3 and put a fourth value in the histogram. There is none. The
+pattern is also a 1-pixel-period column stripe, so the bus is proven clean at
+the maximum possible column transition rate. Whatever attenuates this phase is
+UPSTREAM of the digital bus -- sensor analog path, pixel, microlens or optics --
+and no RTL change to the capture core will remove it. See
+docs/hm01b0-colour-investigation.md.
+
+It is undone on the way to the PNG, per frame and per pixel, before anything
+else looks at the data; fit_phase_defect() carries the measurements and
 repair_phase_defect() applies them. The .raw is never written. --no-repair turns
-it off. Delete both once the RTL fix lands.
+it off. The repair is DECLINED automatically on any frame where the mosaic test
+fires before the repair is applied, because `true = (v - beta)/alpha` is
+algebraically the exact inverse of a dye -- on a real CFA site it would divide
+the colour back out and then report the collapsed 2x2 spread as success.
 
 As of the swap on 2026-09-21 the frames still measure as mono, and they do so
 AFTER that repair, which is the stronger statement: the defect is no longer
@@ -194,10 +210,14 @@ def tile_phase_ratios(rows, width, tile=16):
     mosaic cannot inflate the number. |p[x+1]-p[x]| would be circular, since on
     a mosaiced frame that difference IS the mosaic.
 
-    Yields (ratios, detail, level) with ratios indexed (row%2)*2 + (col%2) and
-    level the tile's raw mean, which measure_phase_deficit() needs: a colour
-    filter is multiplicative and so its ratio does not move with level, and a
-    settling error is not and so its ratio does.
+    Yields (ratios, detail, level) with ratios NORMALISED BY THE TILE MEAN and
+    indexed (row%2)*2 + (col%2); the raw phase mean is ratios[i] * level.
+    `level` is the tile's raw mean, which measure_phase_deficit() needs in order
+    to subtract the black pedestal -- without that subtraction no per-tile ratio
+    can be read as a transmission, whatever its cause. (This docstring used to
+    say a colour filter's ratio does not move with level. It does, whenever a
+    black pedestal is present, which is always on this part; see
+    measure_phase_deficit().)
     """
     height = len(rows)
     out = []
@@ -224,7 +244,7 @@ def tile_phase_ratios(rows, width, tile=16):
     return out
 
 
-def measure_phase_deficit(tiles):
+def measure_phase_deficit(tiles, black=None):
     """Does ONE of the four 2x2 phases just read low -- and does it slide with level?
 
     This settles mono-against-colour more firmly than the parity-correlation
@@ -243,21 +263,37 @@ def measure_phase_deficit(tiles):
     column on the line-anchored grid, in frames whose line phases differ (0, 155,
     0) and whose arm points differ. No CFA layout produces three-equal-one-low.
 
-    LEVEL. A colour filter is multiplicative: red under a fixed illuminant is a
-    fixed fraction of green whether the scene is dim or bright, so the ratio is
-    FLAT against level. This one is not. Per 16x16 tile, low phase over the mean
-    of the other three, binned by tile brightness:
+    LEVEL -- AND THE ARGUMENT THAT USED TO BE MADE FROM IT, WHICH WAS WRONG.
+    Per 16x16 tile, low phase over the mean of the other three, binned by tile
+    brightness:
 
         A   level 41 -> 0.975   50 -> 0.882   59 -> 0.831   94 -> 0.769
         C   level 42 -> 0.943   51 -> 0.863   59 -> 0.814   86 -> 0.716
 
-    corr(ratio, level) = -0.72, -0.80, -0.97 across the three frames. In counts
-    the deficit runs about 1 at level 41 and 22 at level 94 -- it grows far
-    faster than the signal does, which is an under-settled sample rather than a
-    gain, a filter, or anything the sensor could be told to stop doing over I2C.
+    corr(ratio, level) = -0.72, -0.80, -0.97 across the three frames. This was
+    read for three rounds as "a colour filter holds one ratio at every level, so
+    a sliding ratio rules a dye out". THAT INFERENCE DOES NOT HOLD and must not
+    be reused. Raw DN carries a black pedestal K of 36-40 DN on this part -- two
+    thirds of the whole signal in these dim frames -- and a dye attenuates the
+    LIGHT, not the pedestal:
 
-    That is also exactly what the demosaic turns into "colour": hue that tracks
-    brightness, so bright things come out warm and dark things cool.
+        low = K + t*(E - K) = t*E + K*(1 - t)
+
+    so a filtered site's RAW ratio low/E = t + K*(1-t)/E necessarily slides from
+    1.0 at E = K towards t as E rises. The observed slide is exactly that curve.
+    The quantity a CFA actually fixes is the deficit ABOVE BLACK, and that is
+    printed alongside: on frame B it is 0.77 / 0.58 / 0.55 / 0.59 across the same
+    four bins, i.e. flat at t ~= 0.57 once the pedestal is removed (the first
+    bin sits 5 DN above black and is noise). A constant transmission is what a
+    dye does -- and equally what a fixed analog gain or a fill-factor difference
+    does, so it does not choose between them either.
+
+    What DOES choose is the geometry, below: the three phases the deficit does
+    not touch agree to 0.10-0.33%, and no RGGB layout leaves three phases equal.
+
+    The sliding raw ratio is still worth printing, because it is exactly what
+    the demosaic turns into "colour" when it is run on a frame with no mosaic:
+    hue that tracks brightness, so bright things come out warm and dark cool.
 
     Returns None when there are too few tiles, else a dict; `dead` is True when
     the three checks together rule a CFA out.
@@ -310,10 +346,25 @@ def measure_phase_deficit(tiles):
     }
     order = sorted(range(len(ratios)), key=lambda i: levels[i])
     step = max(1, len(order) // 4)
+    # `above` repeats each bin with the pedestal removed. THIS is the quantity a
+    # colour filter holds constant; the raw ratio beside it cannot be, whatever
+    # the cause, and reading a slide in the raw ratio as evidence against a dye
+    # is the mistake this pair of numbers exists to stop anyone making again.
+    rec["above"] = None if black is None else []
     for k in range(0, len(order) - step + 1, step):
         sel = order[k:k + step]
-        rec["bins"].append((sum(levels[i] for i in sel) / len(sel),
-                            sum(ratios[i] for i in sel) / len(sel)))
+        lv = sum(levels[i] for i in sel) / len(sel)
+        rec["bins"].append((lv, sum(ratios[i] for i in sel) / len(sel)))
+        if black is not None:
+            num = den = 0.0
+            for i in sel:
+                t = tiles[i]
+                # t[0] is normalised by the tile mean; t[0][j] * t[2] is raw DN.
+                o = sum(t[0][j] for j in range(4) if j != low) / 3.0 * t[2]
+                if o - black > 3.0:
+                    num += t[0][low] * t[2] - black
+                    den += o - black
+            rec["above"].append((lv, num / den if den > 0 else float("nan")))
     # A CFA is two-equal-two-different, and its ratio does not move with level.
     # Requiring all three at once is what makes this safe to act on: a real
     # mosaic cannot satisfy any two of them, let alone all three.
@@ -322,7 +373,15 @@ def measure_phase_deficit(tiles):
     # top of it. On a clean synthetic mosaic every phase is flat against level
     # and this does not fire, which is what leaves the parity test below free to
     # do its job on frames that have no defect in them.
-    rec["defect"] = rec["worst_corr"] <= -0.4 and rec["deficit"] >= 0.05
+    # The level correlation is NO LONGER part of this test. It used to be, on
+    # the reading "a dye holds one ratio at every level"; that reading is wrong
+    # (see the docstring), because a preserved black pedestal makes a dye's RAW
+    # ratio slide in exactly the same way. What is left is the geometry, which
+    # is the sound argument and the stronger one: one phase well below three
+    # that agree with each other. No Bayer layout produces three equal phases,
+    # so this cannot fire on a real RGGB frame -- dropping the lowest of an
+    # R G G B quad still leaves R against G, tens of percent apart.
+    rec["defect"] = rec["deficit"] >= 0.05
     rec["clean3"] = rec["spread"] <= 0.03
     rec["dead"] = rec["defect"] and rec["clean3"]
     return rec
@@ -626,7 +685,7 @@ def parity_components(tiles):
     return h, v, c
 
 
-def detect_mosaic(rows, width):
+def detect_mosaic(rows, width, black=None):
     """Is this frame a Bayer mosaic, or just combed? Decided from the frame alone.
 
     The HM01B0 ships in a mono and a Bayer-CFA variant that are pin-, register-
@@ -666,11 +725,32 @@ def detect_mosaic(rows, width):
     tiles = tile_phase_ratios(rows, width)
     rec = {"tiles": len(tiles), "mosaic": False, "why": "", "parity": None,
            "flat": None, "busy": None, "n_flat": 0, "n_busy": 0, "deficit": None,
-           "undecided": False, "excess": None}
+           "undecided": False, "excess": None, "synthetic": False}
+
+    # SYNTHETIC-FRAME GUARD. The sensor's TEST_PATTERN_MODE=1 output is a
+    # 1-pixel-period column stripe of 0xff on the black level -- three distinct
+    # byte values in the whole frame -- and it fires every one of the tests
+    # below at +14.9 sigma, because a column stripe at Nyquist IS a checkerboard
+    # to a 2x2 parity test. It was read as "BAYER" once already. A photograph
+    # off an 8-bit sensor never has fewer than tens of distinct values, so
+    # counting them separates the two cases outright, and cheaply.
+    seen = set()
+    for r in rows:
+        seen.update(r)
+        if len(seen) > 24:
+            break
+    if len(seen) <= 24:
+        rec["synthetic"] = True
+        rec["why"] = ("only %d distinct pixel values in the whole frame -- this is a "
+                      "synthetic pattern, not a photograph. No mosaic verdict: a "
+                      "1-pixel column stripe reads as a perfect checkerboard here and "
+                      "says nothing about a CFA" % len(seen))
+        return rec
+
     if len(tiles) < 24:
         rec["why"] = "too few usable tiles to judge"
         return rec
-    rec["deficit"] = measure_phase_deficit(tiles)
+    rec["deficit"] = measure_phase_deficit(tiles, black)
 
     # Supporting evidence, reported either way: does the 2x2 separation follow
     # the scene or the edges? Colour is scene-borne; a settling comb is not.
@@ -721,12 +801,9 @@ def detect_mosaic(rows, width):
         rec["why"] = (
             f"{PHASE_NAMES[d['low']]} reads {d['deficit'] * 100:.1f}% below the other "
             f"three phases, which agree within {d['spread'] * 100:.2f}% -- a Bayer quad "
-            f"is R G G B, two equal and two different, never three equal and one low; "
-            f"and the deficit tracks brightness (corr {d['level_corr']:+.2f}, ratio "
-            f"{d['bins'][0][1]:.3f} at level {d['bins'][0][0]:.0f} falling to "
-            f"{d['bins'][-1][1]:.3f} at level {d['bins'][-1][0]:.0f}) where a colour "
-            f"filter would hold one ratio at every level. AND nothing is hiding "
-            f"under it: the three phases the defect does not touch agree within "
+            f"is R G G B, two equal and two different, never three equal and one low. "
+            f"AND nothing is hiding "
+            f"under it: the three phases the low one does not touch agree within "
             f"{d['spread'] * 100:.2f}%, where any CFA separates them by tens of "
             f"percent -- 20.2% to 50.4% with a synthetic one laid over this very "
             f"frame. There is no colour in this data to recover")
@@ -739,10 +816,70 @@ def detect_mosaic(rows, width):
                       "-- all three parities are one signal, so this is one artifact, "
                       "not green against red and blue")
         return rec
+    # ------------------------------------------------------------------
+    # H-vs-V ANTI-CORRELATION. Checked BEFORE the c_over_hv rejection,
+    # because that rejection is only valid under NEUTRAL light and silently
+    # throws away the coloured case -- which is the case the whole colour
+    # question is about.
+    #
+    # Substitute the layouts into the parity basis (the same algebra this
+    # function's docstring already sets out):
+    #
+    #   GRBG / GBRG :  H = B-R     V = R-B     -> H = -V   ANTI-correlated
+    #   RGGB / BGGR :  H = R-B     V = R-B     -> H = +V
+    #   one-phase defect of depth d on a flat field:
+    #                  H = -d      V = -d      C = -d      -> all three EQUAL
+    #
+    # So a negative H/V correlation is something a single damaged phase
+    # CANNOT produce, at any depth, on any scene. It is a positive test for
+    # a mosaic rather than an absence-of-defect test.
+    #
+    # Why this matters concretely, measured 2026-09-22: a synthetic GBRG
+    # frame under red light (R=181.5 G=101.5 B=86.5) gives H=+95, V=-95,
+    # C=-65. c_over_hv is 0.68, so the old rule called it "not a mosaic" --
+    # at -245 sigma. Under coloured illumination R-B is LARGE, so H and V
+    # dominate C by construction, and the old rule is guaranteed to reject.
+    # It would therefore have failed the red/blue illuminant swap, which is
+    # the experiment designated as decisive for this sensor.
+    # Use the MEANS, not a correlation. On a uniformly lit field H is the same
+    # in every tile, so it has no variance and a Pearson correlation is
+    # undefined -- which is exactly the flat-field case the illuminant swap
+    # produces. The sign relationship lives in the means.
+    mh = sum(h) / len(h)
+    mv = sum(v) / len(v)
+    mc = sum(c) / len(c)
+    scale = max(abs(mh), abs(mv), abs(mc))
+    rec["parity"]["means"] = (mh, mv, mc)
+    if scale >= 0.01:
+        sym = abs(abs(mh) - abs(mv)) / scale      # 0 when |H| == |V|
+        # GRBG / GBRG: H = -V. A one-phase defect gives H = V = C, same sign,
+        # so opposite signs at comparable magnitude cannot be a defect.
+        if mh * mv < 0 and sym < 0.35:
+            rec["mosaic"] = True
+            rec["why"] = (f"row and column parity have OPPOSITE SIGNS at comparable "
+                          f"magnitude (H={mh * 100:+.2f}%, V={mv * 100:+.2f}% of the tile "
+                          f"mean) -- H = -V is the GRBG/GBRG signature, and a single "
+                          f"damaged phase gives H = V = C at any depth, so no defect "
+                          f"can produce this")
+            return rec
+        # RGGB / BGGR: H = +V, same as a defect -- but a defect also forces
+        # |C| == |H|, while a CFA's C = R+B-2G is independent of R-B.
+        if mh * mv > 0 and sym < 0.35 and abs(mh) >= 0.01:
+            dev = abs(abs(mc) - abs(mh)) / max(abs(mh), 1e-9)
+            if dev > 0.35:
+                rec["mosaic"] = True
+                rec["why"] = (f"H and V agree (H={mh * 100:+.2f}%, V={mv * 100:+.2f}%) but "
+                              f"C={mc * 100:+.2f}% is {dev * 100:.0f}% away from them -- a "
+                              f"single damaged phase forces |C| = |H| = |V|, so C moving "
+                              f"independently is the RGGB/BGGR signature")
+                return rec
     if rec["parity"]["c_over_hv"] <= 1.25:
         rec["why"] = (f"checkerboard is only {rec['parity']['c_over_hv']:.2f}x the "
-                      "row/column parity -- a CFA separates green from red and blue "
-                      "by much more than it separates red from blue")
+                      "row/column parity, and row/column parity are not "
+                      f"anti-correlated ({hv_corr:+.2f}) -- under NEUTRAL light a CFA "
+                      "separates green from red and blue by more than it separates red "
+                      "from blue. NOTE this test is weak under COLOURED light, where "
+                      "R-B is large and H,V dominate C by construction")
         return rec
     rec["mosaic"] = True
     rec["why"] = (f"checkerboard is {rec['parity']['c_over_hv']:.2f}x the row/column parity "
@@ -751,7 +888,7 @@ def detect_mosaic(rows, width):
     return rec
 
 
-def detect_bayer_phase(rows, width, rec=None):
+def detect_bayer_phase(rows, width, rec=None, black=None):
     """Which 2x2 phase carries green, hence which of the four patterns applies.
 
     The capture core does not start on a fixed pixel parity -- see measure_comb
@@ -775,7 +912,7 @@ def detect_bayer_phase(rows, width, rec=None):
     """
     height = len(rows)
     if rec is None:
-        rec = detect_mosaic(rows, width)
+        rec = detect_mosaic(rows, width, black)
     if rec.get("parity") is None:
         return None
     green_diag = rec["green_diag"]
@@ -818,7 +955,7 @@ def detect_bayer_phase(rows, width, rec=None):
             "rb_corr": score, "rb_margin": abs(score[0] - score[1])}
 
 
-def demosaic(rows, width, height, pattern, white_balance=True):
+def demosaic(rows, width, height, pattern, white_balance=True, black=0):
     """Bilinear demosaic of a Bayer frame into interleaved 8-bit RGB rows.
 
     Bilinear and nothing fancier: the capture comb already puts a larger error
@@ -830,13 +967,36 @@ def demosaic(rows, width, height, pattern, white_balance=True):
     parity, and so are 2w-2-x and x for even w -- so a mirrored neighbour is
     still the colour the interpolator asked for.
 
-    White balance is grey-world, estimated on the RAW sample sites (where each
-    colour is actually measured) rather than on the interpolated image, and
-    applied as a gain on red and blue with green left alone so overall
-    brightness is unchanged. Returns (rgb_rows, gains, raw_means).
+    WHITE BALANCE IS APPLIED TO SIGNAL ABOVE BLACK, WHICH IS NOT A DETAIL.
+    This sensor sits on a black pedestal of 36-40 DN, which on the dim frames
+    this bench produces is two thirds of the whole code range. A colour filter
+    attenuates light; it cannot attenuate the pedestal. So the correct model of
+    a filtered site is
+
+        v = black + t*(scene)      NOT      v = t*(black + scene)
+
+    and the correct correction is `(v - black) * gain + black`, not `v * gain`.
+    Getting this wrong -- which is what this function used to do -- multiplies
+    the pedestal by the red gain too, so a red gain of 1.85 turns a neutral 38
+    DN of black into 70 DN of red. The visible result is hue that tracks
+    BRIGHTNESS: darks go red, highlights go cyan, measured here at a 1.32x
+    swing in R/G across the luma range of a real frame. That artifact was
+    previously attributed to the capture defect; most of it is this arithmetic.
+
+    `black` should be the fitted pedestal from fit_phase_defect() when there is
+    one, since it is estimated from a regression over thousands of pixels; the
+    frame minimum is a single noise sample and runs a couple of counts low.
+    Passing 0 restores the old behaviour.
+
+    Grey-world is then estimated on the black-subtracted sample sites, which
+    also changes the gains themselves: a pedestal in the means pulls every
+    channel ratio toward 1 and systematically UNDER-corrects.
+
+    Returns (rgb_rows, gains, raw_means) with raw_means above black.
     """
     colour = {(i // 2, i % 2): c for i, c in enumerate(pattern)}
     img = [list(r) for r in rows]
+    black = max(0, min(255, int(black)))
 
     raw_sum = {"R": 0.0, "G": 0.0, "B": 0.0}
     raw_n = {"R": 0, "G": 0, "B": 0}
@@ -844,19 +1004,24 @@ def demosaic(rows, width, height, pattern, white_balance=True):
         r = img[y]
         for x in range(width):
             c = colour[(y & 1, x & 1)]
-            raw_sum[c] += r[x]
+            raw_sum[c] += r[x] - black
             raw_n[c] += 1
     raw_means = {c: (raw_sum[c] / raw_n[c] if raw_n[c] else 0.0) for c in "RGB"}
 
     gains = {"R": 1.0, "G": 1.0, "B": 1.0}
-    if white_balance and raw_means["R"] > 0 and raw_means["B"] > 0:
+    if white_balance and raw_means["R"] > 0.5 and raw_means["B"] > 0.5:
         gains["R"] = raw_means["G"] / raw_means["R"]
         gains["B"] = raw_means["G"] / raw_means["B"]
 
+    # The LUT carries the black subtraction, the gain and the black add-back in
+    # one table, so the per-pixel cost is unchanged. Adding black back keeps the
+    # picture at the brightness it had -- the pedestal is neutral, it is only
+    # being stopped from acquiring a colour -- and --stretch removes it after.
     lut = {}
     for c in "RGB":
         g = gains[c]
-        lut[c] = [min(255, int(v * g + 0.5)) for v in range(256)]
+        lut[c] = [max(0, min(255, int((v - black) * g + black + 0.5)))
+                  for v in range(256)]
 
     def at(x, y):
         if x < 0:
@@ -945,10 +1110,16 @@ def main():
                     help="do not look for the line start; reshape from byte 0 and crop "
                          "blindly, which is what this tool used to do")
     ap.add_argument("--no-repair", action="store_true",
-                    help="do NOT compensate the known capture-path defect that leaves one "
-                         "2x2 sampling phase reading low; show the pixels exactly as the "
-                         "core delivered them. The repair is on by default because without "
-                         "it every frame carries a 12-20%% error on a quarter of its pixels")
+                    help="do NOT compensate the one 2x2 sampling phase that reads low; "
+                         "show the pixels exactly as the core delivered them. The repair "
+                         "is on by default because without it every frame carries a "
+                         "12-20%% error on a quarter of its pixels -- but it is DECLINED "
+                         "automatically on any frame whose mosaic test fires before the "
+                         "repair, since it is the algebraic inverse of a dye")
+    ap.add_argument("--force-repair", action="store_true",
+                    help="apply the phase repair even when the mosaic test fires on the "
+                         "unrepaired frame. Only with independent proof that the low phase "
+                         "is a defect and not a colour channel: this can erase real chroma")
     ap.add_argument("--stretch", action="store_true",
                     help="rescale to full black-to-white; the sensor's default exposure is dark")
     ap.add_argument("--colour", "--color", dest="colour", action="store_true",
@@ -1006,14 +1177,39 @@ def main():
     # downstream is reading the sensor rather than the defect. It is a per-pixel
     # affine map on one 2x2 phase and so cannot create or destroy a mosaic; see
     # the note above fit_phase_defect(). The .raw file is never written.
-    fit = None
+    # The fit runs even under --no-repair, because its `pedestal` is the best
+    # black-level estimate this tool has and the demosaic's white balance needs
+    # one whether or not the repair is applied. Only the repair is suppressed.
+    fit = fit_phase_defect(rows, width)
     clipped = 0
     after_spread = None
-    if not args.no_repair:
-        fit = fit_phase_defect(rows, width)
-        if fit["alpha"] is not None:
-            rows, clipped = repair_phase_defect(rows, width, fit)
-            after_spread = phase_spread(phase_levels(rows, width))
+
+    # THE GUARD. `true = (v - beta)/alpha` is algebraically the exact inverse of
+    # a dye: for a filtered site, low = K + t*(E - K) = t*E + K*(1 - t), which is
+    # the same affine form the fit returns. So on a frame that really does carry
+    # a mosaic this repair would divide the colour straight back out and then
+    # report the collapsed 2x2 spread as evidence it had worked. Run the mosaic
+    # test on the UNREPAIRED rows first and stand down if it fires. Costs one
+    # extra pass and removes the one way this tool could lie in the direction
+    # nobody would check.
+    pre = detect_mosaic(rows, width, fit.get("pedestal") if fit.get("alpha") else lo)
+    mosaic_before_repair = bool(pre.get("mosaic"))
+    if mosaic_before_repair and not args.no_repair and not args.force_repair:
+        fit["why"] = ("DECLINED -- the mosaic test fires on this frame BEFORE any "
+                      "repair, and the repair is the algebraic inverse of a dye, so "
+                      "applying it here would divide the colour out. Pass "
+                      "--force-repair if you have independent proof this is a defect")
+        fit["alpha"] = None
+    if not args.no_repair and fit["alpha"] is not None:
+        rows, clipped = repair_phase_defect(rows, width, fit)
+        after_spread = phase_spread(phase_levels(rows, width))
+
+    # The black pedestal, tracked through the stretch so the demosaic's white
+    # balance can subtract it. The fitted pedestal is preferred over the frame
+    # minimum: it comes from a regression over thousands of pixels, where the
+    # minimum is one sample of the noise and sits a couple of counts low.
+    black = fit["pedestal"] if fit.get("alpha") is not None else lo
+    fitted_black = fit.get("alpha") is not None
 
     if args.stretch:
         rlo = min(min(r) for r in rows)
@@ -1023,6 +1219,7 @@ def main():
             table = bytes(((v - rlo) * 255) // span if rlo <= v <= rhi else 0
                           for v in range(256))
             rows = [r.translate(table) for r in rows]
+            black = max(0.0, (black - rlo) * 255.0 / span)
 
     comb = measure_comb(rows, width)
     out = args.out or args.raw.with_suffix(".png")
@@ -1060,9 +1257,13 @@ def main():
               % (fit["before"] * 100, after_spread * 100,
                  "" if not clipped else
                  "   [%d repaired pixels clipped at 255 -- overexposed]" % clipped))
-        print("    uses only each pixel's own value, so it can neither create nor erase a "
-              "mosaic. KNOWN CAPTURE-PATH DEFECT; delete this once the RTL fix lands. "
-              "--no-repair turns it off")
+        print("    uses only each pixel's own value, so it neither invents a mosaic "
+              "nor smears one -- but it IS the algebraic inverse of a dye, so on a "
+              "frame that really carries a CFA it would divide the colour out. That "
+              "is why it stood down above if the mosaic test had fired first.")
+        print("    NOT a capture-core fault: the sensor's own test pattern arrives "
+              "bit-exact on all four phases, so this attenuation is upstream of the "
+              "digital bus. --no-repair turns the repair off")
 
     # The mosaic test runs on every frame, because the mono and the colour
     # HM01B0 answer the same model id and nothing but the pixels can say which
@@ -1070,7 +1271,10 @@ def main():
     # when the caller insists with --colour/--bayer.
     rec = None
     if not args.gray:
-        rec = detect_mosaic(rows, width)
+        rec = detect_mosaic(rows, width, black)
+        if mosaic_before_repair and not rec["mosaic"]:
+            print("  !! the mosaic test fired BEFORE the repair and does not fire "
+                  "after it -- the repair would have erased chroma; it was declined")
         if rec["parity"] is not None:
             q = rec["parity"]
             print("  2x2 parity over %d tiles, as a fraction of the tile mean:" % rec["tiles"])
@@ -1090,16 +1294,23 @@ def main():
             print("  phase levels vs the other three: %s sits %.1f%% low; the other "
                   "three agree within %.2f%%" % (PHASE_NAMES[d["low"]],
                                                  d["deficit"] * 100, d["spread"] * 100))
-            print("    that deficit against tile brightness: "
+            print("    raw-DN ratio against tile brightness:   "
                   + "  ".join("%.0f->%.3f" % b for b in d["bins"])
-                  + "  (corr %+.2f)" % d["level_corr"]
-                  + "   [a colour filter holds one ratio at every level]")
+                  + "  (corr %+.2f)" % d["level_corr"])
+            if d.get("above"):
+                print("    SAME BINS ABOVE BLACK (the CFA-relevant one): "
+                      + "  ".join("%.0f->%.3f" % b for b in d["above"]))
+                print("      a raw ratio MUST slide when a black pedestal is present, "
+                      "whatever the cause, so only the above-black row can be read as "
+                      "a transmission. Flat here = constant transmission = a dye OR a "
+                      "fixed gain; it does not choose between them.")
         if rec["excess"] is not None:
             x = rec["excess"]
             print("  excess checkerboard energy %+.3e over %d tiles = %+.1f sigma "
                   "-- phase-drift-immune; a 1.5%% colour separation reads +12 sigma "
                   "here, a real CFA hundreds" % (x["excess"], x["n"], x["sigmas"]))
         verdict = ("BAYER" if rec["mosaic"]
+                   else "NO VERDICT (synthetic frame)" if rec.get("synthetic")
                    else "UNDECIDABLE" if rec["undecided"] else "not a mosaic")
         print(f"  mosaic verdict: {verdict} -- {rec['why']}")
 
@@ -1148,7 +1359,8 @@ def main():
                       ph["rb_corr"][0], ph["rb_corr"][1], ph["rb_margin"]))
         if args.swap_rb:
             pattern = pattern.translate(str.maketrans("RB", "BR"))
-        rgb, gains, raw_means = demosaic(rows, width, height, pattern, args.wb)
+        rgb, gains, raw_means = demosaic(rows, width, height, pattern, args.wb,
+                                         black=black)
         png(out, width, height, rgb, colour=True,
             comment=None if measured else
             "ARTIFACT RENDER, NOT REAL COLOUR. This frame measures as having no "
@@ -1156,7 +1368,10 @@ def main():
             "brightness, not of the objects: it comes from one 2x2 sampling phase "
             "reading low by an amount that grows with signal level. Diagnostic only.")
         print(f"  Bayer pattern {pattern}, bilinear demosaic")
-        print("    raw channel means: R %.2f  G %.2f  B %.2f" % (
+        print("    black level %.1f DN subtracted before white balance%s" % (
+            black, "" if fitted_black
+            else "  [frame minimum -- no fitted pedestal available]"))
+        print("    raw channel means ABOVE BLACK: R %.2f  G %.2f  B %.2f" % (
             raw_means["R"], raw_means["G"], raw_means["B"]))
         print("    grey-world gains:  R %.3f  G %.3f  B %.3f%s" % (
             gains["R"], gains["G"], gains["B"], "" if args.wb else "  [--no-wb]"))

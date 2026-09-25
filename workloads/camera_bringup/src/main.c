@@ -594,20 +594,42 @@ int main(void)
         }
 
         /*
-         * Test-pattern content check. Reported, but deliberately NOT part of the verdict: the
-         * expected walking-1s sequence is not established by any source in this repository.
-         * See the provenance note in hm01b0.h.
+         * Test-pattern content check. Reported, never gating.
+         *
+         * This used to test for a walking-1s ramp. It is not one -- a capture off this
+         * part on 2026-09-22 measured a one-pixel-period column stripe of 0xff on the
+         * black level, three distinct byte values in the whole frame. See the note in
+         * hm01b0.h. What is worth reporting is therefore the distinct-value count and
+         * the full-scale adjacent-column step, because those are what say whether the
+         * bus carried the pattern intact.
          */
         {
-            int walking = (pixels[0] == HM01B0_WALKING1_FIRST);
+            unsigned int distinct = 0, steps = 0;
+            uint8_t seen[256] = { 0 };
+            uint8_t lo = 0xffU, hi = 0x00U;
 
-            for (uint32_t i = 1; i < n && i < 8U && walking; i++) {
-                if (pixels[i] != (uint8_t)(HM01B0_WALKING1_FIRST << i)) {
-                    walking = 0;
+            for (uint32_t i = 0; i < n; i++) {
+                if (!seen[pixels[i]]) {
+                    seen[pixels[i]] = 1U;
+                    distinct++;
+                }
+                if (pixels[i] < lo) {
+                    lo = pixels[i];
+                }
+                if (pixels[i] > hi) {
+                    hi = pixels[i];
                 }
             }
-            printf("       test pattern: %s walking-1s (unverified expectation, not gating)\n",
-                   walking ? "matches" : "does NOT match");
+            for (uint32_t i = 1; i < n; i++) {
+                if ((pixels[i - 1] == lo && pixels[i] == hi) ||
+                    (pixels[i - 1] == hi && pixels[i] == lo)) {
+                    steps++;
+                }
+            }
+            printf("       test pattern: %u distinct values, range 0x%02x..0x%02x, "
+                   "%u full-scale adjacent steps\n", distinct, lo, hi, steps);
+            printf("       expect ~3 distinct values and tens of thousands of steps; a "
+                   "fourth value would be a capture-path fault (not gating)\n");
         }
     }
 
