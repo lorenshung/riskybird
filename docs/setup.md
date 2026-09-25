@@ -1511,6 +1511,20 @@ and writes `profile.csv` and `gantt.svg` beside the capture. Naming the config i
 what lets it read both clocks out of the devicetree instead of being told them;
 the `clock evidence` line in the output says which it used.
 
-**Not verified on hardware.** Steps 5a-5c have been run here end to end; 5d has
-been exercised against a spike capture but never against a board, because none
-was attached. No frame rate in this repository was measured on an FPGA.
+**Verified on hardware since.** On 2026-09-24, images built this way from a
+fresh clone ran on three accelerator shells: 14.57 fps on
+`RocketArty200TDroneGemminiSaturnIntAt35Config`, 13.36 fps on
+`RocketArty200TDroneGemminiSaturnFp16At35Config` and 5.32 fps on
+`RocketArty200TDroneGemmini16At40Config`. The two faster ones use a recipe
+`generate` cannot express, published as verified sources under
+`artifacts/modelblaster/dronet/int8/*-gray-nhwc`. The commands, the recipe
+that regenerates them, and the results are in
+[`dronet-on-accel-socs.md`](dronet-on-accel-socs.md). The shells, and where
+their bitstreams and devicetrees come from, are in
+[`accel-shells-bringup.md`](accel-shells-bringup.md).
+
+`pip install -e backends/modelblaster` in 5a upgrades the Zephyr
+environment's numpy to 2.x. On 2026-09-24 it installed numpy 2.5.3, and pip
+warned that `gym-pybullet-drones` wants numpy < 2. Nothing in steps 1-5 uses
+that package. The regenerated DroNet sources were byte-identical to ones made
+under numpy 1.26.4.

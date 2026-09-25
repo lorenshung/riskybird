@@ -49,6 +49,8 @@ side needs the other's toolchain.
 | [`flight-on-fpga.md`](docs/flight-on-fpga.md) | porting the flight controller onto Rocket; phase plan and what is verified |
 | [`te0712-ftdi-carrier-ddr-bringup.md`](docs/te0712-ftdi-carrier-ddr-bringup.md) | the same DDR3 work on the FTDI carrier |
 | [`modelblaster-dronet-on-fpga.md`](docs/modelblaster-dronet-on-fpga.md) | a PyTorch model to an accelerated XC7A200T shell: the Gemmini/Saturn configs, the per-op timeline and FPS, and the two clock/FPU traps |
+| [`accel-shells-bringup.md`](docs/accel-shells-bringup.md) | the drone stack on the Gemmini/Saturn shells: which ones this branch supports, their bitstreams and devicetrees, bench results, and why the flight controller is not among them |
+| [`dronet-on-accel-socs.md`](docs/dronet-on-accel-socs.md) | DroNet on those shells from committed sources: 14.57 fps on IntAt35, the recipe that regenerates it, and the Q31 spike model its gate needs |
 | [`verification.md`](docs/verification.md) | what "verified" means here, and which tests pass where |
 | [`repository-layout.md`](docs/repository-layout.md) | orientation |
 | [`merging-into-main.md`](docs/merging-into-main.md) | what this branch changed, and how to fold it back |
