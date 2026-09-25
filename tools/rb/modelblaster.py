@@ -171,6 +171,32 @@ def _engine_from_text(text: str) -> str | None:
     return None
 
 
+def resolve_kernel_path(path: str) -> Path | None:
+    """Find a picked kernel's source on THIS machine.
+
+    kernel_picks.json records whatever path the codegen host used. A published
+    directory (artifacts/modelblaster/...) therefore names a file on someone
+    else's disk, and on a clean install every lookup missed and the engine
+    split fell back to the name table -- the fallback that painted scalar and
+    RVV ops as Gemmini. A relative path is taken inside the ModelBlaster
+    backend (tools/modelblaster/dronet_gray_nhwc.py writes kernels/<target>/...);
+    an absolute one that is not here is retried from its last kernels/ segment,
+    which is where every curated kernel lives in the pinned backend.
+    """
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = MODELBLASTER / candidate
+    if candidate.is_file():
+        return candidate
+    parts = Path(path).parts
+    if "kernels" in parts:
+        index = len(parts) - 1 - parts[::-1].index("kernels")
+        moved = MODELBLASTER.joinpath(*parts[index:])
+        if moved.is_file():
+            return moved
+    return None
+
+
 def _engine_from_source(path: str) -> str | None:
     """The engine a curated kernel file actually drives, read from its C.
 
@@ -181,8 +207,11 @@ def _engine_from_source(path: str) -> str | None:
     the whole frame one colour. Gemmini is reached through its RoCC macros,
     Saturn through RVV intrinsics; a file with neither is scalar.
     """
+    resolved = resolve_kernel_path(path)
+    if resolved is None:
+        return None
     try:
-        text = Path(path).read_text(errors="replace")
+        text = resolved.read_text(errors="replace")
     except OSError:
         return None
     if re.search(r"\b(tiled_conv\w*|tiled_matmul\w*|tiled_resadd\w*|gemmini_\w+\s*\(|ROCC_INSTRUCTION\w*)", text):
