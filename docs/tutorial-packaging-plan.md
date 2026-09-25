@@ -1,6 +1,6 @@
 # From remote bench to in-person tutorial: packaging plan
 
-Status: proposal (2026-09-24), written at the end of the T01-T42 flight campaign. Nothing here is committed yet.
+Status (2026-09-25): items 1-4 are done as `rb fly` and the `flight_controller` preset modes; see docs/tutorial-flight.md. Item 5 is covered by the per-session logs `rb fly` writes to `results/fly/`; item 6 (`rb release flight`) remains. The inventory below is the original proposal, kept as the record.
 
 ## Goal
 
