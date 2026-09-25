@@ -24,6 +24,8 @@ from . import (
     area,
     dse,
     fingerprint,
+    flightlog,
+    ground,
     modelblaster,
     plotting,
     rose,
@@ -2687,6 +2689,55 @@ def cmd_rose(args: argparse.Namespace) -> int:
     raise RbError(f"unsupported rose action: {args.rose_action}")
 
 
+def cmd_ground(args: argparse.Namespace) -> int:
+    """The flight-test ground station: SoftAP link, panel + monitor, and the live GO / NO-GO."""
+    try:
+        if args.ground_action == "ready":
+            return ground.ready(no_join=args.no_join, auto_rejoin=args.auto_rejoin)
+        if args.ground_action in ("up", "down", "status", "verify"):
+            return ground.wifi(args.ground_action, getattr(args, "ssid", None))
+        if args.ground_action == "gonogo":
+            return ground.gonogo(watch=args.watch)
+        if args.ground_action == "monitor":
+            return ground.monitor(args.extra)
+    except ground.GroundError as exc:
+        raise RbError(str(exc)) from exc
+    raise RbError(f"unsupported ground action: {args.ground_action}")
+
+
+def _flightlog_build_text(args: argparse.Namespace) -> str:
+    # The controller session hands over its build as a pasted block; a file keeps its
+    # line breaks and avoids shell quoting of `->` and parentheses.
+    if getattr(args, "build_file", None):
+        return args.build_file.read_text(encoding="utf-8").strip()
+    return getattr(args, "build", "") or ""
+
+
+def cmd_flightlog(args: argparse.Namespace) -> int:
+    """Publish and inspect flight trials in the flight-logs repo (RB_FLIGHT_LOGS, default ~/flight-logs)."""
+    repo = args.repo or flightlog.DEFAULT_REPO
+    try:
+        if args.flightlog_action == "push":
+            new = flightlog.push(repo=repo, raw=args.raw, date=args.date,
+                                 build=_flightlog_build_text(args), tag=args.tag or "",
+                                 note=args.note or "", dry_run=args.dry_run)
+            if not new:
+                print("no new trials (data refreshed if anything changed)")
+            for trial in new:
+                print(trial.name)
+            return 0
+        if args.flightlog_action == "show":
+            print(flightlog.show(flightlog.resolve_trial(repo, args.trial), step=args.step,
+                                 t_from=args.t_from, t_to=args.t_to))
+            return 0
+        if args.flightlog_action == "compare":
+            print(flightlog.compare([flightlog.resolve_trial(repo, t) for t in args.trials]))
+            return 0
+    except flightlog.FlightLogError as exc:
+        raise RbError(str(exc)) from exc
+    raise RbError(f"unsupported flightlog action: {args.flightlog_action}")
+
+
 def cmd_hil(args: argparse.Namespace) -> int:
     """Run a closed-loop HIL/co-simulation scenario under one supervisor."""
     if args.hil_action != "replay" or args.scenario != "mpc-hover":
@@ -3718,6 +3769,65 @@ def build_parser() -> argparse.ArgumentParser:
     build_group.add_argument("--no-build", action="store_true", help="require existing bridge and guest artifacts")
     build_group.add_argument("--rebuild", action="store_true", help="force both bridge and guest rebuilds")
     hil_replay.set_defaults(func=cmd_hil)
+
+    gnd = sub.add_parser(
+        "ground",
+        help="flight-test ground station: drone SoftAP, panel + monitor, live GO / NO-GO",
+    )
+    gnd_sub = gnd.add_subparsers(dest="ground_action", required=True)
+    gnd_ready = gnd_sub.add_parser(
+        "ready", help="caffeinate, join the SoftAP once, start the panel and the monitor"
+    )
+    gnd_ready.add_argument("--no-join", action="store_true", help="start everything, do not touch Wi-Fi")
+    gnd_ready.add_argument(
+        "--auto-rejoin", action="store_true",
+        help="also recover stale leases and rejoin by itself (switches the Mac's Wi-Fi on each retry)",
+    )
+    gnd_ready.set_defaults(func=cmd_ground)
+    gnd_up = gnd_sub.add_parser("up", help="join the drone SoftAP (fresh lease; needs non-Wi-Fi internet)")
+    gnd_up.add_argument("--ssid", help="drone SSID (default: the script's riskybird-5674)")
+    gnd_up.set_defaults(func=cmd_ground)
+    for action, text in (("down", "leave the SoftAP and restore the previous network"),
+                         ("status", "show the Wi-Fi and internet-path state"),
+                         ("verify", "PING the bridge and listen 10 s on :14550 (stop the monitor first)")):
+        gnd_sub.add_parser(action, help=text).set_defaults(func=cmd_ground)
+    gnd_go = gnd_sub.add_parser("gonogo", help="print the running monitor's verdict (exit 0 only on GO)")
+    gnd_go.add_argument("--watch", action="store_true", help="print once a second until Ctrl-C")
+    gnd_go.set_defaults(func=cmd_ground)
+    gnd_mon = gnd_sub.add_parser("monitor", help="run only the monitor (no panel, no Wi-Fi changes)")
+    gnd_mon.add_argument("extra", nargs=argparse.REMAINDER,
+                         help="passed to riskybird-flightready.py (e.g. --relay 0)")
+    gnd_mon.set_defaults(func=cmd_ground)
+
+    flog = sub.add_parser(
+        "flightlog",
+        help="publish flight trials to the flight-logs repo and inspect them",
+    )
+    flog.add_argument("--repo", type=Path, help="flight-logs checkout (default: $RB_FLIGHT_LOGS or ~/flight-logs)")
+    flog_sub = flog.add_subparsers(dest="flightlog_action", required=True)
+    flog_push = flog_sub.add_parser(
+        "push",
+        help="split the latest raw log into trials (existing trials keep their numbers), "
+        "summarize the new ones, commit and push",
+    )
+    flog_push.add_argument("--raw", type=Path, help="raw log (default: newest results/riskybird-logs/raw_*.log)")
+    flog_push.add_argument("--date", help="session date YYYY-MM-DD (default: from the raw log's name)")
+    build_src = flog_push.add_mutually_exclusive_group()
+    build_src.add_argument("--build", help="the controller session's build text, recorded verbatim")
+    build_src.add_argument("--build-file", type=Path, help="read the build text from a file")
+    flog_push.add_argument("--tag", help="short build label for the README row")
+    flog_push.add_argument("--note", help="operator comment, e.g. \"good hover, still drifting\"")
+    flog_push.add_argument("--dry-run", action="store_true", help="write into the checkout but do not commit or push")
+    flog_push.set_defaults(func=cmd_flightlog)
+    flog_show = flog_sub.add_parser("show", help="timeline of one trial (T27, 27, or the folder name)")
+    flog_show.add_argument("trial")
+    flog_show.add_argument("--step", type=float, default=0.2, help="seconds between rows (default 0.2)")
+    flog_show.add_argument("--from", dest="t_from", type=float, help="start, seconds from ARMING")
+    flog_show.add_argument("--to", dest="t_to", type=float, help="end, seconds from ARMING")
+    flog_show.set_defaults(func=cmd_flightlog)
+    flog_cmp = flog_sub.add_parser("compare", help="side-by-side flight numbers for several trials")
+    flog_cmp.add_argument("trials", nargs="+")
+    flog_cmp.set_defaults(func=cmd_flightlog)
 
     xp = sub.add_parser(
         "xpurt",
