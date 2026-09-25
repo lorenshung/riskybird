@@ -1311,16 +1311,65 @@ def zephyr_build(
     return elf
 
 
+_PERMUTE_MNEMONICS = ("vslide", "vfslide", "vrgather", "vcompress",
+                      "vmv1r", "vmv2r", "vmv4r", "vmv8r")
+
+
+def _is_vector_fp(mnemonic: str) -> bool:
+    """Vector floating point: every vf* except vfirst.m, plus the vmf* compares.
+
+    vfirst.m is an integer mask instruction, and vmfeq/vmflt/... are FP compares
+    that do not start with "vf". Both were misclassified by a plain "vf" prefix.
+    """
+    return (mnemonic.startswith("vf") and not mnemonic.startswith("vfirst")) \
+        or mnemonic.startswith("vmf")
+
+
+def isa_contract_offences(listing: str, *, fp16: bool, noperm: bool) -> dict[str, dict[str, int]]:
+    """Instructions an FP16 or noPermute shell decodes as illegal, per kind.
+
+    `listing` is `objdump -d --no-show-raw-insn` output. Returns
+    {kind: {"<function>: <mnemonic>": count}}; empty means the image is clean.
+
+    FP16 shells run CONFIG_FPU=n, so mstatus.FS stays Off and EVERY floating
+    point instruction traps: scalar F/D/Q/Zfh, fcsr access, and vector FP too
+    (the vector spec requires FS != Off for any vector FP operation).
+    """
+    offences: dict[str, dict[str, int]] = {}
+    function = "?"
+    for line in listing.splitlines():
+        header = re.match(r"^[0-9a-f]+ <(.+)>:$", line)
+        if header:
+            function = header.group(1)
+            continue
+        fields = line.split("\t")
+        if len(fields) < 2 or not fields[0].strip().endswith(":"):
+            continue
+        mnemonic = fields[1].split()[0] if fields[1].split() else ""
+        kind = None
+        if fp16 and mnemonic.startswith(("f", "c.f")) and not mnemonic.startswith("fence"):
+            kind = "scalar floating point"
+        elif (fp16 or noperm) and _is_vector_fp(mnemonic):
+            kind = "vector floating point"
+        elif noperm and mnemonic.startswith(_PERMUTE_MNEMONICS):
+            kind = "vector permute / whole-register move"
+        if kind:
+            per = offences.setdefault(kind, {})
+            key = f"{function}: {mnemonic}"
+            per[key] = per.get(key, 0) + 1
+    return offences
+
+
 def _check_isa_contract(board: Board, elf: Path) -> None:
     """Refuse an image containing instructions this shell decodes as illegal.
 
-    FP16 shells (FP16_SCALAR_FPU_CONFIGS): no scalar F/D/Q/Zfh opcode at all.
-    CONFIG_FPU=n is necessary and not sufficient. Anything that puts "f" or "d"
-    back into a translation unit's -march -- a global "v" (GCC expands it to
-    zve64d, which implies d and f), a per-file -march from a kernel flag table,
-    a prebuilt object -- produces hardware float that links cleanly and traps on
-    the first execution, because Zephyr leaves mstatus.FS off on a no-FPU image
-    and the shell's misa has neither F nor D.
+    FP16 shells (FP16_SCALAR_FPU_CONFIGS): no floating-point opcode at all,
+    scalar or vector. CONFIG_FPU=n is necessary and not sufficient. Anything
+    that puts "f" or "d" back into a translation unit's -march -- a global "v"
+    (GCC expands it to zve64d, which implies d and f), a per-file -march from a
+    kernel flag table, a prebuilt object -- produces hardware float that links
+    cleanly and traps on the first execution, because Zephyr leaves mstatus.FS
+    off on a no-FPU image and the shell's misa has neither F nor D.
 
     Integer no-permute shells (INT_NOPERMUTE_VECTOR_CONFIGS): no vector FP and
     no vslide*/vfslide*/vrgather*/vcompress/vmv<n>r.v. The last is the one that
@@ -1339,30 +1388,7 @@ def _check_isa_contract(board: Board, elf: Path) -> None:
         [str(objdump), "-d", "--no-show-raw-insn", str(elf)],
         capture_output=True, text=True, check=True,
     ).stdout
-    permute = ("vslide", "vfslide", "vrgather", "vcompress",
-               "vmv1r", "vmv2r", "vmv4r", "vmv8r")
-    offences: dict[str, dict[str, int]] = {}
-    function = "?"
-    for line in listing.splitlines():
-        header = re.match(r"^[0-9a-f]+ <(.+)>:$", line)
-        if header:
-            function = header.group(1)
-            continue
-        fields = line.split("\t")
-        if len(fields) < 2 or not fields[0].strip().endswith(":"):
-            continue
-        mnemonic = fields[1].split()[0] if fields[1].split() else ""
-        kind = None
-        if fp16 and mnemonic.startswith(("f", "c.f")) and not mnemonic.startswith("fence"):
-            kind = "scalar floating point"
-        elif noperm and mnemonic.startswith("vf"):
-            kind = "vector floating point"
-        elif noperm and mnemonic.startswith(permute):
-            kind = "vector permute / whole-register move"
-        if kind:
-            per = offences.setdefault(kind, {})
-            key = f"{function}: {mnemonic}"
-            per[key] = per.get(key, 0) + 1
+    offences = isa_contract_offences(listing, fp16=fp16, noperm=noperm)
     if offences:
         lines = []
         for kind, per in offences.items():
@@ -1381,7 +1407,7 @@ def _check_isa_contract(board: Board, elf: Path) -> None:
             "shell rather than hoping the path is never taken."
         )
     print(f"rb: {elf.name}: no instructions {board.config} decodes as illegal "
-          f"({'scalar FP' if fp16 else ''}{' / ' if fp16 and noperm else ''}"
+          f"({'scalar and vector FP' if fp16 else ''}{' / ' if fp16 and noperm else ''}"
           f"{'vector FP, permutes, vmv<n>r' if noperm else ''} checked)")
 
 
