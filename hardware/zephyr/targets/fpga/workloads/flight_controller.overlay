@@ -1,11 +1,13 @@
 /*
  * Flight controller, Phase 1: state estimation on the bench, no actuation.
  *
- * Only the IMU is exposed. The application selects its subsystems from device-tree aliases --
- * HAVE_FLOW/HAVE_TOF/HAVE_BARO in main.cpp, plus DT_NODE_EXISTS(DT_ALIAS(motors)) around the
- * whole PWM actuator block -- so declaring nothing else here compiles the optical flow, the
- * down-ToF, the barometer, the side-ToF bumper and every motor output OUT of the image. That is
- * a stronger guarantee than a runtime disarm: there is no code path to a motor in this build.
+ * Only the IMU and the down-facing VL53L1X (altitude) are exposed. The application selects its
+ * subsystems from device-tree aliases -- HAVE_FLOW/HAVE_TOF/HAVE_BARO in main.cpp, plus
+ * DT_NODE_EXISTS(DT_ALIAS(motors)) around the whole PWM actuator block -- so declaring nothing
+ * else here compiles the optical flow, the barometer, the side-ToF bumper and every motor output
+ * OUT of the image. That is a stronger guarantee than a runtime disarm: there is no code path to
+ * a motor in this build. The flow and motors overlays #include this one, so they inherit the
+ * down-ToF too.
  *
  * Sensors are added one alias at a time as each is verified. See docs/flight-on-fpga.md.
  */
@@ -75,4 +77,3 @@
 		tof = &vl53l1x;
 	};
 };
-
