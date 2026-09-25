@@ -40,7 +40,31 @@ struct rb_camera_capture {
 	uint32_t flags;
 	uint8_t vmin;
 	uint8_t vmax;
+	/* Readout mode as the sensor actually reports it, not as configured.
+	 * readout_ok is 0 when every read succeeded; a non-zero value means the
+	 * four bytes below are meaningless. See the note in hm01b0.h: a colour
+	 * part that is binning or subsampling produces a frame with no mosaic,
+	 * which looks exactly like a mono part. */
+	uint8_t x_odd_inc;
+	uint8_t y_odd_inc;
+	uint8_t binning_mode;
+	uint8_t qvga_win_en;      /* bit 0 only; see hm01b0.h */
+	int readout_ok;
+	/*
+	 * What RB_CAMERA_FULL_READOUT did, if it was built in.
+	 *   RB_CAMERA_PROGRAM_OFF      not compiled in -- the default
+	 *   RB_CAMERA_PROGRAM_OK       the sequence was written and read back clean
+	 *   anything else              the negative errno of the write that failed
+	 * Separate from readout_ok because "the sensor would not accept the
+	 * configuration" and "the sensor would not tell me its configuration" are
+	 * different faults and the second is survivable.
+	 */
+	int program_ok;
 };
+
+#define RB_CAMERA_PROGRAM_OFF      1    /* not built in */
+#define RB_CAMERA_PROGRAM_OK       0
+#define RB_CAMERA_READOUT_NOT_READ (-1000)  /* capture stopped before the probe */
 
 /*
  * Pixels the capture core can hold in one capture -- the hard ceiling on a

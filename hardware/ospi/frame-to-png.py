@@ -53,19 +53,36 @@ UPSTREAM of the digital bus -- sensor analog path, pixel, microlens or optics --
 and no RTL change to the capture core will remove it. See
 docs/hm01b0-colour-investigation.md.
 
-It is undone on the way to the PNG, per frame and per pixel, before anything
-else looks at the data; fit_phase_defect() carries the measurements and
-repair_phase_defect() applies them. The .raw is never written. --no-repair turns
-it off. The repair is DECLINED automatically on any frame where the mosaic test
-fires before the repair is applied, because `true = (v - beta)/alpha` is
-algebraically the exact inverse of a dye -- on a real CFA site it would divide
-the colour back out and then report the collapsed 2x2 spread as success.
+RESOLVED 2026-09-22, AND THE PARAGRAPHS ABOVE ARE THE WRONG CONCLUSION FROM
+RIGHT MEASUREMENTS. "Upstream of the digital bus -- sensor analog path, pixel,
+microlens or optics" was correct. It is the MICROLENS: that phase is the
+sensor's BLUE channel, sitting at ~46% of green under warm indoor light, which
+is simply what blue does. The part is a Bayer colour sensor.
 
-As of the swap on 2026-09-21 the frames still measure as mono, and they do so
-AFTER that repair, which is the stronger statement: the defect is no longer
-sitting on top of the mosaic test, and the test still finds nothing. Nor is the
-mosaic hiding behind a drifting CFA phase, which would cancel in any frame-wide
-average -- checker_excess() squares the checkerboard first so a phase flip
+What was missing was never a better statistic, it was exposure. FRAME_LEN
+capped integration at 340 lines, AE pegged, and 99% of every frame arrived
+clamped to one value by black-level correction. With FRAME_LEN 4000 and BLC off
+the same bench produced a sharp photograph in which the two phases on one
+diagonal agree to 1.3% while the other diagonal splits 45%, and in which the
+phase levels separate over a red object (1.044 / 1.135 / 1.309) and do not over
+a neutral one (1.153 / 1.153 / 1.155). Three distinct levels with the equal
+pair on a diagonal is Bayer; a single-phase fault makes two levels.
+
+So the repair is OFF by default now. fit_phase_defect() still carries the
+measurements and repair_phase_defect() still applies them under --repair,
+because `true = (v - beta)/alpha` is algebraically the exact inverse of a dye:
+on a real CFA site it divides the colour back out and then reports the
+collapsed 2x2 spread as success. It did exactly that here, for weeks.
+
+The automatic decline was not enough on its own -- it only fires when the
+mosaic test fires first, and on a mostly-neutral scene B sits 46% below G
+everywhere, which is indistinguishable from a constant gain fault by any
+frame-wide statistic. Use hardware/ospi/frame-to-colour.py to render colour;
+it picks the green diagonal by agreement rather than by brightness.
+
+Retained below: the mosaic test cannot see a mosaic hiding behind a drifting
+CFA phase, which would cancel in any frame-wide average -- checker_excess()
+squares the checkerboard first so a phase flip
 cannot cancel it, and reads within noise on every frame here while a synthetic
 CFA of one and a half percent reads twelve sigma.
 
@@ -247,9 +264,21 @@ def tile_phase_ratios(rows, width, tile=16):
 def measure_phase_deficit(tiles, black=None):
     """Does ONE of the four 2x2 phases just read low -- and does it slide with level?
 
-    This settles mono-against-colour more firmly than the parity-correlation
-    test below, because it does not need the scene to have had any colour in it.
-    Two independent things are checked and a CFA fails both.
+    CORRECTED 2026-09-23. This function used to claim it "settles mono-against-
+    colour ... because it does not need the scene to have had any colour in it",
+    and that "no CFA layout produces three-equal-one-low". BOTH ARE FALSE. A Bayer
+    sensor under warm indoor light reads red almost exactly like green -- on the
+    first properly exposed frame from the HM01B0 the phase levels were B 41 /
+    G 73 / G 73 / R 74 -- which is three equal and one low, the same shape a
+    single-phase gain fault makes. The measurements below are real; the inference
+    drawn from them was not. A global phase statistic CANNOT separate a constant
+    channel deficit from a constant gain fault. `dead` now means only "this shape
+    is present"; local_colour_test() is what decides, and detect_mosaic() never
+    reports "no colour" from this function alone.
+
+    What the original analysis got right, and still holds: the checks below do
+    not need the scene to be coloured. What it missed: neither can they rule
+    colour OUT, because the shape they detect is also a Bayer shape.
 
     SHAPE. A Bayer quad is R G G B: TWO phases equal (the greens) and two
     different. Measured on three captures minutes apart on this bench, anchored
@@ -261,7 +290,8 @@ def measure_phase_deficit(tiles, black=None):
     -- three agreeing to within 0.32%, 0.21% and 1.13%, and the fourth 14.6%,
     14.9% and 20.1% low. It is the same phase every time, even row and even
     column on the line-anchored grid, in frames whose line phases differ (0, 155,
-    0) and whose arm points differ. No CFA layout produces three-equal-one-low.
+    0) and whose arm points differ. ["No CFA layout produces three-equal-one-low"
+    was written here, and is WRONG: see the correction above.]
 
     LEVEL -- AND THE ARGUMENT THAT USED TO BE MADE FROM IT, WHICH WAS WRONG.
     Per 16x16 tile, low phase over the mean of the other three, binned by tile
@@ -289,14 +319,18 @@ def measure_phase_deficit(tiles, black=None):
     does, so it does not choose between them either.
 
     What DOES choose is the geometry, below: the three phases the deficit does
-    not touch agree to 0.10-0.33%, and no RGGB layout leaves three phases equal.
+    not touch agree to 0.10-0.33%. [This paragraph concluded "no RGGB layout
+    leaves three phases equal" -- also WRONG, for the same reason: under warm
+    light R reads like G, and three phases ARE equal.]
 
     The sliding raw ratio is still worth printing, because it is exactly what
     the demosaic turns into "colour" when it is run on a frame with no mosaic:
     hue that tracks brightness, so bright things come out warm and dark cool.
 
     Returns None when there are too few tiles, else a dict; `dead` is True when
-    the three checks together rule a CFA out.
+    the three-equal-one-low SHAPE is present. That shape does not rule a CFA out
+    (see the correction at the top); detect_mosaic() hands it to
+    local_colour_test() to decide.
     """
     if len(tiles) < 24:
         return None
@@ -685,6 +719,101 @@ def parity_components(tiles):
     return h, v, c
 
 
+# Tiles of this size; a tile is dropped if any pixel is clipped or near black,
+# because a clipped channel cannot report its own ratio.
+LOCAL_COLOUR_TILE = 16
+LOCAL_COLOUR_CLIP = (12, 245)
+# Fraction of tiles that must exceed the green pair's own 95th-percentile scatter.
+# If the odd-one-out phase were the SAME channel as the greens, the two ratios
+# would be identically distributed and exactly 5% of tiles would exceed it by
+# construction -- about +-1.2% at the ~300 tiles in a 324x315 frame. 12% is ~6
+# sigma above that. Measured: 19.2% on the HM01B0 frame that rendered as a colour
+# photograph; a mono-with-defect frame built from it scored 0.7%.
+LOCAL_COLOUR_THRESHOLD = 0.12
+
+
+def local_colour_test(rows, width, low):
+    """Does the odd-one-out phase move against the greens with the SCENE?
+
+    The one test that separates a Bayer sensor under warm light from a mono
+    sensor with one damaged phase -- which every global statistic in this file
+    cannot, because both give three phases equal and one low.
+
+    The two hypotheses differ in WHERE the deficit lives:
+
+      * a gain fault is spatially constant. The phase it does not touch is just
+        another sample of the one channel, so its ratio to the greens wanders
+        tile to tile exactly as much as the two greens wander against each other.
+      * a colour channel follows the scene. Over a red object its ratio to green
+        jumps; over a green one it drops. The greens against each other do not.
+
+    So the green pair is the control, and the question is how often the
+    odd-one-out phase is further from its median than the control ever gets.
+
+    Geometry fixes which phase is which without reference to brightness: removing
+    the low phase leaves exactly one complete diagonal (the greens) and one lone
+    phase -- the low phase's own diagonal partner, the other of red/blue.
+
+    Returns None if there are too few usable tiles, else a dict with `frac`,
+    `n`, the phases, and `pattern` naming r0c0 r0c1 r1c0 r1c1. The pattern takes
+    the LOW phase as blue: blue is the dimmest channel under daylight and under
+    every warm indoor source, and --bayer overrides it where that fails.
+    """
+    T = LOCAL_COLOUR_TILE
+    lo_clip, hi_clip = LOCAL_COLOUR_CLIP
+    height = len(rows)
+    diag_low = 0 if low in DIAGONALS[0] else 1
+    greens = DIAGONALS[1 - diag_low]
+    odd = [i for i in DIAGONALS[diag_low] if i != low][0]
+    ga, gb = (divmod(i, 2) for i in greens)
+    ox = divmod(odd, 2)
+
+    xg, gg = [], []
+    for by in range(0, height - T + 1, T):
+        for bx in range(0, width - T + 1, T):
+            acc = [[0, 0] for _ in range(4)]
+            ok = True
+            for y in range(by, by + T):
+                r = rows[y]
+                for x in range(bx, bx + T):
+                    v = r[x]
+                    if v < lo_clip or v > hi_clip:
+                        ok = False
+                        break
+                    a = acc[(y & 1) * 2 + (x & 1)]
+                    a[0] += v
+                    a[1] += 1
+                if not ok:
+                    break
+            if not ok:
+                continue
+            m = [a[0] / a[1] if a[1] else 0.0 for a in acc]
+            ma, mb, mx = m[ga[0] * 2 + ga[1]], m[gb[0] * 2 + gb[1]], m[ox[0] * 2 + ox[1]]
+            if ma <= 0 or mb <= 0:
+                continue
+            xg.append(mx / ((ma + mb) / 2.0))
+            gg.append(ma / mb)
+    if len(xg) < 40:
+        return None
+
+    def median(a):
+        a = sorted(a)
+        return a[len(a) // 2]
+
+    mx_, mg_ = median(xg), median(gg)
+    dev_x = [abs(v / mx_ - 1.0) for v in xg]
+    dev_g = sorted(abs(v / mg_ - 1.0) for v in gg)
+    thr = dev_g[min(len(dev_g) - 1, int(len(dev_g) * 0.95))]
+    frac = sum(1 for v in dev_x if v > thr) / len(dev_x)
+
+    grid = ["G"] * 4
+    grid[odd] = "R"
+    grid[low] = "B"
+    return {"frac": frac, "n": len(xg), "low": low, "odd": odd,
+            "greens": greens, "green_diag": 1 - diag_low,
+            "pattern": "".join(grid)}
+
+
 def detect_mosaic(rows, width, black=None):
     """Is this frame a Bayer mosaic, or just combed? Decided from the frame alone.
 
@@ -795,18 +924,45 @@ def detect_mosaic(rows, width, black=None):
             f"separated by {d['spread'] * 100:.1f}%, which a defect cannot do. "
             f"Something is separating the phases beyond the defect -- possibly a "
             f"CFA. The parity test below cannot see through a defect this large, "
-            f"so no mosaic verdict is offered. Fix the capture defect first.")
+            f"so no mosaic verdict is offered. On THIS sensor that low phase is "
+            "blue -- see frame-to-colour.py, which renders it rather than "
+            "trying to decide.")
         return rec
     if d is not None and d["dead"]:
+        # Three phases equal and one low. This used to be reported as "not a
+        # mosaic ... there is no colour in this data to recover", which is FALSE
+        # for a Bayer sensor under warm light and told a user with a working
+        # colour camera that it was mono. The global shape cannot decide; the
+        # local test can, so it is asked.
+        lc = local_colour_test(rows, width, d["low"])
+        rec["local_colour"] = lc
+        shape = (f"{PHASE_NAMES[d['low']]} reads {d['deficit'] * 100:.1f}% below the "
+                 f"other three, which agree within {d['spread'] * 100:.2f}%")
+        if lc is not None and lc["frac"] >= LOCAL_COLOUR_THRESHOLD:
+            rec["mosaic"] = True
+            rec["green_diag"] = lc["green_diag"]
+            rec["local_pattern"] = lc["pattern"]
+            rec["why"] = (
+                f"{shape} -- globally the shape of a single-phase fault, but ALSO what "
+                f"a Bayer sensor gives when the light makes red read like green. The "
+                f"local test separates them: the odd-one-out phase "
+                f"({PHASE_NAMES[lc['odd']]}) moves against the green pair beyond the "
+                f"pair's own 95th-percentile scatter in {lc['frac'] * 100:.1f}% of "
+                f"{lc['n']} tiles, where one channel gives 5% by construction. A gain "
+                f"fault is spatially constant and cannot do that. Pattern "
+                f"{lc['pattern']}, taking the dimmest phase as blue (--bayer overrides)")
+            return rec
+        rec["undecided"] = True
+        tested = ("too few unclipped tiles to run the local test" if lc is None else
+                  f"the local test found {lc['frac'] * 100:.1f}% of {lc['n']} tiles "
+                  f"moving, against a {LOCAL_COLOUR_THRESHOLD * 100:.0f}% threshold and "
+                  f"5% by chance")
         rec["why"] = (
-            f"{PHASE_NAMES[d['low']]} reads {d['deficit'] * 100:.1f}% below the other "
-            f"three phases, which agree within {d['spread'] * 100:.2f}% -- a Bayer quad "
-            f"is R G G B, two equal and two different, never three equal and one low. "
-            f"AND nothing is hiding "
-            f"under it: the three phases the low one does not touch agree within "
-            f"{d['spread'] * 100:.2f}%, where any CFA separates them by tens of "
-            f"percent -- 20.2% to 50.4% with a synthetic one laid over this very "
-            f"frame. There is no colour in this data to recover")
+            f"{shape}. That is the signature of a single-phase gain fault AND of a "
+            f"Bayer sensor whose illuminant makes red read like green; no global "
+            f"statistic tells them apart. {tested} -- not enough to call colour, "
+            f"which a scene with little colour in it gives too. This does NOT mean "
+            f"the sensor is mono: capture a strongly coloured target and re-run")
         return rec
     if _rms(c) < 0.01:
         rec["why"] = f"checkerboard is only {_rms(c) * 100:.2f}% of the tile mean -- no 2x2 structure"
@@ -876,7 +1032,7 @@ def detect_mosaic(rows, width, black=None):
     if rec["parity"]["c_over_hv"] <= 1.25:
         rec["why"] = (f"checkerboard is only {rec['parity']['c_over_hv']:.2f}x the "
                       "row/column parity, and row/column parity are not "
-                      f"anti-correlated ({hv_corr:+.2f}) -- under NEUTRAL light a CFA "
+                      f"anti-correlated ({rec['hv_corr']:+.2f}) -- under NEUTRAL light a CFA "
                       "separates green from red and blue by more than it separates red "
                       "from blue. NOTE this test is weak under COLOURED light, where "
                       "R-B is large and H,V dominate C by construction")
@@ -913,6 +1069,14 @@ def detect_bayer_phase(rows, width, rec=None, black=None):
     height = len(rows)
     if rec is None:
         rec = detect_mosaic(rows, width, black)
+    # When the local test decided the mosaic it also fixed the pattern from
+    # geometry, which is far stronger than the luminance tiebreak below. On the
+    # HM01B0 frame that motivated it, the tiebreak's margin was 0.053 and it
+    # picked RGGB -- red and blue SWAPPED, a blue stop sign.
+    if rec.get("local_pattern"):
+        return {"pattern": rec["local_pattern"], "green_diag": rec["green_diag"],
+                "hv_corr": rec.get("hv_corr", 0.0), "rb_corr": (0.0, 0.0),
+                "rb_margin": 0.0, "from_local": True}
     if rec.get("parity") is None:
         return None
     green_diag = rec["green_diag"]
@@ -1109,17 +1273,33 @@ def main():
     ap.add_argument("--no-anchor", action="store_true",
                     help="do not look for the line start; reshape from byte 0 and crop "
                          "blindly, which is what this tool used to do")
+    # OFF BY DEFAULT SINCE 2026-09-22. The "low phase" this repair was written
+    # to compensate is the sensor's BLUE CHANNEL. The part is a Bayer colour
+    # sensor -- proven on a properly exposed frame, where the two phases on one
+    # diagonal agree to 1.3% while the other diagonal splits 45%, and where the
+    # phase levels separate over a red object and do not over a neutral one.
+    # The repair divides that blue deficit out per pixel, which erases the
+    # chroma and then makes the mosaic test report no mosaic. It ran by default
+    # for this entire investigation and is a large part of why the colour was
+    # never found.
+    #
+    # The automatic decline was not enough: it only fires when the mosaic test
+    # fires FIRST, and on a mostly-neutral scene it does not -- B sits 46% below
+    # G everywhere, which is exactly the "one low, three equal" shape a
+    # single-phase defect makes. Global phase levels cannot tell a constant
+    # channel deficit from a constant gain fault; only local colour can.
+    ap.add_argument("--repair", action="store_true",
+                    help="compensate the one 2x2 sampling phase that reads low, as if it "
+                         "were a capture defect. OFF by default: on this sensor that phase "
+                         "is BLUE, and the repair is the algebraic inverse of a dye, so it "
+                         "erases real colour")
     ap.add_argument("--no-repair", action="store_true",
-                    help="do NOT compensate the one 2x2 sampling phase that reads low; "
-                         "show the pixels exactly as the core delivered them. The repair "
-                         "is on by default because without it every frame carries a "
-                         "12-20%% error on a quarter of its pixels -- but it is DECLINED "
-                         "automatically on any frame whose mosaic test fires before the "
-                         "repair, since it is the algebraic inverse of a dye")
+                    help="accepted and ignored; the repair is already off by default")
     ap.add_argument("--force-repair", action="store_true",
                     help="apply the phase repair even when the mosaic test fires on the "
                          "unrepaired frame. Only with independent proof that the low phase "
                          "is a defect and not a colour channel: this can erase real chroma")
+
     ap.add_argument("--stretch", action="store_true",
                     help="rescale to full black-to-white; the sensor's default exposure is dark")
     ap.add_argument("--colour", "--color", dest="colour", action="store_true",
@@ -1141,6 +1321,9 @@ def main():
     ap.add_argument("--no-wb", dest="wb", action="store_false",
                     help="skip the grey-world white balance, leaving raw channel gains")
     args = ap.parse_args()
+    # Downstream still asks `no_repair`; the flag it now comes from is --repair,
+    # and --force-repair still means "repair even if the mosaic test fired".
+    args.no_repair = not (args.repair or args.force_repair)
     if args.gray and (args.colour or args.bayer or args.force):
         sys.exit("--gray contradicts --colour/--force-colour/--bayer")
 
@@ -1241,7 +1424,7 @@ def main():
     # Every run says what the repair did, so a frame can never be read without
     # knowing whether it was corrected and how well the correction landed.
     if args.no_repair:
-        print("  capture defect repair: OFF [--no-repair] -- one 2x2 phase is left reading "
+        print("  phase repair: OFF (default; that phase is BLUE) -- one 2x2 phase is left reading "
               "low, so the 2x2 numbers below are the defect and not the scene")
     elif fit["alpha"] is None:
         print(f"  capture defect repair: DECLINED -- {fit['why']}")
@@ -1350,13 +1533,22 @@ def main():
             if ph is None:
                 sys.exit("frame too small to detect a Bayer phase")
             pattern = ph["pattern"]
-            print("  phase detection: green on the %s diagonal, from "
-                  "corr(row-parity, column-parity) = %+.4f" % (
-                      "-".join(PHASE_NAMES[i] for i in DIAGONALS[ph["green_diag"]]),
-                      ph["hv_corr"]))
-            print("    red/blue tiebreak by correlation with local luminance: "
-                  "%.4f vs %.4f (margin %.4f -- weak; --swap-rb flips it)" % (
-                      ph["rb_corr"][0], ph["rb_corr"][1], ph["rb_margin"]))
+            diag = "-".join(PHASE_NAMES[i] for i in DIAGONALS[ph["green_diag"]])
+            if ph.get("from_local"):
+                # Say where the pattern really came from. Printing the parity
+                # correlation and a 0.0000-vs-0.0000 tiebreak here would credit a
+                # test that was not the one that decided.
+                print("  phase detection: green on the %s diagonal, from the local "
+                      "colour test (geometry: the complete diagonal left once the low "
+                      "phase is removed)" % diag)
+                print("    red/blue by level: the dimmest phase is blue -- true under "
+                      "daylight and warm indoor light; --swap-rb or --bayer if not")
+            else:
+                print("  phase detection: green on the %s diagonal, from "
+                      "corr(row-parity, column-parity) = %+.4f" % (diag, ph["hv_corr"]))
+                print("    red/blue tiebreak by correlation with local luminance: "
+                      "%.4f vs %.4f (margin %.4f -- weak; --swap-rb flips it)" % (
+                          ph["rb_corr"][0], ph["rb_corr"][1], ph["rb_margin"]))
         if args.swap_rb:
             pattern = pattern.translate(str.maketrans("RB", "BR"))
         rgb, gains, raw_means = demosaic(rows, width, height, pattern, args.wb,

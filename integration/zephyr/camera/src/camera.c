@@ -46,13 +46,25 @@
 #define CAPSTAT_DONE    (1U << 1)
 
 /*
- * MCLK = sysclk / (2 * (div + 1)), sysclk = 50 MHz, so div = 1 is 12.5 MHz.
- * 12.5 MHz because that is the rate this sensor has actually answered at on
- * this hardware; 6.25 MHz, equally inside the datasheet's 3-36 MHz range, got
- * no ACK at all.
+ * MCLK = sysclk / (2 * (div + 1)). On the 50 MHz shells div = 1 is 12.5 MHz,
+ * the rate this sensor has actually answered at on this hardware; 6.25 MHz,
+ * equally inside the datasheet's 3-36 MHz range, got no ACK at all.
+ *
+ * sysclk is the fabric clock, so the same div = 1 is 10 MHz on the 40 MHz
+ * accelerator shells and 8.75 MHz on the 35 MHz one -- neither tried. 12.5 MHz
+ * is not reachable there; div = 0 gives 20 / 17.5 MHz. Override per build with
+ * RB_EXTRA_CFLAGS=-DCAM_MCLK_DIV=<n> (C only, so RB_EXTRA_CFLAGS, not
+ * RB_CMAKE_ARGS). The register is 8 bits wide (ospi/Params.scala mclkDivWidth).
  */
+#ifndef CAM_MCLK_DIV
 #define CAM_MCLK_DIV       1U
-#define CAPTURE_TIMEOUT_MS 4000
+#endif
+BUILD_ASSERT((CAM_MCLK_DIV) <= 0xffU, "CAM_MCLK_DIV is an 8-bit register field");
+/* The same number SIFIVE_PERIPHERAL_CLOCK_FREQUENCY is built from. */
+#define CAM_SYSCLK_HZ \
+	((uint32_t)CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC * CONFIG_RTC_CLOCK_DIVIDER_VALUE)
+#define CAM_MCLK_HZ        (CAM_SYSCLK_HZ / (2U * ((CAM_MCLK_DIV) + 1U)))
+#define CAPTURE_TIMEOUT_MS 20000
 
 static const struct device *i2c_dev;
 
@@ -143,12 +155,74 @@ static int cam_reg_write(uint16_t reg, uint8_t val)
  * before clipping. Override with RB_CAMERA_AE_TARGET.
  */
 #ifndef RB_CAMERA_AE_SETTLE_MS
-#define RB_CAMERA_AE_SETTLE_MS 600
+#define RB_CAMERA_AE_SETTLE_MS 6000
 #endif
 
 #ifndef RB_CAMERA_AE_TARGET
-#define RB_CAMERA_AE_TARGET 128
+/*
+ * 64 DN, not 128.
+ *
+ * AE's target is a mean of the sensor's LINEAR output, and a mean of 128 there
+ * is not mid-grey -- it is about a stop and a half hot, because everything
+ * downstream that displays the frame applies an sRGB curve that lifts 0.25
+ * linear to roughly 0.53 on screen. Measured on the same scene:
+ *
+ *     target 128:  18.3% of samples clipped at 255, analog gain 0x10
+ *     target  64:   0.1% clipped,                   analog gain 0x00 (minimum)
+ *
+ * So the lower target is better twice over: the highlights survive, and AE
+ * reaches the exposure with integration time alone instead of buying the last
+ * stop with analog gain, which is the noisiest way to get it.
+ */
+#define RB_CAMERA_AE_TARGET 64
 #endif
+
+/*
+ * Turn on the D8 status LED, the only light source on this board that software
+ * can reach.
+ *
+ * It is an indicator LED on the ADS7128 expander (GPIO7, ACTIVE LOW), not an
+ * illuminator, and it is not aimed at the lens. It is worth a try anyway: when
+ * the airframe is face down on a bench the LED and the camera are looking at
+ * the same nearby surface, and a few photons is the difference between a frame
+ * that says "zero light" and one that has something in it to measure.
+ *
+ * MEASURED 2026-09-22 with the lens dark: the sensor emitted a constant 96 DN
+ * over 99.99% of the frame, which is exactly BLC_TARGET 32 x digital gain 3 --
+ * i.e. its black level amplified, i.e. no photons at all. If this LED changes
+ * that number at all, there is an optical path to work with.
+ *
+ * Deliberately NOT reverted afterwards: an LED left on is visible to a human
+ * walking past and is a far smaller problem than a dark camera nobody can
+ * diagnose remotely.
+ */
+#define CAM_ADS7128_ADDR      0x17U
+#define CAM_ADS7128_CMD_WRITE 0x08U
+#define CAM_ADS7128_PIN_CFG   0x05U
+#define CAM_ADS7128_GPIO_CFG  0x07U
+#define CAM_ADS7128_GPO_VALUE 0x0BU
+#define CAM_STATUS_LED_CH     7U
+
+static int cam_status_led_on(void)
+{
+	uint8_t tx[3];
+	int rc;
+
+	/* GPIO mode, then output, then drive LOW (active low = lit). */
+	tx[0] = CAM_ADS7128_CMD_WRITE; tx[1] = CAM_ADS7128_PIN_CFG;
+	tx[2] = (uint8_t)(1U << CAM_STATUS_LED_CH);
+	rc = i2c_write(i2c_dev, tx, sizeof(tx), CAM_ADS7128_ADDR);
+	if (rc != 0) {
+		return rc;
+	}
+	tx[1] = CAM_ADS7128_GPIO_CFG;
+	rc = i2c_write(i2c_dev, tx, sizeof(tx), CAM_ADS7128_ADDR);
+	if (rc != 0) {
+		return rc;
+	}
+	tx[1] = CAM_ADS7128_GPO_VALUE; tx[2] = 0x00U;   /* LOW -> LED on */
+	return i2c_write(i2c_dev, tx, sizeof(tx), CAM_ADS7128_ADDR);
+}
 
 static int cam_set_ae_target(uint8_t target)
 {
@@ -206,6 +280,114 @@ static int stop(const char **stage, const char **detail,
 	return -1;
 }
 
+/*
+ * Print the live exposure chain. MUST be called with the sensor STREAMING and
+ * AE settled: every register here is an AE OUTPUT, and in standby they still
+ * hold whatever the PREVIOUS run converged to. Reading them before
+ * MODE_SELECT therefore reports the last scene the camera saw, not this one.
+ * That is not hypothetical -- on this bench it printed "the sensor has NO
+ * LIGHT" for a capture of a brightly lit target, because the carried-over
+ * values were from a run with the lens dark.
+ */
+static void cam_dump_exposure(void)
+{
+	static const struct { uint16_t reg; const char *name; } dump[] = {
+		{ HM01B0_REG_AE_CTRL,        "ae_ctrl      " },
+		{ HM01B0_REG_AE_TARGET,      "ae_target    " },
+		{ HM01B0_REG_AE_MIN_MEAN,    "ae_min_mean  " },
+		{ HM01B0_REG_MAX_INTG_H,     "max_intg_h   " },
+		{ HM01B0_REG_MAX_INTG_L,     "max_intg_l   " },
+		{ HM01B0_REG_MAX_AGAIN,      "max_again    " },
+		{ HM01B0_REG_MAX_DGAIN,      "max_dgain    " },
+		{ HM01B0_REG_INTEGRATION_H,  "integration_h" },
+		{ HM01B0_REG_INTEGRATION_L,  "integration_l" },
+		{ HM01B0_REG_ANALOG_GAIN,    "analog_gain  " },
+		{ HM01B0_REG_DIGITAL_GAIN_H, "dig_gain_h   " },
+		{ HM01B0_REG_DIGITAL_GAIN_L, "dig_gain_l   " },
+		{ HM01B0_REG_FRAME_LEN_H,    "frame_len_h  " },
+		{ HM01B0_REG_FRAME_LEN_L,    "frame_len_l  " },
+		{ HM01B0_REG_LINE_LEN_H,     "line_len_h   " },
+		{ HM01B0_REG_LINE_LEN_L,     "line_len_l   " },
+		{ HM01B0_REG_BLC_CFG,        "blc_cfg      " },
+		{ HM01B0_REG_BLC_TARGET,     "blc_target   " },
+	};
+
+	uint8_t ag = 0, dgh = 0, dgl = 0;
+	uint8_t ih = 0, il = 0, mih = 0, mil = 0, mag = 0;
+
+	printk("         --- HM01B0 exposure chain ---\n");
+	for (unsigned i = 0; i < ARRAY_SIZE(dump); i++) {
+		uint8_t v = 0;
+		int rc = cam_reg_read(dump[i].reg, &v);
+
+		if (rc == 0) {
+			printk("         %s 0x%04x = 0x%02x (%u)\n",
+			       dump[i].name, dump[i].reg, v, v);
+			if (dump[i].reg == HM01B0_REG_ANALOG_GAIN)    { ag = v; }
+			if (dump[i].reg == HM01B0_REG_DIGITAL_GAIN_H) { dgh = v; }
+			if (dump[i].reg == HM01B0_REG_DIGITAL_GAIN_L) { dgl = v; }
+			if (dump[i].reg == HM01B0_REG_INTEGRATION_H)  { ih = v; }
+			if (dump[i].reg == HM01B0_REG_INTEGRATION_L)  { il = v; }
+			if (dump[i].reg == HM01B0_REG_MAX_INTG_H)     { mih = v; }
+			if (dump[i].reg == HM01B0_REG_MAX_INTG_L)     { mil = v; }
+			if (dump[i].reg == HM01B0_REG_MAX_AGAIN)      { mag = v; }
+		} else {
+			printk("         %s 0x%04x = NAK (%d) -- wrong address?\n",
+			       dump[i].name, dump[i].reg, rc);
+		}
+	}
+
+	/*
+	 * AE SATURATION IS A LIGHTING REPORT, NOT A FAULT, and saying so
+	 * here is the whole point of dumping these.
+	 *
+	 * With the gain chain pegged the sensor emits amplified black,
+	 * which arrives as a nearly constant frame with a handful of
+	 * distinct values. That looks exactly like a dead sensor, a
+	 * broken capture path or a "synthetic pattern", and it has
+	 * already been misread as all three on this bench. It is none of
+	 * them: it means no photons.
+	 *
+	 * Measured on this hardware for contrast -- lens with a view:
+	 * analog_gain 0x00, integration 67 of 562 lines. Lens dark:
+	 * analog_gain 0x30 (max), digital gain 3x, and the frame comes
+	 * back as 99.99% one value.
+	 *
+	 * No colour question can be answered in this state: a per-channel
+	 * ratio needs signal above black, and there is none.
+	 */
+	/*
+	 * Analog gain pegged is sufficient on its own. Do NOT also
+	 * require the digital gain to read > 1: DIGITAL_GAIN_H is the
+	 * INTEGER part and the fraction lives in DIGITAL_GAIN_L, so a
+	 * genuine 1.92x reads as h=0x01, l=0xec. Testing h > 1 silently
+	 * missed a fully saturated sensor on this bench.
+	 */
+	if (ag >= HM01B0_ANALOG_GAIN_MAX) {
+		printk("         *** AE SATURATED -- analog gain at max (0x%02x), "
+		       "digital gain %u+%u/256. The sensor has NO LIGHT.\n",
+		       ag, dgh, dgl);
+		printk("         *** This is a lighting problem, not a sensor, capture "
+		       "or colour problem. Point the camera at a lit scene.\n");
+	}
+	{
+		/*
+		 * Where the loop actually stopped. "Pegged" only means no light
+		 * if the loop was free to go further; if integration is sitting
+		 * exactly on MAX_INTG the ceiling is what stopped it, and the
+		 * headroom below is real exposure nobody is using.
+		 */
+		unsigned intg = ((unsigned)ih << 8) | il;
+		unsigned maxi = ((unsigned)mih << 8) | mil;
+
+		printk("         AE stopped at integration %u of MAX_INTG %u%s; "
+		       "analog gain 0x%02x of MAX_AGAIN 0x%02x\n",
+		       intg, maxi,
+		       (maxi != 0U && intg >= maxi) ? " (AT THE CEILING)" : "",
+		       ag, mag);
+	}
+}
+
 int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 			    struct rb_camera_capture *out,
 			    const char **stage, const char **detail)
@@ -234,6 +416,9 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 	}
 
 	/* MCLK first: the sensor cannot answer on SCCB without its master clock. */
+	printk("         MCLK %u Hz = sysclk %u Hz / (2*(div %u + 1))\n",
+	       (unsigned int)CAM_MCLK_HZ, (unsigned int)CAM_SYSCLK_HZ,
+	       (unsigned int)(CAM_MCLK_DIV));
 	sys_write32(CAM_MCLK_DIV, CAM_MCLKDIV);
 	sys_write32(CTRL_ENABLE, CAM_CTRL);
 	k_msleep(10);
@@ -280,92 +465,6 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 	 */
 	out->program_ok = cam_program_full_readout();
 #endif
-
-	/*
-	 * EXPOSURE CHAIN DUMP. Read-only, and printed rather than returned,
-	 * because this is a bring-up question rather than something a caller
-	 * acts on: nothing in this tree has ever written or read any of these,
-	 * so the sensor has run on power-up defaults throughout. Every frame
-	 * captured on this bench spans 5-49 DN above a ~36 DN black floor,
-	 * where a correctly exposed 8-bit frame spans 90-150, and at 20 DN of
-	 * signal a colour difference is below the quantisation noise. So this
-	 * is the first thing to look at before any further colour analysis.
-	 *
-	 * A NAK or an unchanged value means the ADDRESS is wrong -- these come
-	 * from the published Himax reference init, not from a register map in
-	 * this repository. Report, never act.
-	 */
-	{
-		static const struct { uint16_t reg; const char *name; } dump[] = {
-			{ HM01B0_REG_AE_CTRL,        "ae_ctrl      " },
-			{ HM01B0_REG_AE_TARGET,      "ae_target    " },
-			{ HM01B0_REG_AE_MIN_MEAN,    "ae_min_mean  " },
-			{ HM01B0_REG_INTEGRATION_H,  "integration_h" },
-			{ HM01B0_REG_INTEGRATION_L,  "integration_l" },
-			{ HM01B0_REG_ANALOG_GAIN,    "analog_gain  " },
-			{ HM01B0_REG_DIGITAL_GAIN_H, "dig_gain_h   " },
-			{ HM01B0_REG_DIGITAL_GAIN_L, "dig_gain_l   " },
-			{ HM01B0_REG_FRAME_LEN_H,    "frame_len_h  " },
-			{ HM01B0_REG_FRAME_LEN_L,    "frame_len_l  " },
-			{ HM01B0_REG_LINE_LEN_H,     "line_len_h   " },
-			{ HM01B0_REG_LINE_LEN_L,     "line_len_l   " },
-			{ HM01B0_REG_BLC_CFG,        "blc_cfg      " },
-			{ HM01B0_REG_BLC_TARGET,     "blc_target   " },
-		};
-
-		uint8_t ag = 0, dgh = 0, dgl = 0;
-
-		printk("         --- HM01B0 exposure chain ---\n");
-		for (unsigned i = 0; i < ARRAY_SIZE(dump); i++) {
-			uint8_t v = 0;
-			int rc = cam_reg_read(dump[i].reg, &v);
-
-			if (rc == 0) {
-				printk("         %s 0x%04x = 0x%02x (%u)\n",
-				       dump[i].name, dump[i].reg, v, v);
-				if (dump[i].reg == HM01B0_REG_ANALOG_GAIN)    { ag = v; }
-				if (dump[i].reg == HM01B0_REG_DIGITAL_GAIN_H) { dgh = v; }
-				if (dump[i].reg == HM01B0_REG_DIGITAL_GAIN_L) { dgl = v; }
-			} else {
-				printk("         %s 0x%04x = NAK (%d) -- wrong address?\n",
-				       dump[i].name, dump[i].reg, rc);
-			}
-		}
-
-		/*
-		 * AE SATURATION IS A LIGHTING REPORT, NOT A FAULT, and saying so
-		 * here is the whole point of dumping these.
-		 *
-		 * With the gain chain pegged the sensor emits amplified black,
-		 * which arrives as a nearly constant frame with a handful of
-		 * distinct values. That looks exactly like a dead sensor, a
-		 * broken capture path or a "synthetic pattern", and it has
-		 * already been misread as all three on this bench. It is none of
-		 * them: it means no photons.
-		 *
-		 * Measured on this hardware for contrast -- lens with a view:
-		 * analog_gain 0x00, integration 67 of 562 lines. Lens dark:
-		 * analog_gain 0x30 (max), digital gain 3x, and the frame comes
-		 * back as 99.99% one value.
-		 *
-		 * No colour question can be answered in this state: a per-channel
-		 * ratio needs signal above black, and there is none.
-		 */
-		/*
-		 * Analog gain pegged is sufficient on its own. Do NOT also
-		 * require the digital gain to read > 1: DIGITAL_GAIN_H is the
-		 * INTEGER part and the fraction lives in DIGITAL_GAIN_L, so a
-		 * genuine 1.92x reads as h=0x01, l=0xec. Testing h > 1 silently
-		 * missed a fully saturated sensor on this bench.
-		 */
-		if (ag >= HM01B0_ANALOG_GAIN_MAX) {
-			printk("         *** AE SATURATED -- analog gain at max (0x%02x), "
-			       "digital gain %u+%u/256. The sensor has NO LIGHT.\n",
-			       ag, dgh, dgl);
-			printk("         *** This is a lighting problem, not a sensor, capture "
-			       "or colour problem. Point the camera at a lit scene.\n");
-		}
-	}
 
 	out->readout_ok = 0;
 	{
@@ -418,6 +517,161 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 #ifndef RB_CAMERA_TEST_PATTERN
 #define RB_CAMERA_TEST_PATTERN 0
 #endif
+	/*
+	 * D8 is the only light software controls, so it is on by default -- but
+	 * it sits ON THE BOARD, inches from the lens and pointing roughly the
+	 * same way. If the sensor is enclosed, covered or filmed, D8 is then the
+	 * brightest thing in frame and the ONLY thing in frame, which is
+	 * indistinguishable from a scene until you turn it off. Build with
+	 * RB_CAMERA_STATUS_LED=0 to take the control capture that tells them
+	 * apart: a bright blob that survives with the LED dark is external
+	 * light; one that vanishes was always the LED.
+	 */
+#ifndef RB_CAMERA_STATUS_LED
+#define RB_CAMERA_STATUS_LED 1
+#endif
+#if RB_CAMERA_STATUS_LED
+	{
+		int ledrc = cam_status_led_on();
+
+		printk("         status LED (D8, the only light software controls): %s\n",
+		       ledrc == 0 ? "ON" : "write failed");
+	}
+#else
+	printk("         status LED (D8): OFF by request -- control capture, any "
+	       "light in this frame came from outside the board\n");
+#endif
+
+	/*
+	 * BLACK LEVEL CORRECTION OVERRIDE.
+	 *
+	 * BLC subtracts a dark reference and adds back BLC_TARGET, so every
+	 * pixel at or below that reference leaves the sensor as exactly
+	 * BLC_TARGET. Measured on this bench with the lens looking at a lit
+	 * scene: 101641 of 102690 pixels came back BIT-IDENTICAL at 96, which
+	 * is BLC_TARGET 32 times the 3x digital gain, with 364 at 255 and only
+	 * ~55 values in between in the entire frame.
+	 *
+	 * A frame with NO NOISE is the finding. At maximum analog gain a live
+	 * analog readout cannot produce a hundred thousand identical pixels --
+	 * read noise and dark current alone would scatter them across several
+	 * DN, and roughly half would land above the reference. They do not, so
+	 * the dark reference BLC is subtracting sits above the signal, and the
+	 * clamp -- not the scene and not the capture path -- is what flattens
+	 * the picture.
+	 *
+	 * This tree has never written the Himax analog/BLC init block (0x1000
+	 * to 0x100C), so BLC has only ever run on power-up defaults. Rather
+	 * than write a register map this repository does not have, turn the
+	 * clamp OFF and look: with BLC disabled the pedestal comes through raw,
+	 * and noise reappearing is proof the analog path is alive and the clamp
+	 * was eating the image.
+	 *
+	 * MEASURED, same scene, back to back:
+	 *
+	 *   BLC on  (0x01): range 96..255, 101641/102690 pixels BIT-IDENTICAL
+	 *                   at 96, 364 at 255, ~55 intermediate values total.
+	 *   BLC off (0x00): range 0..171, a graded noisy image with 55 distinct
+	 *                   levels across the lit region.
+	 *
+	 * So OFF is the default here. Leaving it on is not a neutral choice --
+	 * it is what made every frame in this investigation look like a dead
+	 * sensor. Build with RB_CAMERA_BLC_CFG=0xff to leave the register
+	 * alone, or =0x01 to put the clamp back deliberately.
+	 */
+#ifndef RB_CAMERA_BLC_CFG
+#define RB_CAMERA_BLC_CFG 0x00
+#endif
+#if RB_CAMERA_BLC_CFG != 0xff
+	{
+		uint8_t back = 0xffU;
+		int rc = cam_reg_write(HM01B0_REG_BLC_CFG, RB_CAMERA_BLC_CFG);
+
+		if (rc == 0) {
+			rc = cam_reg_read(HM01B0_REG_BLC_CFG, &back);
+		}
+		printk("         BLC_CFG forced to 0x%02x -- write %s, reads back 0x%02x%s\n",
+		       (unsigned)RB_CAMERA_BLC_CFG, rc == 0 ? "ACKed" : "FAILED", back,
+		       back == (uint8_t)RB_CAMERA_BLC_CFG ? "" : "  <- DID NOT STICK");
+	}
+#endif
+
+	/*
+	 * EXPOSURE CEILING.
+	 *
+	 * AE cannot expose past MAX_INTG (0x2105/06) and MAX_INTG cannot
+	 * usefully exceed FRAME_LEN (0x0340/41), so the frame length is the
+	 * real ceiling on how much light this sensor is allowed to collect.
+	 * Measured defaults: FRAME_LEN 562 lines, MAX_INTG 340, and AE parked
+	 * at integration 300 with analog gain already pegged at 0x30. The loop
+	 * was out of rope, not out of scene.
+	 *
+	 * Line time is LINE_LEN 370 pclk at ~12.5 MHz, so 300 lines is ~8.9 ms.
+	 * Stretching FRAME_LEN buys exposure in direct proportion and costs
+	 * only frame rate, which a stills capture does not care about: at 4000
+	 * lines a frame still completes in ~118 ms, far inside CAPTURE_TIMEOUT_MS.
+	 *
+	 * MEASURED, same indoor scene, back to back:
+	 *
+	 *   562 / 340  (the defaults):  AE pegged, analog gain 0x30, digital
+	 *                               gain 3x, 99.6% of the frame at zero and
+	 *                               a single 17x31 lit patch.
+	 *   4000 / 3900:                AE converged -- analog gain 0x10, frame
+	 *                               mean 129 against an AE target of 128,
+	 *                               160 distinct levels, a sharp photograph.
+	 *
+	 * That one change is the difference between "the sensor has no light"
+	 * and a picture. 0 leaves a register alone; set FRAME_LEN first, since
+	 * raising MAX_INTG past FRAME_LEN does nothing -- the sensor cannot
+	 * integrate for longer than a frame lasts.
+	 *
+	 * COSTS FRAME RATE: 4000 lines is ~118 ms, about 8 fps. That is free for
+	 * a stills capture and wrong for a flight vision loop, which should pass
+	 * a shorter FRAME_LEN and accept the noise.
+	 */
+#ifndef RB_CAMERA_FRAME_LEN
+#define RB_CAMERA_FRAME_LEN 4000
+#endif
+#ifndef RB_CAMERA_MAX_INTG
+#define RB_CAMERA_MAX_INTG 3900
+#endif
+#if RB_CAMERA_FRAME_LEN || RB_CAMERA_MAX_INTG
+	{
+		static const struct { uint16_t reg; uint8_t val; } ex[] = {
+#if RB_CAMERA_FRAME_LEN
+			{ HM01B0_REG_FRAME_LEN_H, (RB_CAMERA_FRAME_LEN >> 8) & 0xffU },
+			{ HM01B0_REG_FRAME_LEN_L, RB_CAMERA_FRAME_LEN & 0xffU },
+#endif
+#if RB_CAMERA_MAX_INTG
+			{ HM01B0_REG_MAX_INTG_H,  (RB_CAMERA_MAX_INTG >> 8) & 0xffU },
+			{ HM01B0_REG_MAX_INTG_L,  RB_CAMERA_MAX_INTG & 0xffU },
+#endif
+		};
+		int rc = cam_reg_write(HM01B0_REG_GRP_PARAM_HOLD, HM01B0_GRP_HOLD);
+
+		for (unsigned i = 0; rc == 0 && i < ARRAY_SIZE(ex); i++) {
+			rc = cam_reg_write(ex[i].reg, ex[i].val);
+		}
+		(void)cam_reg_write(HM01B0_REG_GRP_PARAM_HOLD, HM01B0_GRP_COMMIT);
+
+		/* Read back: a frame-timing register that is ACKed and then
+		 * ignored looks exactly like one that took, and the whole point
+		 * of moving these is to know how much exposure was really
+		 * bought. */
+		for (unsigned i = 0; i < ARRAY_SIZE(ex); i++) {
+			uint8_t back = 0xffU;
+
+			(void)cam_reg_read(ex[i].reg, &back);
+			printk("         exposure ceiling 0x%04x <- 0x%02x, reads 0x%02x%s\n",
+			       ex[i].reg, ex[i].val, back,
+			       back == ex[i].val ? "" : "  <- DID NOT STICK");
+		}
+		printk("         FRAME_LEN=%u MAX_INTG=%u requested (0 = untouched); "
+		       "write %s\n", (unsigned)RB_CAMERA_FRAME_LEN,
+		       (unsigned)RB_CAMERA_MAX_INTG, rc == 0 ? "ACKed" : "FAILED");
+	}
+#endif
+
 	{
 		int aerc = cam_set_ae_target(RB_CAMERA_AE_TARGET);
 
@@ -447,13 +701,21 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 	 * AE settle. 100 ms was enough when the target was never changed --
 	 * the sensor simply streamed at whatever it powered up with. Having
 	 * just moved the target, the loop has to re-converge, and it does so
-	 * over frames rather than instantly: at ~30 fps, 600 ms is roughly 18
-	 * frames, which is ample for an AE loop that only has to walk
-	 * integration time up. Capturing before it converges yields a frame
-	 * part-way through the ramp, which looks exactly like a target that
-	 * did not take.
+	 * over frames rather than instantly.
+	 *
+	 * Count FRAMES, not milliseconds. At FRAME_LEN 4000 a frame is ~118 ms,
+	 * so 1500 ms is only 12 of them -- measured, that was enough for AE to
+	 * drop digital gain but NOT to walk analog gain back down, and the frame
+	 * came out with its median pixel at 255. 6000 ms is ~50 frames, and with
+	 * that the frame mean lands on 129 against a target of 128. Capturing
+	 * before convergence yields a frame part-way through the ramp, which
+	 * looks exactly like a target that did not take.
 	 */
 	k_msleep(RB_CAMERA_AE_SETTLE_MS);
+
+	/* Now, and only now, do these registers describe the frame that is about
+	 * to be taken. See cam_dump_exposure(). */
+	cam_dump_exposure();
 
 	/* PCLK is only meaningful after the sensor leaves standby -- the part
 	 * powers up in standby and a healthy camera drives no pixel clock until

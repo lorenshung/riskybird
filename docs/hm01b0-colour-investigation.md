@@ -1136,3 +1136,203 @@ this document can explain it away if it opens up.
   quantities that say whether the bus carried the pattern intact.
 * `integration/zephyr/camera/src/camera.c` — the test-pattern comment records
   the result and warns against reading phase means off a pattern frame.
+
+## 2026-09-22, later: the black level clamp
+
+Three instrument faults were removed before any of the colour numbers on this
+page could be trusted. Everything above this heading was measured through at
+least one of them.
+
+**1. The exposure dump was reporting the previous run.** It read the AE chain
+before `MODE_SELECT=streaming`. Those registers are AE *outputs*, and in standby
+they still hold whatever the last run converged to, so the dump described the
+last scene the camera saw. It printed *"the sensor has NO LIGHT"* for a capture
+of a brightly lit target. It is now `cam_dump_exposure()`, called after the AE
+settle.
+
+**2. The capture timeout was false.** `CAPTURE_TIMEOUT_MS` was 4000. With
+integration walked up to 300 lines a frame no longer finishes inside that, so
+the stage reported `timeout -- the frame did not complete` while the core had in
+fact reached `PIXTARGET` — `capcount=102690` of `pixtarget=102690`, visible in
+GDB a moment later. Now 20000.
+
+**3. Black level correction was clamping the whole picture.** Same scene, back
+to back:
+
+| `BLC_CFG` | range | frame content |
+|---|---|---|
+| `0x01` (on) | 96..255 | **101641 of 102690 pixels bit-identical at 96** (`BLC_TARGET` 32 × digital gain 3), 364 at 255, ~55 intermediate values in the entire frame |
+| `0x00` (off) | 0..171 | a graded, noisy, linear image |
+
+A frame with *no noise* is the finding. At maximum analog gain a live analog
+readout cannot emit a hundred thousand identical pixels — read noise alone
+scatters them across several DN. The dark reference BLC subtracts sits above the
+signal, so the clamp, not the scene and not the capture path, is what flattened
+every frame in this investigation. This tree has never written the Himax
+analog/BLC init block (`0x1000`–`0x100C`), so BLC has only ever run on power-up
+defaults. `RB_CAMERA_BLC_CFG` now defaults to `0x00`.
+
+### First linear frame
+
+With the clamp off, 102305 of 102690 pixels are exactly zero and ~385 carry real
+graded values. The lit region is a single 17×31 patch; the rest of the field
+receives nothing at all. Inside it, over the 98 well-lit 2×2 tiles:
+
+```
+  r0c0 = 130.9      r0c1 = 122.1
+  r1c0 = 119.5      r1c1 =   0.0     <- zero in 98 of 98 tiles
+```
+
+One phase dead, the other three live, and the two survivors that are diagonal to
+each other agree within 2%. That is Bayer geometry. It is **not yet proof**: a
+dead phase reads zero too. The one measurement that separates them is a change
+of illuminant colour — a colour filter kills a *different* phase when the light
+changes, a broken phase kills the same one always. That control has not been
+taken yet.
+
+Note also that the patch renders R ≈ G with B absent, i.e. yellow-white, not
+red — so whatever the camera is imaging, it is not the red target that was in
+front of it.
+
+### Tools
+
+`hardware/ospi/frame-to-colour.py` demosaics a raw capture. It is deliberately
+separate from `frame-to-png.py`: nothing it prints is evidence *for* a mosaic.
+It warns when the two middle phases come out adjacent rather than diagonal,
+which is what happens under near-neutral light where brightness cannot identify
+the red phase; `--order RGGB` forces the assignment.
+
+```
+python3 hardware/ospi/frame-to-colour.py bootup-frame.raw 326 14 \
+    --crop 282,314,112,136 --order RGGB
+```
+
+## RESOLVED — it is a colour camera
+
+![the stop sign, in colour](images/stop-sign-colour.png)
+
+The part is a Bayer colour sensor. Every "it measures as mono" result before
+this was an instrument artifact. Nothing about the sensor or the capture core
+ever had to change.
+
+### What was actually wrong
+
+**Exposure was capped.** `FRAME_LEN` is 562 lines and `MAX_INTG` 340, so AE
+could not integrate past 300 lines — about 8.9 ms — and pegged analog gain at
+`0x30` in an ordinary lit room. The frame came back 99.6% zero with a single
+17×31 lit patch, which reads exactly like a dead sensor. Raising `FRAME_LEN` to
+4000 and `MAX_INTG` to 3900 gives AE thirteen times the rope, and it converges:
+analog gain drops to `0x10`, frame mean lands on 129 against an AE target of
+128, 160 distinct levels, a sharp photograph.
+
+`RB_CAMERA_AE_SETTLE_MS` has to go up with it — **count frames, not
+milliseconds**. At `FRAME_LEN` 4000 a frame is ~118 ms, so the old 1500 ms was
+12 frames: enough for AE to drop digital gain, not enough to walk analog gain
+back down, and the median pixel came out at 255. 6000 ms is ~50 frames.
+
+All three are now the defaults, along with `BLC_CFG = 0x00`.
+
+**And the analysis tool was erasing the colour.** `frame-to-png.py` applied its
+"capture defect repair" by default: it rescaled the low 2×2 phase per pixel,
+which is the algebraic inverse of a dye, and then reported *not a mosaic*. That
+low phase is the blue channel. The repair is now off by default.
+
+### The phase map
+
+```
+r0c0 = blue     r0c1 = green
+r1c0 = green    r1c1 = red
+```
+
+The greens are the anti-diagonal and agree to 1.3%; the other diagonal splits
+45%. Under warm indoor light blue sits at ~46% of green, which is what blue
+does — and is indistinguishable, by any frame-wide statistic, from the constant
+gain fault it was mistaken for.
+
+The measurement that separates them is **local**, in one frame:
+
+| region | the three non-blue phases |
+|---|---|
+| the red sign | 1.044 / 1.135 / 1.309 |
+| neutral background | 1.153 / 1.153 / 1.155 |
+
+Phases that separate only where the scene is red cannot be a fixed gain. Three
+distinct levels with the equal pair on a diagonal is Bayer.
+
+### Taking a colour picture
+
+```
+./rb debug bootup_check --target arty200t \
+    --config RocketArty200TDroneFullDDRConfig --usb-location 7-1.1.4.3 \
+    --gdb-script hardware/ospi/bootup-capture.gdb --ram-console
+
+python3 hardware/ospi/frame-to-colour.py bootup-frame.raw 326 2
+```
+
+```
+  greens are the anti-diagonal (they agree to 1.3%; the other diagonal differs by 45.3%)
+  phase r0c0 mean   79.52  -> blue
+  phase r0c1 mean  146.85  -> green
+  phase r1c0 mean  148.79  -> green
+  phase r1c1 mean  145.28  -> red
+  white balance (grey-world): R x1.02  G x1.00  B x1.86
+```
+
+`--no-wb` leaves the channels raw, which is what any further colour measurement
+should use; white balance is grey-world and on by default because without it
+the picture is strongly yellow-green.
+
+The greyscale of the same capture, for reference:
+
+![the same frame, greyscale](images/stop-sign-grey.png)
+
+## Refining the render
+
+Four changes, measured on the same scene.
+
+**Exposure.** AE's target is a mean of the sensor's LINEAR output, and 128 there
+is not mid-grey — it is about a stop and a half hot, because everything that
+displays the frame applies an sRGB curve that lifts 0.25 linear to ~0.53 on
+screen.
+
+| AE target | clipped samples | analog gain |
+|---|---|---|
+| 128 | 18.3% | 0x10 |
+| **64** | **0.1%** | **0x00** (minimum) |
+
+Better twice over: the highlights survive, and AE reaches the exposure with
+integration time alone instead of buying the last stop with analog gain. 64 is
+now the default.
+
+**Full resolution.** The renderer binned each 2×2 tile into one pixel — a
+quarter of the pixels and every edge with them. Now gradient-corrected
+interpolation (Malvar-He-Cutler) at the full 324×315.
+
+**The sRGB curve.** The sensor is linear and displays are not. Omitting this is
+what made a correct render look muddy.
+
+**A colour matrix.** The three filters overlap, so a red object puts real signal
+into the blue pixels. White balance cannot undo that — it is a per-channel gain,
+and the gain that makes a neutral surface neutral (blue ×2.03 here) also doubles
+the blue that leaked onto the red sign. Rendered colours:
+
+| region | no matrix | strength 0.7 |
+|---|---|---|
+| stop sign | `#E0A09A` (pale salmon) | `#EF9393` |
+| white desk | `#B9BCBF` | `#B8BCC1` |
+| green PCB | `#6D7A77` | `#697C76` |
+
+The matrix is **generic, not calibrated** for this part — there is no spectral
+measurement of these filters in this repository. Use `--ccm 0` for any
+measurement. Strength defaults to 0.7 rather than 1.0 because the matrix
+multiplies the dominant channel by 1.6 and that clips on a brightly lit
+saturated object: at full strength the sign's red reaches 251, the highlight
+roll-off blends it toward white, and the sign comes out *pinker* than at 0.7.
+
+**Noise needed no work.** High-frequency noise on the lit desk measures 1.7 DN
+against a mean of 124 — SNR 70. The 10–70% figures a naive standard deviation
+gives are scene texture, not sensor noise.
+
+White balance holds up against real surfaces: the desk reads `#B8BCC1` and the
+wall `#636E67`, both neutral within a few levels, while the sign (raw R/G 2.22)
+and the PCB (raw R/G 0.84) separate hard in opposite directions.

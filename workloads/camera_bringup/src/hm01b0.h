@@ -166,6 +166,21 @@
 #define HM01B0_REG_AE_CTRL       0x2100U /* bit0: 1 = auto exposure enabled */
 #define HM01B0_REG_AE_TARGET     0x2101U /* AE target mean, in DN */
 #define HM01B0_REG_AE_MIN_MEAN   0x2102U /* AE minimum acceptable mean */
+/*
+ * AE CLAMPS. These bound what the AE loop is ALLOWED to reach, so they decide
+ * whether "analog gain pegged at max" means the scene is dark or merely that
+ * the loop ran out of rope. Read them before concluding anything about light:
+ * integration stalling well below FRAME_LEN is MAX_INTG doing its job, not the
+ * sensor refusing to expose.
+ *
+ * Addresses are from the published Himax reference register map, not from a
+ * datasheet in this repository -- so they are reported, never acted on, per the
+ * rule the exposure dump already follows.
+ */
+#define HM01B0_REG_MAX_INTG_H    0x2105U /* AE integration ceiling, high byte */
+#define HM01B0_REG_MAX_INTG_L    0x2106U /* AE integration ceiling, low byte  */
+#define HM01B0_REG_MAX_AGAIN     0x2107U /* AE analog-gain ceiling, full res  */
+#define HM01B0_REG_MAX_DGAIN     0x210AU /* AE digital-gain ceiling           */
 #define HM01B0_REG_BLC_CFG       0x1000U /* black level correction enable */
 #define HM01B0_REG_BLC_TARGET    0x1003U /* black level target, in DN */
 
