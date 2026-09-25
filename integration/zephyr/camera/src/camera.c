@@ -744,6 +744,18 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 	} while (captured < want &&
 		 (sys_read32(CAM_CAPSTAT) & CAPSTAT_DONE) == 0U &&
 		 k_uptime_get() < deadline);
+	/*
+	 * Read the count again now that the loop has stopped. The core sets
+	 * CAPCOUNT to the target and CAPSTAT.DONE in the same cycle
+	 * (hardware/ospi HM01B0Capture.scala, the bounded-capture gate), so the
+	 * iteration that sees DONE can hold a CAPCOUNT sampled just before the
+	 * last pixel landed. Trusting that stale value failed a complete frame
+	 * as "overflow -- the frame did not complete" on 2 of 4 runs on the
+	 * 35 MHz Fp16At35 shell, with CAPCOUNT reading the full target
+	 * afterwards. Once DONE is set the count no longer moves, and after a
+	 * timeout a re-read is still short, so this cannot pass a short frame.
+	 */
+	captured = sys_read32(CAM_CAPCOUNT);
 	out->captured = captured;
 
 	/*
