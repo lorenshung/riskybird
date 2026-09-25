@@ -1,9 +1,11 @@
 """rb fly and the flight presets: pure logic, no hardware."""
 
+import argparse
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
@@ -120,6 +122,91 @@ class ImuVerdicts(unittest.TestCase):
     def test_parses_the_debug_line(self):
         s = fly._imu_samples(["flight_controller: iter=6400 a=[1.039 0.107 9.617] g=[-0.019 -1.239 0.063]"])
         self.assertEqual(s[0][1], [1.039, 0.107, 9.617])
+
+
+def _adapter(location, manufacturer="FTDI", product="Dual RS232-HS"):
+    return {"location": location, "pid": "6010", "manufacturer": manufacturer,
+            "product": product, "serial": "(none)", "bus": "7", "device": "1", "ttys": ""}
+
+
+BENCH = [_adapter("7-1.1.1", "Digilent", "Digilent Adept USB Device"),
+         _adapter("7-1.1.4.1"),
+         _adapter("7-1.1.4.2", "Digilent", "Digilent Adept USB Device"),
+         _adapter("7-1.1.4.3"),
+         _adapter("5-2", "Xilinx", "A-U250-A64G")]
+
+
+def _args(**kw):
+    base = dict(debug_location=None, bitstream_location=None, console="/dev/null", esp_port="x")
+    base.update(kw)
+    return argparse.Namespace(**base)
+
+
+class Discovery(unittest.TestCase):
+    """The probe detaches an adapter's JTAG, so it must never reach someone else's board."""
+
+    def _discover(self, args, idcodes):
+        from rb import cli
+        probed = []
+
+        def probe(location):
+            probed.append(location)
+            return idcodes.get(location, "all ones (nothing driving TDO)")
+
+        with mock.patch.object(cli, "ftdi_adapters", return_value=BENCH), \
+             mock.patch.object(cli, "probe_idcode", side_effect=probe), \
+             mock.patch.object(fly, "_holders", return_value=[]):
+            return fly.discover(args), probed
+
+    def test_vendor_boards_are_never_probed(self):
+        bench, probed = self._discover(_args(), {
+            "7-1.1.4.1": "0x13636093 xc7a200t config TAP -- bitstream link",
+            "7-1.1.4.3": "0x00000001 Rocket debug TAP"})
+        self.assertEqual(sorted(probed), ["7-1.1.4.1", "7-1.1.4.3"])
+        self.assertEqual(bench.bitstream["location"], "7-1.1.4.1")
+        self.assertEqual(bench.debug["location"], "7-1.1.4.3")
+
+    def test_halted_debug_adapter_resolves_to_the_twin_not_the_digilent_on_the_same_hub(self):
+        bench, _ = self._discover(_args(), {"7-1.1.4.1": "0x13636093 xc7a200t config TAP -- bitstream link"})
+        self.assertEqual(bench.debug["location"], "7-1.1.4.3")
+
+    def test_both_locations_given_probes_nothing(self):
+        bench, probed = self._discover(_args(debug_location="7-1.1.4.3", bitstream_location="7-1.1.4.1"), {})
+        self.assertEqual(probed, [])
+        self.assertEqual(bench.debug["location"], "7-1.1.4.3")
+
+    def test_a_named_location_that_is_not_a_drone_adapter_is_refused(self):
+        with self.assertRaises(fly.FlyError):
+            self._discover(_args(debug_location="7-1.1.4.2", bitstream_location="7-1.1.4.1"), {})
+
+
+class StopScript(unittest.TestCase):
+    def _stop(self, last):
+        calls = []
+        with tempfile.TemporaryDirectory() as d, \
+             mock.patch.object(fly, "LAST_MODE", Path(d) / "last-mode"), \
+             mock.patch.object(fly, "discover", return_value=fly.Bench(None, {"location": "x"}, None, None)), \
+             mock.patch.object(fly, "rb_debug", side_effect=lambda *a, **k: calls.append((a[3], k))):
+            fly._remember_mode(*last)
+            fly.gdb_step(argparse.Namespace(mode=None), fly.STOP)
+        return calls[0]
+
+    def test_flight_controller_gets_the_estop_script(self):
+        script, kw = self._stop(("t21-hover-1.0m", "flight_controller"))
+        self.assertEqual(script, fly.STOP)
+
+    def test_an_image_without_g_estop_gets_a_plain_halt(self):
+        # stop.gdb aborts on the missing g_estop before `monitor halt`
+        script, kw = self._stop(("default", "motor_duty"))
+        self.assertEqual(script, fly.HALT)
+        self.assertEqual(kw["workload"], "motor_duty")
+        self.assertIn("monitor halt", fly.HALT.read_text())
+        self.assertNotIn("g_estop =", fly.HALT.read_text())
+
+    def test_motor_step_length_is_bounded_by_the_firmware_dwell(self):
+        args = argparse.Namespace(duty=20, ms=fly.MOTOR_DUTY_DWELL_MS + 1, yes=True)
+        with self.assertRaises(fly.FlyError):
+            fly.motors(args)
 
 
 if __name__ == "__main__":

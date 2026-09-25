@@ -766,11 +766,15 @@ def program_fpga(board: Board, tool: str = "auto", usb_location: str = "") -> No
         # does not survive the PROGRAM_B pulse openFPGALoader issues at the end
         # of a flash write. Measured on the drone bench: the part comes back
         # DONE=0 after every one of nine PROGRAM_B resets, while an SRAM load
-        # of the byte-identical image reaches DONE=1 every time. A cold power
-        # cycle does boot from flash, so the write above is not wasted -- but
-        # without this second load `rb program` returns success and leaves an
-        # unconfigured part, which is what makes `rb debug` report an all-ones
-        # scan that reads like a broken cable.
+        # of the byte-identical image reaches DONE=1 every time. Whether the
+        # flash copy boots at all depends on the bitstream: only images built
+        # with fpga-shells 80831d8 (2026-09-23, the TE0712 SPI_32BIT_ADDR boot
+        # properties) can -- a 40 MHz shell built that day came back from a
+        # cold power cycle on its own. The FullDDR image flown so far predates
+        # it and never configures from flash. Either way, without this second
+        # load `rb program` returns success and leaves an unconfigured part,
+        # which is what makes `rb debug` report an all-ones scan that reads
+        # like a broken cable.
         run(
             [*loader, "--bitstream", bitstream],
             environment="host",
@@ -2091,12 +2095,17 @@ def cmd_bench(args: argparse.Namespace) -> int:
 
     rows = []
     for adapter in adapters:
-        idcode = "(not probed)" if args.no_probe else probe_idcode(adapter["location"])
+        if args.no_probe:
+            idcode = "(not probed)"
+        elif is_foreign_adapter(adapter) and not args.all:
+            idcode = f"(not probed: {adapter['manufacturer']} board; --all probes it)"
+        else:
+            idcode = probe_idcode(adapter["location"])
         if "config TAP" in idcode and "Alveo" not in idcode:
             role = "bitstream"
         elif "Rocket debug TAP" in idcode:
             role = "debug"
-        elif "Alveo" in idcode:
+        elif "Alveo" in idcode or idcode.startswith("(not probed:"):
             role = "other"
         elif "all ones" in idcode:
             # The debug adapter reads all ones whenever no design is running,
@@ -2137,6 +2146,20 @@ def cmd_bench(args: argparse.Namespace) -> int:
     print()
     print("bus:device changes on every replug or USB reset; the location does not.")
     return 0
+
+
+# FTDI boards whose EEPROM names them as someone else's: Digilent Arty/Nexys boards and the Alveo
+# card's own FT4232H. The drone's programmer board carries two blank-EEPROM FT2232Hs (manufacturer
+# "FTDI", product "Dual RS232-HS", no serial). An IDCODE probe detaches ftdi_sio from channel A,
+# so shifting a scan through a board that is not the drone's takes its JTAG away from whoever is
+# using it -- on a shared host that is other people's hardware.
+FOREIGN_FTDI_MANUFACTURERS = ("Digilent", "Xilinx")
+
+
+def is_foreign_adapter(adapter: dict[str, str]) -> bool:
+    """True for an adapter whose EEPROM says it belongs to a vendor board, not the drone."""
+
+    return adapter.get("manufacturer", "") in FOREIGN_FTDI_MANUFACTURERS
 
 
 def probe_idcode(location: str) -> str:
@@ -3803,6 +3826,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the IDCODE probe (faster, keeps ttyUSB nodes bound, but "
         "cannot tell the bitstream adapter from the debug one)",
+    )
+    bench.add_argument(
+        "--all",
+        action="store_true",
+        help="also probe adapters whose EEPROM names a vendor board (Digilent, "
+        "Xilinx). Off by default: a probe detaches that board's JTAG from "
+        "whoever is using it",
     )
     bench.set_defaults(func=cmd_bench)
     probe_ftdi.set_defaults(func=cmd_probe_ftdi)

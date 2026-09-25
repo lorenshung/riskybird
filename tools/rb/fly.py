@@ -43,9 +43,13 @@ from .boards import ROOT
 
 FLIGHT_GDB = ROOT / "hardware" / "flight"
 FREERUN = FLIGHT_GDB / "freerun.gdb"
+STOP = FLIGHT_GDB / "stop.gdb"
+HALT = FLIGHT_GDB / "halt.gdb"
 DEFAULT_TARGET = "arty200t"
 DEFAULT_CONFIG = "RocketArty200TDroneFullDDRConfig"
 RESULTS = ROOT / "results" / "fly"
+
+MOTOR_DUTY_DWELL_MS = 6000    # workloads/motor_duty/src/main.c MOTOR_DUTY_DWELL_MS
 
 BANNER_COMMIT_CAPABLE = "COMMIT GATE -- build is COMMIT-CAPABLE"
 BANNER_COMMITTED = "*** COMMITTED TO A FLIGHT TEST ***"
@@ -259,7 +263,10 @@ def discover(args) -> Bench:
     """Bitstream and debug adapters by IDCODE; FPGA console and ESP ports."""
     from . import cli, artifacts
 
-    adapters = [a for a in cli.ftdi_adapters() if a["pid"] in cli.MPSSE_PRODUCT_IDS]
+    # Never probe a vendor board (Digilent, Alveo): the probe detaches its JTAG from whoever is
+    # using it. And with both locations given there is nothing to find, so probe nothing at all.
+    adapters = [a for a in cli.ftdi_adapters()
+                if a["pid"] in cli.MPSSE_PRODUCT_IDS and not cli.is_foreign_adapter(a)]
     bit = dbg = None
     want_dbg = getattr(args, "debug_location", None) or os.environ.get("RB_FTDI_LOCATION")
     want_bit = getattr(args, "bitstream_location", None)
@@ -271,8 +278,14 @@ def discover(args) -> Bench:
         if want_bit and a["location"] == want_bit:
             bit = a
             continue
+        if want_dbg and want_bit:
+            continue
         idcode = cli.probe_idcode(a["location"])
         probed.append((a, idcode))
+    for want, found, flag in ((want_dbg, dbg, "--debug-location"), (want_bit, bit, "--bitstream-location")):
+        if want and found is None:
+            raise FlyError(f"{flag} {want}: no drone programmer adapter at that location "
+                           "(rb bench lists them)")
     for a, idcode in probed:
         if bit is None and "config TAP" in idcode and "Alveo" not in idcode:
             bit = a
@@ -351,6 +364,7 @@ def program_sram(args, bench: Bench) -> None:
     """The flight shell into SRAM (default), or flash then SRAM with --flash."""
     from . import cli
 
+    _require(bench, bitstream=True)
     target = cli.get_target(args.target)
     board = target.fpga_board.with_config(args.config)
     location = bench.bitstream["location"]
@@ -528,6 +542,10 @@ def gdb_step(args, script: Path) -> int:
     mode = args.mode or mode
     if not mode:
         raise FlyError("which image is running? pass --mode (no rb fly load/commit recorded one)")
+    if script == STOP and workload != "flight_controller":
+        # stop.gdb latches g_estop first, and only flight_controller has one: against any other
+        # image the batch aborts on the missing symbol before `monitor halt`, and the core runs on.
+        script = HALT
     rb_debug(args, bench, mode, script, workload=workload, no_load=True)
     return 0
 
@@ -607,26 +625,35 @@ def imu(args) -> int:
 # ---------------------------------------------------------------------------------------------
 
 def motors(args) -> int:
+    if not 5 <= args.duty <= 25:
+        raise FlyError("--duty must be 5..25 (motor_duty's own ceiling is 25)")
+    if not 200 <= args.ms <= MOTOR_DUTY_DWELL_MS:
+        raise FlyError(f"--ms must be 200..{MOTOR_DUTY_DWELL_MS} (motor_duty ends every step "
+                       f"itself after its {MOTOR_DUTY_DWELL_MS} ms dwell)")
     print("MOTOR TEST: spins each selected motor ALONE at "
           f"{args.duty}% for {args.ms} ms. Pack IN, props on or off, hands clear.")
     print("Stops: each step ends itself; the ESP cuts all four 120 ms after frames stop; pull the pack.")
     if not args.yes:
         if not sys.stdin.isatty() or input("Type 'spin' to run it: ").strip().lower() != "spin":
             raise FlyError("not confirmed")
-    if not 5 <= args.duty <= 25:
-        raise FlyError("--duty must be 5..25 (motor_duty's own ceiling is 25)")
     bench = discover(args)
     _require(bench, debug=True, console=True, esp=True)
     session = _session_dir()
     build(args, "default", workload="motor_duty")
     taps = _taps(bench, session, fpga_writable=True)
+    loaded = False
     try:
         time.sleep(3.0)
+        since = taps["esp"].mark()
         rb_debug(args, bench, "default", FREERUN, workload="motor_duty")
+        loaded = True
         _remember_mode("default", "motor_duty")
         fpga = taps["fpga"]
         if not fpga.wait_for("Keys:", 15):
             raise FlyError("motor_duty banner not seen on the console")
+        link = _wait_link(taps["esp"], since)
+        if not link.get("ok"):
+            raise FlyError(f"ESP link not up, not spinning anything: {link.get('why')}")
         mark = fpga.mark(); fpga.write(b"+"); time.sleep(0.3); fpga.write(b"-"); time.sleep(0.5)
         current = None
         for line in fpga.since(mark):
@@ -653,5 +680,14 @@ def motors(args) -> int:
         print(f"rb fly motors: done (logs {session}). Tell the operator: corner, spin direction from above, air down?")
         return 0
     finally:
+        # Every exit -- done, an error, Ctrl-C mid-spin -- disarms and halts the core, so the
+        # ESP sees the frames stop and cuts all four; nothing is left running for `rb fly stop`.
+        if loaded:
+            try:
+                taps["fpga"].write(b"x")
+                rb_debug(args, bench, "default", HALT, workload="motor_duty", no_load=True)
+            except Exception as exc:  # noqa: BLE001 -- the operator must hear about it
+                print(f"rb fly motors: could not halt the core ({exc}) -- run `rb fly stop` "
+                      "or pull the pack", file=sys.stderr)
         for tap in taps.values():
             tap.stop()
