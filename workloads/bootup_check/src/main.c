@@ -25,6 +25,7 @@
  */
 
 #include <riskybird/camera.h>
+#include <riskybird/motor_guard.h>
 #include <riskybird/tof.h>
 #include "pmw3901.h"
 
@@ -426,6 +427,50 @@ __attribute__((noinline)) void camera_frame_ready(void)
 	__asm__ volatile("" ::: "memory");
 }
 
+/*
+ * The readout mode, printed on BOTH the pass and the fail path.
+ *
+ * On the fail path especially: a capture that dies at "sync" or "timeout" is
+ * exactly when you most want to know what mode the sensor is in, and that is
+ * exactly when the old code returned before printing it. The probe runs before
+ * streaming starts, so by the time any capture-stage failure fires these four
+ * values have already been read and are the most useful thing on the screen.
+ *
+ * What the flag means: subsampling or binning averages or skips adjacent CFA
+ * sites, so a colour part in either mode returns pixels indistinguishable from
+ * a mono part. The QVGA window is NOT in that list -- the datasheet is explicit
+ * that it is a crop at (0,0), and a crop cannot destroy a mosaic.
+ */
+static void report_readout(const struct rb_camera_capture *cap)
+{
+	if (cap->program_ok == RB_CAMERA_PROGRAM_OK) {
+		printf("         full-readout config: written and committed "
+		       "(RB_CAMERA_FULL_READOUT)\n");
+	} else if (cap->program_ok != RB_CAMERA_PROGRAM_OFF) {
+		printf("         full-readout config: FAILED (%d) -- the sensor did "
+		       "not accept it; the values below are whatever survived\n",
+		       cap->program_ok);
+	}
+	if (cap->readout_ok == RB_CAMERA_READOUT_NOT_READ) {
+		printf("         readout: not probed -- the capture stopped before "
+		       "the sensor was asked\n");
+		return;
+	}
+	if (cap->readout_ok != 0) {
+		printf("         readout: registers unreadable (%d)\n",
+		       cap->readout_ok);
+		return;
+	}
+	printf("         readout: x_odd_inc=0x%02x y_odd_inc=0x%02x "
+	       "binning=0x%02x qvga_win=%u%s\n",
+	       cap->x_odd_inc, cap->y_odd_inc, cap->binning_mode,
+	       cap->qvga_win_en,
+	       (cap->binning_mode != 0x00U || cap->x_odd_inc != 0x01U ||
+		cap->y_odd_inc != 0x01U)
+		       ? "  <- MOSAIC-DESTROYING"
+		       : "  (full readout; a mosaic would survive)");
+}
+
 static void stage_camera(void)
 {
 	static struct rb_camera_capture cap;
@@ -465,14 +510,35 @@ static void stage_camera(void)
 		 * reading out, and the anchor below is what lets the debugger
 		 * do it. */
 		camera_frame_pixels = cap.drained;
+		/* Before finish(), which prints the stage verdict: the readout
+		 * lines belong with the failure they explain, not after it. */
+		report_readout(&cap);
 		finish(S_CAMERA, BAD, "%s -- %s", stage, why);
 		return;
 	}
 	camera_frame_pixels = cap.drained;
+	/*
+	 * READ THE WIDTH, NOT THE HEIGHT.
+	 *
+	 * LASTWIDTH is trustworthy: it is the length of the last complete line
+	 * before end-of-frame, and it reads 326 in every capture -- 324 active
+	 * pixels behind two 0x00 dummies, confirmed by the dummies themselves
+	 * appearing at exactly one offset mod 326 in all 315 lines of four
+	 * separate captures.
+	 *
+	 * LASTHEIGHT is not. The core counts lines only while a capture is
+	 * storing, and ARM lands wherever the free-running sensor happens to be,
+	 * so the count is taken across a frame boundary from an arbitrary
+	 * starting line. The same firmware and the same core have reported 242,
+	 * 272 and 296 for a sensor whose line count did not change. Do not infer
+	 * a readout mode from it; the sensor's own registers, above, are what
+	 * answers that.
+	 */
 	printf("         model 0x%04x, %ux%u measured (%ux%u configured), "
 	       "min=0x%02x max=0x%02x\n",
 	       cap.model_id, cap.measured_width, cap.measured_height,
 	       cap.configured_width, cap.configured_height, cap.vmin, cap.vmax);
+	report_readout(&cap);
 	finish(S_CAMERA, OK, "%u-byte frame captured; reshape rows at %u",
 	       cap.drained, cap.measured_width);
 }
@@ -660,9 +726,90 @@ static void stage_motors(void)
 	       "  partial, per-motor symptom, not an all-or-nothing battery check.\n"
 	       "  This stage checks PWM comparator writes, not physical rotation.\n");
 
+	/*
+	 * Attitude watchdog, armed BEFORE the countdown so it is already
+	 * sampling when the first motor turns. It kills every channel on excess
+	 * tilt, on free fall, or on impact.
+	 *
+	 * This stage had no supervision of any kind until 2026-09-21, when the
+	 * drone was knocked off the bench mid-sweep and kept driving all the way
+	 * down and through what it hit. Free fall is the condition that catches
+	 * that: a frame dropped flat never tilts, so a tilt-only guard watches it
+	 * fall and does nothing.
+	 *
+	 * A guard that will not start is a FAILED stage, not a warning. Running
+	 * the sweep unsupervised is the exact situation this exists to prevent,
+	 * so it refuses rather than proceeding.
+	 */
+	{
+		int grc = rb_motor_guard_start(motors, ARRAY_SIZE(motors),
+					       MOTOR_PERIOD_NSEC, NULL);
+
+		if (grc != 0) {
+			for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
+				(void)pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0);
+			}
+			finish(S_MOTORS, BAD,
+			       "attitude watchdog would not start (%d) -- refusing to sweep",
+			       grc);
+			return;
+		}
+	}
+	printf("         attitude watchdog armed: tilt>45deg, free fall, or impact "
+	       "kills all four\n");
+
+	/*
+	 * Opt-in guard self-test, motors OFF. Build with
+	 *   RB_EXTRA_CPPFLAGS="-DBOOTUP_GUARD_SELFTEST=1"
+	 * and the guard runs for BOOTUP_GUARD_SELFTEST_SEC seconds, printing what
+	 * it can see, before anything is allowed to spin.
+	 *
+	 * This exists because the sweep's window is about seven seconds with no
+	 * feedback, so an operator who tilts a moment late gets "watchdog clean"
+	 * -- which is indistinguishable from a guard that cannot see at all.
+	 * Showing the live tilt makes "it did not trip" a measurement instead of
+	 * an absence.
+	 */
+#ifndef BOOTUP_GUARD_SELFTEST
+#define BOOTUP_GUARD_SELFTEST 0
+#endif
+#ifndef BOOTUP_GUARD_SELFTEST_SEC
+#define BOOTUP_GUARD_SELFTEST_SEC 25
+#endif
+#if BOOTUP_GUARD_SELFTEST
+	printf("\n         GUARD SELF-TEST: %d s, motors stay OFF.\n",
+	       (int)BOOTUP_GUARD_SELFTEST_SEC);
+	printf("         Tilt the drone past 45 deg, or lift and drop it onto\n"
+	       "         something soft. tilt%% is sin^2(angle); it trips at 50.\n\n");
+	for (int t = 0; t < BOOTUP_GUARD_SELFTEST_SEC * 2; t++) {
+		int32_t tp = 0, am = 0;
+
+		rb_motor_guard_live(&tp, &am);
+		printf("         tilt%%=%3d (trip at 50)   |a|=%5d mm/s^2   %s\n",
+		       (int)tp, (int)am,
+		       rb_motor_guard_tripped() ? "<<< TRIPPED" : "");
+		if (rb_motor_guard_tripped()) {
+			finish(S_MOTORS, BAD,
+			       "GUARD SELF-TEST TRIPPED: %s (|a|=%d mm/s^2) -- the watchdog works; no sweep run",
+			       rb_motor_guard_reason_str(),
+			       (int)rb_motor_guard_trip_accel());
+			rb_motor_guard_stop();
+			return;
+		}
+		k_msleep(500);
+	}
+	printf("         self-test finished without tripping.\n\n");
+#endif
+
 	for (int left = BOOTUP_MOTOR_WARN_SEC; left > 0; left--) {
 		printf("  sweeping in %d ... (Ctrl-C to stop)\n", left);
 		k_msleep(1000);
+		if (rb_motor_guard_tripped()) {
+			rb_motor_guard_stop();
+			finish(S_MOTORS, BAD, "watchdog tripped before the sweep: %s",
+			       rb_motor_guard_reason_str());
+			return;
+		}
 	}
 	printf("\n");
 
@@ -685,20 +832,47 @@ static void stage_motors(void)
 		written++;
 		k_msleep(BOOTUP_MOTOR_PULSE_MS);
 		(void)pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0);
+		/* What this stage can honestly claim: the comparator write landed.
+		 * There is no rotation feedback on this board, so "stopped" or
+		 * "driven" would be reporting something nobody measured. */
 		printf("active comparator write succeeded\n");
+		/* Checked between every pulse as well as inside the guard thread,
+		 * so the sweep stops advancing the moment the airframe moves
+		 * rather than working through the remaining motors. */
+		if (rb_motor_guard_tripped()) {
+			int32_t a = rb_motor_guard_trip_accel();
+
+			rb_motor_guard_stop();
+			finish(S_MOTORS, BAD,
+			       "WATCHDOG KILLED THE MOTORS at motor%u: %s (|a|=%d mm/s^2)",
+			       (unsigned)i + 1U, rb_motor_guard_reason_str(), (int)a);
+			return;
+		}
 		k_msleep(700);
 	}
-	if (written != ARRAY_SIZE(motors)) {
-		finish(S_MOTORS, BAD,
-		       "%u/%u PWM comparator writes succeeded at %u%% duty",
+
+	{
+		uint32_t seen = rb_motor_guard_samples();
+
+		rb_motor_guard_stop();
+		if (written != ARRAY_SIZE(motors)) {
+			finish(S_MOTORS, BAD,
+			       "%u/%u PWM comparator writes succeeded at %u%% duty",
+			       written, (unsigned)ARRAY_SIZE(motors),
+			       (unsigned)BOOTUP_MOTOR_DUTY_PCT);
+			return;
+		}
+		/* Two things are reported and neither is rotation. The write count
+		 * is what was actually checked. The watchdog sample count is there
+		 * because zero would mean the guard thread never ran, which is
+		 * indistinguishable from "watched and saw nothing" in any message
+		 * that only says the sweep passed. */
+		finish(S_MOTORS, OK,
+		       "%u/%u PWM comparator writes succeeded at %u%% duty; "
+		       "rotation not verified; watchdog clean over %u samples",
 		       written, (unsigned)ARRAY_SIZE(motors),
-		       (unsigned)BOOTUP_MOTOR_DUTY_PCT);
-		return;
+		       (unsigned)BOOTUP_MOTOR_DUTY_PCT, (unsigned)seen);
 	}
-	finish(S_MOTORS, OK,
-	       "%u/%u PWM comparator writes succeeded at %u%% duty; rotation not verified",
-	       written, (unsigned)ARRAY_SIZE(motors),
-	       (unsigned)BOOTUP_MOTOR_DUTY_PCT);
 }
 
 #else
