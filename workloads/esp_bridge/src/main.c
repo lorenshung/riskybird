@@ -159,15 +159,18 @@
 #define TELEM_PORT 14550
 #define CMD_PORT   14551
 
-/* A telemetry line is ~240 bytes with the v1.1 tail. 256 is the smallest power
- * of two that holds one; anything longer is dropped at a line boundary rather
- * than being allowed to desynchronise the stream. */
-#define TELEM_LINE_MAX 256
+/* Must hold the LONGEST line the flight controller mirrors, not a typical one:
+ * anything longer is dropped whole at the line boundary, silently. It was 256,
+ * sized for the ~240-byte v1.1 line; the FPGA build's line is 281 bytes
+ * (measured, 2026-09-23) out of a 384-byte esp_line[] buffer in main.cpp, so
+ * EVERY telemetry line was dropped and only short replies like "FCACK PING"
+ * reached the ground station. 512 covers the sender's whole buffer. */
+#define TELEM_LINE_MAX 512
 
-/* Sized for roughly 8 lines in flight. The UART ISR must never block, so the
- * only backpressure available is dropping -- and dropping whole lines at the
- * ring is far better than delivering half of one. */
-#define RB_SIZE    2048
+/* Sized for roughly 8 lines in flight at that length. The UART ISR must never
+ * block, so the only backpressure available is dropping -- and dropping whole
+ * lines at the ring is far better than delivering half of one. */
+#define RB_SIZE    4096
 
 #define AP_CHANNEL 6
 #define MAX_CLIENTS 4
@@ -269,10 +272,11 @@ static void fpga_uart_write(const char *s, size_t len)
  * value and same argument as workloads/esp_motors: a flight-configured FPGA
  * build must not be able to produce flight thrust on a bench that was not
  * expecting it. Raise deliberately, and only for a flight test:
- *   RB_EXTRA_CFLAGS=-DESP_LINK_MAX_DUTY_PCT=45
+ *   RB_CMAKE_ARGS="-DESP_LINK_MAX_DUTY_PCT=80"   (a cache var in CMakeLists.txt;
+ *   RB_EXTRA_CFLAGS is dropped on this target and silently leaves it at 25)
  */
 #ifndef ESP_LINK_MAX_DUTY_PCT
-#define ESP_LINK_MAX_DUTY_PCT 25U
+#define ESP_LINK_MAX_DUTY_PCT 25
 #endif
 
 /* How often the ESP's own link-health line is emitted, to the console and to
@@ -739,7 +743,8 @@ static void downlink_thread(void *a, void *b, void *c)
 static void status_thread(void *a, void *b, void *c)
 {
 	char buf[256];
-	int sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	int sock = -1;
+	bool sock_err_said = false;
 
 	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
 
@@ -748,6 +753,18 @@ static void status_thread(void *a, void *b, void *c)
 		int n;
 
 		k_msleep(ESP_LINK_STATUS_MS);
+		/* Opened here and retried, not once at thread start: this is the last
+		 * socket the image opens, and with CONFIG_ZVFS_OPEN_MAX=4 the open
+		 * failed with EMFILE -- after which every RBLINK was silently never
+		 * sent, while the console copy below kept printing and looked fine. */
+		if (sock < 0) {
+			sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+			if (sock < 0 && !sock_err_said) {
+				sock_err_said = true;
+				printk("esp_bridge: STATUS SOCKET FAILED (errno %d) -- RBLINK is "
+				       "console-only, NOT reaching the ground station\n", errno);
+			}
+		}
 		clients_now(&cl);
 		n = status_line(buf, sizeof(buf), cl.count);
 		if (n <= 0) {

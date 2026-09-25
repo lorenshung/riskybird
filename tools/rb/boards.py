@@ -732,6 +732,67 @@ WORKLOADS = {
                 "esp-motors",
                 (
                     ("ROSE_ESP_MOTORS", "1"),
+                    # 200 Hz, not the CMake default of 50.
+                    #
+                    # 50 Hz is a 20 ms zero-order hold in the actuator. The
+                    # inner rate loop's TAU_ROLLRATE is 0.025 s and
+                    # FLIGHT_TUNING_LOG.md entries 6-7 put that loop ON its
+                    # stability edge already (0.015 oscillates; 0.02 is "the
+                    # known-stable inner loop"). Adding ~10 ms of effective
+                    # delay to a 25 ms time constant is the most likely reason
+                    # a faithful reproduction of the 2026-08-13 position-hold
+                    # milestone would still fail to hold -- that flight
+                    # actuated EVERY control iteration, with the FPGA driving
+                    # the pins directly.
+                    #
+                    # 200 Hz aligns with the receiver's own 5 ms tick and costs
+                    # 14 B x 200 = 2800 B/s, 24% of the 115200 link. 1000/200
+                    # divides exactly, so the period is a clean 5 ms.
+                    ("ROSE_ESP_MOTORS_HZ", "200"),
+                    # ---- the one fact a REMOTE operator cannot otherwise get ----
+                    #
+                    # This mode is the one that commands the drone, and it is
+                    # run over ssh with nobody in the room. The single question
+                    # that decides whether it is safe to touch anything is "can
+                    # a motor physically turn", and on this airframe that is
+                    # exactly "is the pack connected": the motors are brushed,
+                    # switched by low-side SI2302 FETs off +BATT, so with no
+                    # pack the FETs gate a weakly cap-charged rail and nothing
+                    # turns. There are no ESCs and no second energy source.
+                    #
+                    # vbat= has been in the telemetry line all along -- it is a
+                    # field of the SHARED TELEM_TAIL_FMT that feeds both the
+                    # console printk and the esp-uart radio mirror. It was
+                    # simply always 0.000, because g_vbat is only ever written
+                    # by battery_poll() and ROSE_BATT_SENSE defaults to 0 and
+                    # no mode but autoflight set it. So this one line is the
+                    # whole fix for observability: nothing needed adding to the
+                    # format string.
+                    ("ROSE_BATT_SENSE", "1"),
+                    # ...but NOT as a control input, which is what
+                    # ROSE_BATT_SENSE alone would mean. On its own it also
+                    # scales every motor duty by BATT_NOMINAL_V/g_vbat and
+                    # latches the emergency estop below BATT_CUTOFF_V. Both are
+                    # right for a flight and wrong here, because the AIN5
+                    # channel and the 200k/100k scaling have NEVER been checked
+                    # against a meter on this carrier. main.cpp's guards reject
+                    # a garbage reading (battery_poll() drops anything outside
+                    # [0.5, 6.0] V; the estop needs >= 1.0 V; the scale needs
+                    # [1.0, 5.0] V) -- but they do not and cannot reject a
+                    # PLAUSIBLE WRONG one. A mis-scaled result in [1.0, 3.8) V
+                    # boosts commanded duty by up to 30 % while telemetry still
+                    # shows the duty that was asked for, and one in [1.0, 3.2) V
+                    # estops a healthy bench run in a way that reads, remotely,
+                    # exactly like a real fault.
+                    #
+                    # So: observability now, actuation after verification. Drop
+                    # this line -- and only this line -- once someone has put a
+                    # meter on the pack and confirmed it against vbat=. The boot
+                    # banner says so on every run, so the promotion cannot be
+                    # forgotten. `--mode autoflight` is unaffected: it does not
+                    # set this, and keeps the full sag comp + cutoff + arm gate
+                    # it deliberately turned on.
+                    ("ROSE_BATT_REPORT_ONLY", "1"),
                     # The wire format is one header shared with
                     # workloads/esp_motors. The sample is built in place from a
                     # submodule and cannot guess where this checkout is, so the
@@ -767,7 +828,24 @@ WORKLOADS = {
                     # whose own documentation disagrees with it is one edit away
                     # from silently changing the estimator under a mode that
                     # commands motors.
-                    ("ROSE_USE_EKF", "1"),
+                    #
+                    # COMPLEMENTARY, NOT EKF, AND THAT IS NOT A PREFERENCE.
+                    # The 2026-08-13 position-hold milestone (72b391a, ~1 m
+                    # drift) records it as a requirement in tools/build.sh:
+                    #
+                    #   "NOTE: ROSE_USE_EKF=0 is REQUIRED -- the EKF's tof_gate
+                    #    decouples altitude and climbs away."
+                    #
+                    # The gate rejects a ToF sample too far from the predicted
+                    # state; once altitude has diverged, every subsequent GOOD
+                    # sample is rejected too, so altitude decouples and the
+                    # drone climbs away. This mode previously set 1 on the
+                    # strength of docs/FLIGHT_BUILD.md -- but that file
+                    # documents the EARLIER untethered-hop build, and its own
+                    # "Known caveat" section describes precisely that
+                    # climb-away as unfixed. tools/build.sh is the record of
+                    # what actually held position.
+                    ("ROSE_USE_EKF", "0"),
                     # Optical flow -> horizontal velocity into the estimator.
                     # FLIGHT_TUNING_LOG.md entry 15: the build that flew before
                     # this one had ROSE_FLOW=0, so horizontal velocity was pure

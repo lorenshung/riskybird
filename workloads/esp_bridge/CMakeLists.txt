@@ -25,3 +25,14 @@ if(NOT EXISTS ${RB_MOTOR_LINK_DIR}/riskybird/motor_link.h)
     "flight_controller --mode esp-motors passes as ROSE_MOTOR_LINK_DIR.")
 endif()
 target_include_directories(app PRIVATE ${RB_MOTOR_LINK_DIR})
+
+# The motors build's duty ceiling, reachable from the build line. Same reason as
+# workloads/esp_motors/CMakeLists.txt: RB_EXTRA_CFLAGS is dropped on this target
+# (fpga_board=None), so a bare #ifndef in src/main.c could only ever be 25 %.
+# Declared here, -DESP_LINK_MAX_DUTY_PCT=80 on the CMake line reaches the
+# compiler. A cache variable: it persists in the build tree, so build a flight
+# image into its own directory or with a pristine build, and read the value back
+# from the boot banner ("duty ceiling NN%"). The default matches src/main.c.
+set(ESP_LINK_MAX_DUTY_PCT 25 CACHE STRING
+    "motors build: collective duty ceiling applied at the gate (percent)")
+target_compile_definitions(app PRIVATE ESP_LINK_MAX_DUTY_PCT=${ESP_LINK_MAX_DUTY_PCT})
