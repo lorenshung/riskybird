@@ -1,5 +1,12 @@
 # Flight calibration procedures: the optical-flow scale and the thrust curve
 
+> **Procedure record (2026-09-21 to 2026-09-25), not run on hardware.** Neither
+> measurement below has been made. Written when the ESP ran `esp_motors`; the flying ESP image is
+> now `esp_bridge --mode motors` ([`esp-motor-offload.md`](esp-motor-offload.md)), which applies the
+> same `motor_link` frames with its own ceiling (`ESP_LINK_MAX_DUTY_PCT`, 98) in place of
+> `ESP_MOTORS_MAX_DUTY_PCT`. `motor_duty` has never run on hardware; `rb fly motors` drives it
+> ([`tutorial-flight.md`](tutorial-flight.md)).
+
 Two unmeasured numbers stand between this airframe and a 30-second, 1-metre
 hover with a controlled descent:
 
@@ -112,7 +119,7 @@ numbers:
 | number | where | what it actually is |
 |---|---|---|
 | **0.583** | `controller.hpp`, `controller_pid.cpp:405`, `controller_tinympc.cpp:54-55`, `main.cpp:1099` | The controller's **linearisation point**. `duty = (u + 0.583) * batt_scale`, so `u = 0` *means* 58.3 % duty, and TinyMPC's input box is built as `u ∈ [-0.583, 1-0.583]` around it. |
-| **0.71** | `samples/rose_flight_controller/docs/FLIGHT_TUNING_LOG.md` | Observed **in flight** on the ~58 g v3 airframe: "thrust-marginal — ~71 % hover duty, raw command saturating 42–65 % of the flight". Those flights ran `AUTOFLIGHT_MAX_DUTY = 0.95`. |
+| **0.71** | `backends/zephyr-chipyard-sw/samples/rose_flight_controller/docs/FLIGHT_TUNING_LOG.md` | Observed **in flight** on the ~58 g v3 airframe: "thrust-marginal — ~71 % hover duty, raw command saturating 42–65 % of the flight". Those flights ran `AUTOFLIGHT_MAX_DUTY = 0.95`. |
 | **0.15** | a comment on `main.cpp:636`, `AUTOFLIGHT_MAX_DUTY 0.45f /* ... (hover~0.15; margin above) */` | A comment with nothing behind it, numerically **identical to `MOTOR_BREAKAWAY_DUTY 0.15f`** on line 1051. A duty at which a motor only just starts turning cannot also hover a 58 g quadcopter. One of those two was copied from the other. |
 
 This matters beyond bookkeeping:
@@ -189,7 +196,7 @@ done without the battery is done first.
 ### 3.1 Build all three images
 
 ```bash
-cd /scratch2/loren/riskybird-dev-setup && source ./rb-env.sh
+source ./rb-env.sh            # from the top of the checkout
 export RB_DTS_DIR=$HOME/riskybird-dts
 
 # Flow capture (FPGA)
@@ -221,8 +228,8 @@ Successfully created ESP32-C6 image.
 .../build/zephyr/esp32c6/esp_motors/default/zephyr/zephyr.elf
 ```
 
-`motor_duty` is registered in `tools/rb/boards.py` like every other workload (it briefly lived in a
-`tools/rb-ext.py` side registry, now removed), so plain `./rb` builds it.
+`motor_duty` is registered in `tools/rb/boards.py` like every other workload, so plain `./rb`
+builds it.
 
 ### 3.2 Prove the frame-rate interlock (do this once; it takes 30 seconds)
 
@@ -491,7 +498,7 @@ float ax = -(float)m.deltaX * FLOW_RAD_PER_COUNT / dt;   /* +x = -dX */
 float ay =  (float)m.deltaY * FLOW_RAD_PER_COUNT / dt;   /* +y = +dY */
 ```
 
-and against the airframe convention recorded in `FLIGHT_TUNING_LOG.md`:
+and against the airframe convention recorded in `backends/zephyr-chipyard-sw/samples/rose_flight_controller/docs/FLIGHT_TUNING_LOG.md`:
 **`+vy` / `+roll` = LEFT**. If nose-forward produces a *positive* `sumdx`, the
 remap in `flow.c` is backwards for this mounting and no amount of getting `K`
 right will help.
@@ -1090,7 +1097,7 @@ Two things follow from `d_h`, and neither is done by this document:
    the controller stack's, not this procedure's.
 2. **`AUTOFLIGHT_MAX_DUTY` must be above `d_h` with real margin.** At 0.45 and a
    hover near 0.65 the drone cannot take off at all. The flights in
-   `FLIGHT_TUNING_LOG.md` ran 0.95.
+   `backends/zephyr-chipyard-sw/samples/rose_flight_controller/docs/FLIGHT_TUNING_LOG.md` ran 0.95.
 
 ---
 
@@ -1128,14 +1135,14 @@ throwing away the very write the script makes.
 
 The rest of the flight-test procedure — the envelope guard, the tilt/free-fall/
 impact cuts, and the ordered bench steps that prove each one — is in
-**`docs/flight-safety-bench-procedure.md`**, and it should be run before this.
+**`docs/history/flight-safety-bench-procedure.md`**, and it should be run before this.
 
 ---
 
 ## 7. Command reference
 
 ```bash
-cd /scratch2/loren/riskybird-dev-setup && source ./rb-env.sh
+source ./rb-env.sh            # from the top of the checkout
 export RB_DTS_DIR=$HOME/riskybird-dts     # no elaborated DTS in this worktree
 
 # --- builds -------------------------------------------------------------
@@ -1178,12 +1185,11 @@ when more than one FTDI is attached, which on this bench is always.
 | `workloads/pmw3901_test/src/pmw3901.c` | motion-burst read timing matched to the flight driver (~285 µs/read instead of ~3 ms) |
 | `workloads/motor_duty/` | fixed-duty commander: `motor_link` frames at 50 Hz, four independent bounds, scripted sweep with a thermal drift check |
 | `tools/flow-cal.py` | host-side solver, validator and self-test |
-| `tools/rb-ext.py` | temporary registry shim for `motor_duty`; delete once `boards.py` carries the row |
-| `samples/rose_flight_controller/src/flow.c` | `CS_GPIO_PIN` made overridable; `FLOW_RAD_PER_COUNT` lives here |
-| `samples/rose_flight_controller/src/pmw3901.c` | chip-ID check now requires **both** `0x49` and `0xB6`; first read discarded |
+| `backends/zephyr-chipyard-sw/samples/rose_flight_controller/src/flow.c` | `CS_GPIO_PIN` made overridable; `FLOW_RAD_PER_COUNT` lives here |
+| `backends/zephyr-chipyard-sw/samples/rose_flight_controller/src/pmw3901.c` | chip-ID check now requires **both** `0x49` and `0xB6`; first read discarded |
 | `integration/zephyr/motor_link/include/riskybird/motor_link.h` | the wire format, and the single copy of it |
 | `workloads/esp_motors/` | the ESP end: applies duty, enforces its own ceiling, cuts on a 120 ms silence |
-| `docs/flight-safety-bench-procedure.md` | the envelope guard, the commitment gate, and every way to stop the motors |
+| `docs/history/flight-safety-bench-procedure.md` | the envelope guard, the commitment gate, and every way to stop the motors |
 
 ---
 

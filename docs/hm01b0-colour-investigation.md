@@ -1,12 +1,19 @@
 # Is the fitted HM01B0 mono or colour? An adversarial re-analysis
 
-> **READ PART III FIRST (end of file, 2026-09-22 evening).** The verdict line
-> immediately below is PART I and is superseded in its reasoning, though not in
-> its direction. Part II broke its central argument; Part III settles the phase
-> puzzle, moves the fault out of the capture core for good, and restates what the
-> pixels support. Where Part I argues "the deficit slides with brightness,
-> therefore not a dye", that argument is **invalid** — see II.1 and III.4 — and
-> must not be reused.
+> **RESOLVED 2026-09-22: it is a colour camera.** The HM01B0 on the drone is a Bayer
+> colour sensor -- `r0c0` blue, `r0c1` and `r1c0` green (the anti-diagonal, agreeing to
+> 1.3%), `r1c1` red -- proven with a colour photograph of a red stop sign
+> ([RESOLVED](#resolved--it-is-a-colour-camera), near the end). Every "it measures as mono"
+> result before that was an instrument artifact: the auto-exposure target had never been set
+> (60 DN, ~28 DN of signal), `FRAME_LEN` capped integration, black-level correction clamped
+> ~99% of each frame to one value, and `frame-to-png.py`'s default "defect repair" divided the
+> blue channel back out. Render colour with `hardware/ospi/frame-to-colour.py`.
+>
+> **Read the rest as a record (2026-09-21 to 2026-09-24).** Parts I-III below argue mono, then
+> reopen the case, then move the fault out of the capture core; their measurements are real
+> but the Part I verdict is wrong, and its "the deficit slides with brightness, therefore not
+> a dye" argument is invalid (II.1, III.4). The capture paths in section 0 were local files
+> and are not in the repository.
 
 **PART I verdict: the fitted sensor is MONOCHROME. Confidence: high (~95%) from data alone.**
 There is no colour mosaic in any captured frame. The faint tint the renderer produces is
@@ -25,9 +32,9 @@ conclusion is confirmed it says so; where its *reasoning* was wrong it says that
 | label | file | bytes | note |
 |---|---|---|---|
 | A | scratchpad `frame-A.raw` | 102690 | post-swap |
-| B | `/scratch2/loren/riskybird-dev-setup/bootup-frame.raw` (= `frame-B.raw`) | 102690 | post-swap |
-| C | `/scratch2/loren/riskybird-dev/bootup-frame.raw` (= `frame-C.raw`) | 102690 | post-swap |
-| CTRL | `/scratch2/loren/riskybird-dev/docs/figures/hm01b0_first_frame_326x242_gray8.raw` | 79056 | **pre-swap, known mono** |
+| B | `bootup-frame.raw` in the `setup` checkout (= `frame-B.raw`) | 102690 | post-swap |
+| C | `bootup-frame.raw` in the `main` checkout (= `frame-C.raw`) | 102690 | post-swap |
+| CTRL | `docs/figures/hm01b0_first_frame_326x242_gray8.raw` on `main` | 79056 | **pre-swap, known mono** |
 
 A, B and C are three distinct captures (distinct md5s). `hardware/ospi/bootup-capture.gdb`
 dumps `pixels[]` with `dump binary memory`, so these are the capture core's own bytes with
@@ -672,7 +679,6 @@ prints the verdict. It takes the `.raw` files directly.
 
 ### RUN 1 — the sensor's own test pattern (no human, no scene, no phone)
 
-    cd /scratch2/loren/riskybird-dev
     RB_EXTRA_CPPFLAGS=-DRB_CAMERA_TEST_PATTERN=1 \
     ./rb debug bootup_check --target arty200t \
         --config RocketArty200TDroneFullDDRConfig --usb-location 7-1.1.4.3 \
@@ -684,10 +690,10 @@ prints the verdict. It takes the `.raw` files directly.
 command-line argument, and it must be on the `rb debug` line because `rb debug`
 rebuilds -- a flag given only to an earlier `rb build` is silently reverted. It
 lands in the build fingerprint (`.rb-build-inputs`), so changing it forces a
-pristine rebuild automatically; no `--pristine always` is needed. Run it from
-`/scratch2/loren/riskybird-dev`, which is the checkout that carries the
-`readout:` line and the `RB_CAMERA_FULL_READOUT` path -- `riskybird-dev-setup`
-has an older `integration/zephyr/camera/src/camera.c` without them.
+pristine rebuild automatically; no `--pristine always` is needed. (At the time
+this ran only the `main` checkout carried the `readout:` line and the
+`RB_CAMERA_FULL_READOUT` path; `integration/zephyr/camera/src/camera.c` on
+`setup` now has the readout-mode record and `RB_CAMERA_FULL_READOUT`.)
 
 `TEST_PATTERN_MODE` is generated **after the analog column path and after the
 CFA**, and emits only powers of two. So:

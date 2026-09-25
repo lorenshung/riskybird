@@ -1,5 +1,14 @@
 # Tethered flight attempt — procedure and safety audit
 
+> **Historical record (2026-09-21), not instructions.** The procedure written before
+> the first tethered attempt. Superseded by [`../tutorial-flight.md`](../tutorial-flight.md).
+> Known-wrong claims: "there is NO remote kill in this build" (dashboard ESTOP is real with
+> `esp_bridge --mode motors` + `ROSE_UART_CMD`, which every preset sets); duty frames at 50 Hz
+> (~247 frames/s now); `esp_motors` and `ESP_MOTORS_MAX_DUTY_PCT` as the ESP side (now
+> `esp_bridge --mode motors`, `ESP_LINK_MAX_DUTY_PCT` 98); "nothing here was tested on the drone"
+> (T01-T56 then flew, 2026-09-23/24).
+
+
 **Airframe:** riskybird v3, ~58–60 g, props ON.
 **Mode:** `flight_controller --mode esp-motors` (FPGA computes, ESP32-C6 drives all four gates).
 **Written:** 2026-09-21. **Read the whole of Part 0 before touching anything.**
@@ -947,7 +956,7 @@ physical, both are instant, and both are why your hand belongs on the connector.
 | `workloads/esp_motors/CMakeLists.txt` | Declared `ESP_MOTORS_MAX_DUTY_PCT` and `ESP_MOTORS_TIMEOUT_MS` as cache variables and wired them into `target_compile_definitions`, because `RB_EXTRA_CFLAGS` is silently dropped for `esp32c6` targets and the ceiling could not otherwise be raised. |
 | `hardware/flight/guard-check.gdb` | Prints `g_guard_acc_skips` and explains what a rising count means. |
 | ...the same `esp_motors/src/main.c`, docs | Corrected the networking thread-priority note in the header. It claimed the net traffic-class threads run at `K_PRIO_COOP(0)` = −16 and recommended `CONFIG_NET_TC_THREAD_PRIO_CUSTOM`. Verified in-tree: with the default cooperative type `BASE_PRIO_RX = NET_TC_NUM_PRIORITIES − 1`, which Kconfig defaults to `NUM_COOP_PRIORITIES`, so the RX thread is **−1** (the lowest coop priority, already outranked), and `NET_TC_TX_COUNT` defaults to 0 so there is no TX thread. Turning `PRIO_CUSTOM` on without setting the bases defaults them to 0 and **creates** the −16 collision it was meant to prevent. Relative coop priority does not govern preemption anyway; the fix that works is `CONFIG_NET_TC_THREAD_PREEMPTIVE=y` + `CONFIG_SYSTEM_WORKQUEUE_PRIORITY=1`. Moot for this image, which has no networking. |
-| `docs/tethered-flight-attempt.md` | This document. |
+| `docs/history/tethered-flight-attempt.md` | This document. |
 
 A note on one change that was made and then reversed during this audit, recorded so it is not
 re-made by accident: the accelerometer trust band was briefly widened to 0.4–2.0 g and then put

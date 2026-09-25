@@ -1,5 +1,13 @@
 # RiskyBird: state estimation and wireless flight on FPGA
 
+> **Bring-up record (2026-09-04 to 2026-09-20)**, still the reference for how the flight
+> controller was ported and for its build modes. To fly, use [`tutorial-flight.md`](tutorial-flight.md).
+> Superseded here: Phase 4's `--mode motors` drives the gates from the FPGA, which is now the
+> legacy path (motor 4's F13 pad is dead; flights use `esp-motors` with the ESP32-C6 owning the
+> gates, [`esp-motor-offload.md`](esp-motor-offload.md)); the remote ESTOP listed as open is a
+> real kill with `esp_bridge --mode motors` and `ROSE_UART_CMD`; and every `rb debug --program`
+> below writes the SPI flash, where SRAM is the current practice.
+
 Porting the flight stack that **actually flew on the ESP32-C6** onto Rocket running on the
 TE0712 drone carrier. This is the running record of that effort: what was brought in, what the
 reference build was, what is proven here, and what is still blocked.
@@ -208,7 +216,7 @@ The UDP uplink was then exercised by sending `PING` to `192.168.4.1:14551`:
 ACK PING
 ```
 
-Finally, the new `--mode telem` on `workloads/flight_controller` moved its
+Finally, the new `--mode telem` on the `flight_controller` workload moved its
 existing telemetry line to uart1; the bridge forwarded it unchanged and
 `riskybird_panel.py` served the dashboard from that same UDP stream. The first
 capture recorded this:

@@ -1,5 +1,12 @@
 # Motor PWM bring-up
 
+> **Bring-up record (2026-09-06 to 2026-09-21) for the legacy FPGA-PWM path.**
+> The drone no longer drives its motors this way: FPGA ball F13 (motor 4) has a dead
+> output driver, so all four motors moved to the ESP32-C6 (`esp_bridge --mode motors`),
+> commanded by the FPGA over uart1 -- see [`esp-motor-offload.md`](esp-motor-offload.md).
+> Still accurate here: the harness inversion, the pin map, the register contract and the
+> simulations. Superseded: the open question on where motor 4 breaks (answered below).
+
 Four brushed-motor gate-drive outputs on the TE0712 drone carrier, from the two
 sifive PWM blocks the drone periphery already elaborated.
 
@@ -326,10 +333,15 @@ counter reset, where the comparator is briefly high.
 
 ### What remains open
 
-- **The physical location of motor 4's open.** The ESP gate probe below closes
-  the path through the gate node: motors 1–3 receive FPGA PWM and motor 4 does
-  not. A meter still has to split the remaining F13-to-gate path between the
-  carrier-side 47R/trace/JB1 pin and the module-side ball/seating.
+- **Where motor 4 breaks -- settled 2026-09-21: the F13
+  output driver is dead and the net is intact.** A bare-metal bitstream in
+  `hardware/padtest/` drove the four pads at 4/8/12/16% and read back
+  `M1=40 M2=80 M3=120 M4=0` per mille at the gates; a second one
+  (`hardware/padtest/f13probe/`) configured F13 as an input with its pullup and
+  read a solid 0, which only a pad still connected to the carrier's 10k gate
+  pulldown can give. So the 47R, trace, JB1 pin and FET are fine; no RTL or pin
+  remap can help, because /MOTOR4 reaches the FPGA only at F13. See
+  [`esp-motor-offload.md`](esp-motor-offload.md).
 
 ### Two ways the probe itself was wrong first
 
@@ -451,7 +463,7 @@ request, so a renewal has to be an actual write.
 
 ## Bench procedure, for whoever is next in the room
 
-Only step 2 remains open. The gate measurement no longer needs a person or a
+Nothing here remains open. The gate measurement never needed a person or a
 meter; `motor_safe` turns the parked ESP pins into four logic probes. Propellers
 off throughout.
 
@@ -484,12 +496,12 @@ off throughout.
    `samples/riskybird/actuator_bringup`, so the gate net, SI2302 and motor are
    good. Together, the verified gate measurements place the fault between the
    FPGA's F13 ball and the gate.
-2. **Split the remaining motor 4 path with a meter — open.** Measure J1_100 and
-   use working motor 1 at J1_31 as the reference. That distinguishes the
-   carrier-side 47R/trace/JB1 pin from the module-side F13 ball/seating; neither
-   the ESP gate probe nor JTAG can close that last split. The board owner
-   reports that motor 4 previously worked from the FPGA, so this is
-   **recorded** as a fault that developed over time, not a design error.
+2. **Split the remaining motor 4 path — closed 2026-09-21, no meter needed.**
+   The bare-metal pad test and the F13 input probe in `hardware/padtest/`
+   proved the net from J1_100 to the gate intact and the F13 output driver
+   dead (the item under "What remains open" above has the numbers). Motor 4
+   previously worked from the FPGA, so it is a fault that developed, not a
+   design error. The motors now run from the ESP32-C6.
 3. **For any further spin test, power +BATT and remove the propellers.** These
    are brushed motors switched directly by low-side SI2302 FETs. There is no
    ESC to arm or latch and no ESC-provided locked-rotor protection; those
@@ -508,8 +520,8 @@ off throughout.
 | `hardware/pwm/tb_motor_pwm.cpp` | the Verilator check, and the offline model of the on-chip probe |
 | `hardware/pwm/probe.gdb` | the batch readback that measures the live board |
 | `tests/test_pwm.py` | the four-way contract |
-| `dse/scripts/plot_motor_pwm_duty.py` | the duty figure |
-| `dse/scripts/plot_te0712_j1_signal_map.py` | the J1 figure |
+| `dse/scripts/plot_motor_pwm_duty.py` (on `main`) | the duty figure |
+| `dse/scripts/plot_te0712_j1_signal_map.py` (on `main`) | the J1 figure |
 
 ---
 

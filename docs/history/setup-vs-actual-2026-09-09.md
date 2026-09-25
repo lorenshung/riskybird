@@ -1,13 +1,21 @@
 # RiskyBird bench setup: `docs/setup.md` versus the actual run
 
+> **Historical record (2026-09-09), not instructions.** One cold-clone run of
+> `setup.md`; its findings were folded into [`../setup.md`](../setup.md), which supersedes it.
+> Known-wrong claims: "the expected two-absent ToF population warning" (the drone is meant to
+> carry three ToFs and only two answer, so that WARN is a real fault); motor 4 turning was true
+> that day, but FPGA ball F13 has since died ([`../esp-motor-offload.md`](../esp-motor-offload.md)).
+> `$WORK` below stands for that run's scratch workspace.
+
+
 Run date: 2026-09-09  
 Cold-clone commit: `8ddc99c` on branch `setup`  
-Workspace: `/scratch2/tmp-codex/riskybird-dev`  
+Workspace: `$WORK/riskybird-dev`
 Tier: bench only (Zephyr builds, programming, and attached-board checks)
 
 The propellers were confirmed removed before either motor run. The battery was
 connected and the drone was secured. No repository was modified outside
-`/scratch2/tmp-codex`, and nothing was committed or pushed.
+`$WORK`, and nothing was committed or pushed.
 
 ## Outcome
 
@@ -28,7 +36,7 @@ connected and the drone was secured. No repository was modified outside
 - The operator confirmed the post-fix physical sweep worked. All four logical
   motor lines matched physical motion. No pre-countdown blast was reported on
   the post-fix run.
-- The final camera artifact is [bootup-frame.png](../bootup-frame.png): 324 ×
+- The final camera artifact was `bootup-frame.png` (a run output, not committed): 324 ×
   315, 8-bit grayscale, pixel range 0–255. It is a visually coherent,
   non-uniform photograph and is not row-sheared. The raw capture is 102,690
   bytes.
@@ -49,14 +57,14 @@ they are not misrepresented as product defects.
    [] []
    ```
 
-   Actual: the host already had `/home/loren/riskybird-dts` and
-   `/home/loren/riskybird-bitstreams`, so `rb-env.sh` exported those paths.
+   Actual: the host already had `$HOME/riskybird-dts` and
+   `$HOME/riskybird-bitstreams`, so `rb-env.sh` exported those paths.
    They were unset for the cold setup. Fresh side repositories were cloned
    inside the requested workspace and every later shell explicitly used:
 
    ```console
-   export RB_DTS_DIR=/scratch2/tmp-codex/riskybird-dts
-   export RB_BITSTREAM_DIR=/scratch2/tmp-codex/riskybird-bitstreams
+   export RB_DTS_DIR=$WORK/riskybird-dts
+   export RB_BITSTREAM_DIR=$WORK/riskybird-bitstreams
    source ./rb-env.sh
    ```
 
@@ -64,12 +72,12 @@ they are not misrepresented as product defects.
    constraint.** Step 2b says it edits `~/.condarc`,
    `~/.conda/environments.txt`, and `~/.wget-hsts`; step 2c registers the SDK
    under `~/.cmake`; steps 2d and 3c clone under `~`. The installers were run
-   with their home redirected to `/scratch2/tmp-codex/cold-home`, and the side
+   with their home redirected to `$WORK/cold-home`, and the side
    repositories were instead cloned as:
 
    ```console
-   git clone git@github.com:lorenshung/dts.git /scratch2/tmp-codex/riskybird-dts
-   git clone git@github.com:lorenshung/bitstream.git /scratch2/tmp-codex/riskybird-bitstreams
+   git clone git@github.com:lorenshung/dts.git $WORK/riskybird-dts
+   git clone git@github.com:lorenshung/bitstream.git $WORK/riskybird-bitstreams
    ```
 
    This was required by the test constraint, not by RiskyBird itself.
@@ -192,7 +200,7 @@ they are not misrepresented as product defects.
     ```console
     openFPGALoader --board te0712_8 --busdev-num 7:9 \
         --write-flash --verify \
-        --bitstream /scratch2/tmp-codex/riskybird-bitstreams/arty200t/arty200t.RocketArty200TDroneFullDDRConfig.bit
+        --bitstream $WORK/riskybird-bitstreams/arty200t/arty200t.RocketArty200TDroneFullDDRConfig.bit
     ```
 
     It printed `Verifying write (May take time)`, read flash to 100%, and
@@ -374,15 +382,16 @@ PNG SHA-256: c8a8a775fd6b35184e3d3248d7b1d6201a86cecb57e6169dd2cb8950746eaa31
 RAW SHA-256: 57ef08e75cb3a33eec0969a37c1349e86dd4551d9c94c2e4571559b3885ef2a9
 ```
 
-Supporting logs are outside the repository but within the mandated workspace:
+Supporting logs were kept in that run's workspace (`$WORK/run-logs/`), outside the
+repository, and are not committed:
 
-- [final board console](../../run-logs/bootup-console-fixed.log)
-- [final debug/GDB capture](../../run-logs/debug-bootup-motors-fixed.log)
-- [FullDDR `rb program`](../../run-logs/program-full-ddr-fixed-run.log)
-- [FullDDR explicit flash verification](../../run-logs/verify-full-ddr-flash.log)
-- [final ESP flash](../../run-logs/flash-motor-safe-final.log)
-- [ESP motor-safe console](../../run-logs/motor-safe-console.log)
-- [final doctor](../../run-logs/doctor-final.log)
+- final board console: `run-logs/bootup-console-fixed.log`
+- final debug/GDB capture: `run-logs/debug-bootup-motors-fixed.log`
+- FullDDR `rb program`: `run-logs/program-full-ddr-fixed-run.log`
+- FullDDR explicit flash verification: `run-logs/verify-full-ddr-flash.log`
+- final ESP flash: `run-logs/flash-motor-safe-final.log`
+- ESP motor-safe console: `run-logs/motor-safe-console.log`
+- final doctor: `run-logs/doctor-final.log`
 
 ## Verification limits
 

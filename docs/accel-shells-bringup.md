@@ -7,7 +7,7 @@ devicetrees, what `rb` changes for them, and what was measured on the bench.
 DroNet on these shells has its own page:
 [`dronet-on-accel-socs.md`](dronet-on-accel-socs.md).
 
-Evidence labels are the ones [`verification.md`](verification.md) defines:
+Evidence labels are the ones the [repository README](../README.md#documentation) sets out:
 **verified** means run here with the output quoted, **recorded** means taken
 from another log (mostly the dev tree's 2026-09-23 bring-up), and **blocked**
 means it cannot be checked yet, with the reason given.

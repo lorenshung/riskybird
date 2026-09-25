@@ -6,9 +6,13 @@ camera and motors, and one command — `rb` — that builds and runs all of it.
 
 ## Start here
 
-**[`docs/setup.md`](docs/setup.md)** — the install guide. Built up one step at a
-time, each ending in a command whose real output is quoted, so you can tell
-whether the step worked rather than assuming it did.
+**To fly the drone: [`docs/tutorial-flight.md`](docs/tutorial-flight.md).** One
+machine, no Chipyard or Vivado: `rb fly` programs the shell, builds and loads a
+flight preset, checks the ESP motor link and prints `READY`.
+
+**To install: [`docs/setup.md`](docs/setup.md).** Built up one step at a time,
+each ending in a command whose real output is quoted, so you can tell whether
+the step worked rather than assuming it did.
 
 Three tiers, and you probably want the first:
 
@@ -33,27 +37,37 @@ side needs the other's toolchain.
 | `workloads/` | Zephyr applications — sensors, camera, motors, DDR stress. (`flight_controller` is the exception: it is maintained upstream and lives in the Zephyr backend, built in place.) |
 | `hardware/zephyr/` | device-tree overlays and Kconfig per board, target and workload |
 | `hardware/openocd/` | JTAG adapter and target configs |
-| `tools/bench/` | bench helpers, including the FTDI reset the JTAG link needs |
+| `tools/bench/` | bench helpers, including the FTDI reset the JTAG link needs, and the ground-station monitor |
+| `tools/flight/` | the flight presets `rb fly` builds (`presets/*.env`) and the campaign scripts it replaced (`legacy/`) |
+| `hardware/flight/`, `hardware/padtest/` | GDB scripts for the flight image (arm, commit, stop, where); the bare-metal motor-pad test |
 | `tools/collect-*.py` | publish bitstreams and devicetrees for hosts that cannot build them |
 | `backends/` | Chipyard, Zephyr and ModelBlaster, as submodules, initialised per tier |
+| `artifacts/modelblaster/` | the committed DroNet kernels the accelerator shells run |
 
 ## Documentation
 
 | | |
 | --- | --- |
-| [`setup.md`](docs/setup.md) | install, both tiers |
+| [`tutorial-flight.md`](docs/tutorial-flight.md) | **fly the drone**: `rb fly`, the presets that flew, the ground station, known issues |
+| [`setup.md`](docs/setup.md) | install, all three tiers, and the board acceptance and bootup checks |
 | [`drone-initial-bringup.md`](docs/drone-initial-bringup.md) | first contact with the drone bench: adapters, console, what a dead link looks like |
 | [`te0712-drone-carrier-ddr-bringup.md`](docs/te0712-drone-carrier-ddr-bringup.md) | DDR3 on the carrier, and the power findings — **read before concluding a board is broken** |
+| [`esp-motor-offload.md`](docs/esp-motor-offload.md) | how the motors are driven now (from the ESP32-C6), and why: FPGA ball F13 is dead |
+| [`wireless-telemetry-bringup.md`](docs/wireless-telemetry-bringup.md) | the ESP Wi-Fi bridge, the `RBLINK` line and the dashboard ESTOP |
+| [`remote-bench-operation.md`](docs/remote-bench-operation.md) | running the bench when nobody is in the room |
+| [`flight-calibration-procedures.md`](docs/flight-calibration-procedures.md) | the optical-flow scale and thrust-curve procedures |
 | [`hm01b0-camera-bringup.md`](docs/hm01b0-camera-bringup.md) | the camera, end to end |
-| [`motor-pwm-bringup.md`](docs/motor-pwm-bringup.md) | motor PWM |
-| [`flight-on-fpga.md`](docs/flight-on-fpga.md) | porting the flight controller onto Rocket; phase plan and what is verified |
+| [`hm01b0-colour-investigation.md`](docs/hm01b0-colour-investigation.md) | the camera is Bayer colour: the exposure and black-level fixes, and how to render colour |
+| [`motor-pwm-bringup.md`](docs/motor-pwm-bringup.md) | FPGA motor PWM, the legacy path (motor 4 cannot be driven from it) |
+| [`flight-on-fpga.md`](docs/flight-on-fpga.md) | porting the flight controller onto Rocket; phase plan and what was verified |
 | [`te0712-ftdi-carrier-ddr-bringup.md`](docs/te0712-ftdi-carrier-ddr-bringup.md) | the same DDR3 work on the FTDI carrier |
-| [`modelblaster-dronet-on-fpga.md`](docs/modelblaster-dronet-on-fpga.md) | a PyTorch model to an accelerated XC7A200T shell: the Gemmini/Saturn configs, the per-op timeline and FPS, and the two clock/FPU traps |
 | [`accel-shells-bringup.md`](docs/accel-shells-bringup.md) | the drone stack on the Gemmini/Saturn shells: which ones this branch supports, their bitstreams and devicetrees, bench results, and why the flight controller is not among them |
 | [`dronet-on-accel-socs.md`](docs/dronet-on-accel-socs.md) | DroNet on those shells from committed sources: 14.57 fps on IntAt35, the recipe that regenerates it, and the Q31 spike model its gate needs |
-| [`verification.md`](docs/verification.md) | what "verified" means here, and which tests pass where |
-| [`repository-layout.md`](docs/repository-layout.md) | orientation |
-| [`merging-into-main.md`](docs/merging-into-main.md) | what this branch changed, and how to fold it back |
+| [`modelblaster-dronet-on-fpga.md`](docs/modelblaster-dronet-on-fpga.md) | the earlier single-shell DroNet write-up: the Gemmini/Saturn configs, the per-op timeline, and the two clock/FPU traps |
+| [`upstream-pr/`](docs/upstream-pr/README.md) | the patch series proposed to `ucb-bar/zephyr-chipyard-sw` |
+| [`repository-layout.md`](docs/repository-layout.md) | orientation, and what is on `setup` versus `main` |
+| [`merging-into-main.md`](docs/merging-into-main.md) | how this branch relates to `main` |
+| [`history/`](docs/history/) | handoffs, plans and one-off records, kept for provenance; each opens with what it got wrong |
 
 Docs distinguish **verified** (run here, output quoted) from **recorded**,
 **declared** and **blocked**. That vocabulary is load-bearing — if a page says a
@@ -61,8 +75,9 @@ thing is verified, someone ran it and pasted what it printed.
 
 ## Scope
 
-The supported surface is Chipyard and Zephyr. `rb --help` also lists six
+The supported surface is Chipyard, Zephyr and the drone. `rb --help` also lists
 commands marked `[experimental]` — `rose`, `hil`, `xpurt`, `schedule`, `dse`,
-`area`. They work and are used in this repository's own experiments, but their
-setup is undocumented and their interfaces are expected to change. See the note
-at the top of `docs/setup.md`.
+`area`. Their backends and data (`backends/RoSE`, `backends/XPU-RT`, `dse/`,
+`experiments/`) live on the `main` branch, not here, so on this branch they
+cannot run (most of `rb area` included). See the
+note at the top of `docs/setup.md`.

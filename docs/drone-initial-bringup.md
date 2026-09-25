@@ -447,7 +447,7 @@ Four of the six match devices this repository already describes:
 | --- | --- | --- |
 | 0x17 | ADS7128 ADC / GPIO expander | `hardware/zephyr/targets/esp32c6/workloads/ads7128_test.overlay:16` |
 | 0x18 | BMI088 accelerometer | `hardware/zephyr/fpga-common.overlay:72` |
-| 0x29 | VL53L0X/VL53L1X time-of-flight | `hardware/zephyr/targets/fpga/workloads/tof_sensor.overlay:6` |
+| 0x29 | VL53L1X time-of-flight (down), power-on address; the flight controller moves it to 0x30 | `hardware/zephyr/targets/fpga/workloads/flight_controller.overlay:51` |
 | 0x68 | BMI088 gyroscope | `hardware/zephyr/fpga-common.overlay:79` |
 | 0x2B | **unidentified** | not referenced anywhere in this repository |
 | 0x76 | **unidentified** | not referenced anywhere in this repository |
@@ -512,13 +512,32 @@ The BMI088 is two I2C devices, not one -- accelerometer at 0x18 and gyroscope at
 `bosch,bmi08x-gyro` in `hardware/zephyr/fpga-common.overlay` and
 `fpga-drone.overlay` already describe them at 200 Hz, +/-6 g and +/-1000 dps.
 
-## ToF array: four sensors, and an unresolved discrepancy
+## ToF array: three sensors intended, two answer
 
-Partial. Recorded here so the measurements are not lost; see the workload for
-detail.
+**The drone is meant to carry three time-of-flight sensors** (confirmed by the
+board owner, 2026-09-10): two side VL53L5CX and one down-facing VL53L1X, each
+held in reset through its own ADS7128 XSHUT channel. On the current board only
+two answer -- one side sensor and the down sensor -- measured 2026-09-10 with
+`bootup_check`:
 
-Four ToF sensors initialize and identify cleanly, all behind the ADS7128
-expander at 0x17:
+```console
+ch1 side  VL53L5CX   at 0x31 (id 0xf002)
+ch2 side  -- absent (err -116)
+ch3 side  -- absent (err -116)
+ch6 down  VL53L1X    at 0x34 (id 0xeacc)
+no unclaimed channel answers at 0x29
+[ WARN ] ToF array (XSHUT)    2 up, 2 absent -- down sensor present
+```
+
+The missing side sensor is not on an undeclared channel (the all-channel scan
+finds nothing), so it is dead, unpopulated or its XSHUT line is broken. **That
+WARN is a real fault**, not a population note; do not trim the declared
+channels to make it pass. The down sensor, which altitude uses, is unaffected.
+
+The rest of this section is the earlier record, kept for its bug fixes. It was
+taken before the three-sensor intent was confirmed, and it expected five. At the
+time four sensors initialized and identified, all behind the ADS7128 expander at
+0x17:
 
 ```console
 RB_TOF init code=0 initialized=4 of 4
@@ -545,8 +564,9 @@ Three things came out of this that are worth keeping:
   array; per-sensor `status[]` plus step-level error reporting turns an opaque
   `-EIO` into `step=direct-probe-0x29 sensor=4`.
 
-**Unresolved.** The expected topology is one directly-wired VL53L1X plus four
-ADS7128-gated VL53L5CX. Measured instead: no sensor survives with all eight
+**Superseded expectation.** That session expected one directly-wired VL53L1X
+plus four ADS7128-gated VL53L5CX; the real topology is the three above, with
+the down sensor gated too. What it measured: no sensor survives with all eight
 channels held low (so nothing is directly wired), and only three L5CX appear.
 Worse, the two discovery methods disagree -- releasing channels *cumulatively*
 finds L5CX on 1, 2, 3 and nothing on 4, while releasing each channel *alone*

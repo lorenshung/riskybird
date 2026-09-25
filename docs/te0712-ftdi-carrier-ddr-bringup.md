@@ -1,5 +1,11 @@
 # TE0712 FTDI-carrier DDR3 bring-up
 
+> **Bring-up record (2026-08-31 to 2026-09-03)** for the FTDI carrier; its DDR3 results
+> stand. Superseded on programming: `rb program` now writes the flash **and then loads SRAM**, so
+> the part does not come back holding the `spiOverJtag` bridge; and flash boot on the TE0712 needs
+> the SPI-boot bitstream properties added in fpga-shells `80831d8` (2026-09-23), which older
+> bitstreams lack. Use SRAM for now ([`setup.md`](setup.md), the note under 3a).
+
 The smallest bitstream that answers one question: **does the DDR3 configuration
 work on this carrier?**
 

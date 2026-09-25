@@ -1,5 +1,12 @@
 # Bench procedure: the tilt guard, the commitment gate, and every way to stop the motors
 
+> **Historical record (2026-09-21), not instructions.** Superseded by
+> [`../esp-motor-offload.md`](../esp-motor-offload.md) (what was measured) and
+> [`../tutorial-flight.md`](../tutorial-flight.md) (how to fly). Known-wrong claims: "nothing in
+> this document has been run on hardware" and §5 (the failsafe, tilt guard and 5 s window latch
+> were all measured the same day); the predicted window-expired flags byte `0x11` (it is `0x10`).
+
+
 Written after the 2026-09-21 bench run in which the drone was rotated by hand to
 roughly 90 degrees under `--mode esp-motors` and **nothing cut the motors**.
 That failure and its root cause are in the first section; the procedure follows.
@@ -10,7 +17,7 @@ cannot spin a motor come first.
 
 > **Partly superseded, later the same day.** Several of the steps below were
 > subsequently run on this hardware. See section 4 of
-> `docs/esp-motor-offload-handoff.md` for what was actually measured — the ESP
+> `docs/history/esp-motor-offload-handoff.md` for what was actually measured — the ESP
 > failsafe (`cuts=1`), the tilt guard firing at 47.457 deg, the 5009 ms
 > commitment-window latch, and the accelerometer trust band surviving props-on
 > vibration (0 of 44 samples outside 0.6–1.5 g). **Section 5 of this document
@@ -197,7 +204,7 @@ as PWM-path-only.
 1. Build both images.
 
    ```bash
-   cd /scratch2/loren/riskybird-dev-setup && source ./rb-env.sh
+   source ./rb-env.sh            # from the top of the checkout
    ./rb build flight_controller --target arty200t \
        --config RocketArty200TDroneFullDDRConfig --mode esp-motors
    ./rb build esp_motors --target esp32c6

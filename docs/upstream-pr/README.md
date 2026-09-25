@@ -43,8 +43,11 @@ standalone and succeeds in sequence. Squash them.
 ```sh
 cd backends/zephyr-chipyard-sw
 git switch -c riskybird-fpga-portability ucb/riskybirdv3-bringup
-git am docs/upstream-pr/*.patch          # or `git apply` to stage without commits
+git am ../../docs/upstream-pr/*.patch    # or `git apply` to stage without commits
 ```
+
+The patches live in this repository, two levels above the submodule, so the
+path is relative to `backends/zephyr-chipyard-sw`.
 
 Then, before proposing:
 
@@ -84,8 +87,10 @@ Seven patches become about four commits.
   his tree is the one that has flown. Propose a **SHA pin to the current tip of
   `rose-2-dev`**, keeping our comment block as the justification.
 - **`ROSE_UART_CMD`, `fpga-esp-uart.conf`, `console-to-udp.py`** — new work from
-  2026-09-22, unverified on hardware. They belong in a later PR, after a command
-  has actually moved something on a board.
+  2026-09-22, and not in these patches. `ROSE_UART_CMD` is no longer unverified:
+  every flight T01-T42 (2026-09-23/24) was built with it, and the dashboard
+  RESET that launches each flight reaches the FPGA through it. It belongs in a later PR of its
+  own, generated from the current pin rather than from this series.
 
 ## Worth saying in the PR description
 

@@ -1,5 +1,15 @@
 # Handoff: the motor PWM offload to the ESP32-C6
 
+> **Historical record (2026-09-21), not instructions.** The bench record of moving
+> motor PWM to the ESP32-C6. What still holds is summarised in [`../esp-motor-offload.md`](../esp-motor-offload.md);
+> how to fly is [`../tutorial-flight.md`](../tutorial-flight.md). Known-wrong or superseded claims:
+> "nothing about hover has been measured -- do not fly" (T01-T56 flew on 2026-09-23/24);
+> `esp_motors` as the ESP image (the flying image is `esp_bridge --mode motors`); `MOTOR_MAX_DUTY`
+> 0.10 as the operative limit (the presets use `AUTOFLIGHT_MAX_DUTY` 0.95); §5.4 "the camera does
+> not deliver colour" (it is Bayer colour); `setup-vs-actual.md` is not on this branch (it is
+> [`setup-vs-actual-2026-09-09.md`](setup-vs-actual-2026-09-09.md)).
+
+
 **Written 2026-09-21 on the Linux build host, for a Mac with the drone attached
 and no memory of the session that produced it.** Everything you need is restated
 here. Where a number came from a hardware run it says **measured**; where
@@ -168,8 +178,8 @@ You are on branch `setup`. The offload work is here:
 | `hardware/flight/commit.gdb` | the run-time half of the flight-commit interlock (new) |
 | `hardware/flight/guard-check.gdb` | read the envelope guard's own view over JTAG (new) |
 | `hardware/flight/stop.gdb`, `estop.gdb` | rewritten for the offload path |
-| `docs/flight-safety-bench-procedure.md` | the full bench procedure |
-| `docs/motor4-remote-investigation.md` | the original work order, for background |
+| `docs/history/flight-safety-bench-procedure.md` | the full bench procedure |
+| `docs/history/motor4-remote-investigation.md` | the original work order, for background |
 | `backends/zephyr-chipyard-sw` | submodule `dev`, **with uncommitted changes** |
 
 ### 2.1 It builds ONLY in this tree — verified
@@ -461,7 +471,7 @@ The ESP saw
 flags=0x10[WINDOW-EXPIRED]
 ```
 
-> `docs/flight-safety-bench-procedure.md` predicted `flags=0x11`. **The
+> `docs/history/flight-safety-bench-procedure.md` predicted `flags=0x11`. **The
 > prediction was wrong and the measurement is right**: when the gate refuses, the
 > sender clears ARMED *and* sets WINDOW, so `0x10` is correct. That doc was
 > written before any of this ran; its section 5 ("Not verified — nothing here has
@@ -804,7 +814,7 @@ image** with its own build directory.
 
 ## 8. What to do next, ranked
 
-**1. Re-run the bench procedure in `docs/flight-safety-bench-procedure.md`, Part A
+**1. Re-run the bench procedure in `docs/history/flight-safety-bench-procedure.md`, Part A
 (battery DISCONNECTED).** It cannot spin a motor and it re-establishes on *your*
 machine everything section 4 establishes here. A banner was added to the top of
 that document pointing at section 4, because its own section 5 ("Not verified")
@@ -871,8 +881,8 @@ delay the failsafe. Merging needs `CONFIG_NET_TC_THREAD_PRIO_CUSTOM` with
 
 | document | why |
 |---|---|
-| `docs/flight-safety-bench-procedure.md` | the full ordered bench procedure; its section 5 is superseded by section 4 here |
-| `docs/motor4-remote-investigation.md` | the original work order; section 2 lists everything already eliminated, so you do not re-run it |
+| `docs/history/flight-safety-bench-procedure.md` | the full ordered bench procedure; its section 5 is superseded by section 4 here |
+| `docs/history/motor4-remote-investigation.md` | the original work order; section 2 lists everything already eliminated, so you do not re-run it |
 | `integration/zephyr/motor_link/include/riskybird/motor_link.h` | the wire contract, with the reasoning for every field width |
 | `workloads/esp_motors/src/main.c` | the receiver's whole safety model, stated case by case |
 | `docs/motor-pwm-bringup.md` | the PWM block, the harness inversion, and why `obj/*.v` is the wrong file to read |

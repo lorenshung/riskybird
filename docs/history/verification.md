@@ -1,5 +1,12 @@
 # Verification record — 2026-07-24 through 2026-07-26
 
+> **Historical record (2026-07-24 to 2026-07-26), not instructions.** Measured on
+> `main`, before `setup` existed in its current form. Superseded by "Checking the tooling itself"
+> in [`../setup.md`](../setup.md). Known-wrong or stale here: every test count and per-module
+> pass/fail below, and the note that `test_dse` and `test_rose` pass here (part of the suite
+> needs data and backends that live only on `main`); the KU040 rows used the 32 KiB scratchpad map.
+
+
 > **Running the suite.** `python3 -m unittest discover -s tests` needs the
 > backends installed -- it exercises environment construction, the board and
 > workload registries, and the Chipyard hook, all of which resolve real paths.

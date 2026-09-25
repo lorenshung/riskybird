@@ -1,5 +1,11 @@
 # HM01B0 camera bring-up — process and results
 
+> **Bring-up record (2026-09-06)** for the capture path; the RTL, pin and register
+> material below still holds. Two things changed after it was written: the sensor is a **Bayer
+> colour** part (blue at `r0c0`), and the dark frames were an exposure bug, not the scene -- see
+> [`hm01b0-colour-investigation.md`](hm01b0-colour-investigation.md) and render colour with
+> `hardware/ospi/frame-to-colour.py`.
+
 A minimal FPGA target that proves two independent things about the HM01B0 camera on the
 Arty100T/TE0712 drone carrier:
 
@@ -450,8 +456,12 @@ Both files land in the directory you ran from.
 
 ![HM01B0 frame](figures/hm01b0_first_frame.png)
 
-Same frame with `--stretch`, which rescales to full black-to-white -- the
-sensor's default exposure is dark indoors:
+Same frame with `--stretch`, which rescales to full black-to-white. The frame
+is dark because the driver never set the sensor's auto-exposure target, which
+sat at 60 DN (about 28 DN above black), not because of the room; black-level
+correction and a short `FRAME_LEN` made it worse. All three are fixed in
+`integration/zephyr/camera/src/camera.c` (found 2026-09-22, see
+[`hm01b0-colour-investigation.md`](hm01b0-colour-investigation.md)):
 
 ![HM01B0 frame, contrast stretched](figures/hm01b0_first_frame_bright.png)
 

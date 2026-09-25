@@ -1,5 +1,11 @@
 # DroNet on the XC7A200T, through ModelBlaster
 
+> **Record (2026-09-16 to 2026-09-17)** of the first DroNet runs on one accelerator shell.
+> Superseded by [`dronet-on-accel-socs.md`](dronet-on-accel-socs.md), which regenerates DroNet on
+> all three supported shells from committed sources (14.57 fps on IntAt35), and
+> [`accel-shells-bringup.md`](accel-shells-bringup.md) for the shells themselves. The commands below
+> are corrected to the current `rb debug` syntax (the workload is positional).
+
 How to take a PyTorch model to a RiskyBird FPGA shell and get a per-op timeline
 and a frame rate out of it, and what is actually measured so far.
 
@@ -516,7 +522,7 @@ These shells are built `uartTsi = false`, so there is no UART-TSI and `rb load`
 cannot be used. The ELF goes in over JTAG:
 
 ```console
-rb debug --target arty200t --workload dronet \
+rb debug dronet --target arty200t \
      --config RocketArty200TDroneGemmini16At40Config
 ```
 
@@ -544,7 +550,7 @@ anything. `--ram-console` puts output in a RAM ring buffer read back over the
 same JTAG link that loaded the image:
 
 ```console
-rb debug --target arty200t --workload dronet \
+rb debug dronet --target arty200t \
      --config RocketArty200TDroneGemmini16At40Config --ram-console
 ```
 

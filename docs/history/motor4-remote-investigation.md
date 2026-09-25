@@ -1,5 +1,12 @@
 # Motor 4: remote investigation prompt
 
+> **Historical record (2026-09-21), not instructions.** The work order for the
+> motor 4 investigation. Superseded by [`../esp-motor-offload.md`](../esp-motor-offload.md).
+> Its open questions are closed: FPGA ball F13's output driver is dead while the net is intact
+> (bare-metal `hardware/padtest/`, `M1=40 M2=80 M3=120 M4=0`), so there is no RTL or pin-map fix,
+> and all four motors moved to the ESP32-C6.
+
+
 **Read this as a work order, not as a report.** It is written for an AI coding
 agent running on the Linux host that has Chipyard and Vivado for this project
 and can elaborate shells and build bitstreams. It was written on the bench Mac,

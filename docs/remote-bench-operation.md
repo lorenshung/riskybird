@@ -1,5 +1,10 @@
 # Running the drone bench remotely
 
+> Written 2026-09-22, when the ESP ran `esp_motors`. The flying ESP image is now
+> `esp_bridge --mode motors` ([`esp-motor-offload.md`](esp-motor-offload.md)): the same
+> 120 ms failsafe on the same gates, plus the Wi-Fi bridge and an ESP-side ESTOP. Read
+> `esp_motors` below as "a motor-driving ESP image" unless the text is about its console.
+
 For the case where the hardware is on the bench and **you are not in the room**.
 Nobody is there to catch the drone, unplug the battery, or notice that a motor
 started. Everything below is written for that case and nothing else.
@@ -21,8 +26,7 @@ The short version:
 ## 1. Starting the session
 
 ```bash
-cd /scratch2/loren/riskybird-dev-setup
-tools/bench/rb-watch.sh
+tools/bench/rb-watch.sh          # from the top of the checkout
 ```
 
 Run it again any time — if the session exists it re-attaches and restarts
@@ -36,9 +40,9 @@ On a fresh start it prints where the logs are going:
 
 ```
 creating session 'riskybird'
-  logs         : /home/loren/riskybird-logs/sessions/2026-09-22T15-09-35
-  FPGA console : /dev/ttyUSB5 -> /home/loren/riskybird-logs/fpga-console.log
-  ESP          : /dev/ttyACM0 -> /home/loren/riskybird-logs/esp-live.log
+  logs         : $RB_LOGDIR/sessions/2026-09-22T15-09-35
+  FPGA console : /dev/ttyUSB5 -> $RB_LOGDIR/fpga-console.log
+  ESP          : /dev/ttyACM0 -> $RB_LOGDIR/esp-live.log
 ```
 
 ### The four panes
@@ -231,8 +235,8 @@ Do these freely, remote, unattended, at 3 a.m.
   symbol checks, doc work, reading and grepping logs, plotting flight logs.
 - Workloads with **no motor aliases in their devicetree**, so `CONFIG_PWM` is off
   and `pwm_sifive_init()` never runs. There is no register that can drive a gate
-  because the block is not connected to anything: `sensor_bringup`,
-  `sensor_check`, `tof_sensor`, `bmi088_test`, `ads7128_test`, `i2c_scanner`,
+  because the block is not connected to anything:
+  `sensor_check`, `bmi088_test`, `ads7128_test`, `i2c_scanner`,
   `pmw3901_test`, `ddr_stress`, `camera_bringup`, `camera_photo`.
 - `bootup_check` **in its default mode**. Stage 8 (motors) is compiled out
   entirely unless the `pwm_motor1` alias exists, which only
@@ -418,6 +422,11 @@ started. That is most of what `rb-watch.sh` is for. So the remote recipe is just
 Get the two locations from the status screen or `rb bench`; never copy them from
 an old command, because they renumber on every replug.
 
+`--program` writes the bitstream to the SPI flash, persistently, before it loads
+SRAM, so it changes what the board boots after the next power cycle. Drop it if
+the shell is already loaded, or program SRAM alone as `setup.md` describes (the
+note under 3a); `rb fly` is SRAM-only.
+
 If the console still misbehaves, `rb debug --ram-console` buffers the console
 into RAM and reads it back over the same JTAG link — the fallback for a board
 whose UART is unproven, and for short workloads that finish before anything can
@@ -542,13 +551,14 @@ Read this before you need it.
 
 - **You cannot pull the battery.** It is the only stop that needs none of our
   software to work, and it is the only one you do not have.
-- **The dashboard / ground-station ESTOP button does nothing.** Checked in the
-  source, not assumed: every `rose_cmd_*` hook in the flight controller
-  (`rose_cmd_estop` and friends) sits inside `#if defined(CONFIG_WIFI)`, which is
-  only true on the ESP-native build, and the `telem_wifi.c` that would call them
-  is not in this checkout. `workloads/esp_motors/` has no uplink at all. The
-  bridge *fabricates* the `ACK ESTOP`, so the button looks like it worked. **It
-  is not a kill. It is a button that prints a word.**
+- **The dashboard ESTOP is a kill only with the right pair of images.** With
+  `esp_bridge --mode motors` on the ESP it latches `kill=1` and zeroes the gates
+  at the ESP, independent of the FPGA, and a flight controller built with
+  `ROSE_UART_CMD` (every flight preset) hears it too. With `esp_motors`, which
+  has no uplink, or a flight controller without that knob, the bridge's
+  `ACK ESTOP` means only "delivered to the FPGA UART" and nothing stops. Check
+  `kill=1` in `RBLINK` before relying on it, and remember it needs the Wi-Fi link
+  to still be up.
 - **You cannot count on `estop.gdb` or `stop.gdb`.** They are fine scripts, but
   they need a debugger *already attached*. Attaching OpenOCD and halting takes a
   second or two over JTAG, and that is on top of you noticing, deciding, and
@@ -671,10 +681,12 @@ this change set; the `commit gate` line below sits beside it.)
 
 ## Related
 
-- `docs/flight-safety-bench-procedure.md` — the tilt guard, the commitment gate,
-  and every way to stop the motors, with the ordered bench procedure.
-- `docs/esp-motor-offload-handoff.md` §4 — what was actually measured on
-  hardware: `cuts=1`, the 47.457° guard trip, the 5009 ms window.
+- `docs/esp-motor-offload.md` — what was measured on hardware: `cuts=1`, the
+  47.457° guard trip, the 5009 ms window; the full record is
+  `docs/history/esp-motor-offload-handoff.md` §4.
+- `docs/history/flight-safety-bench-procedure.md` — the 2026-09-21 bench procedure
+  for the tilt guard, the commitment gate and every way to stop the motors.
+- `docs/tutorial-flight.md` — `rb fly stop` and the flight-day procedure.
 - `docs/flight-calibration-procedures.md` §3.4 — why `rb run` does not work on
   these shells and what to use instead.
 - `hardware/flight/*.gdb` — each script's header explains what it does, what it

@@ -1,76 +1,54 @@
-# Folding this branch back into `main`
+# How `setup` relates to `main`
 
-`setup` was built as an orphan branch — a from-scratch rebuild, one piece at a
-time, each verified before the next went in. It has no common ancestor with
-`main`, so `git merge` will not do anything sensible here. This is what the
-decision actually looks like.
+`setup` is a **separate, curated history**, not a branch of `main`: it was
+rebuilt from scratch, one verified piece at a time, starting at `6c6887f`
+("setup: rb, the entry point"). The two share **no common ancestor**
+(`git merge-base main setup` finds nothing), so `git log main..setup` and a
+plain `git merge` do not mean anything here. Compare them path by path:
 
-## It is not "replace main"
-
-`setup` carries a **subset** of `main`'s paths. Replacing `main` wholesale would
-drop the research surface:
-
-| Only on `main` | Files |
-| --- | --- |
-| `dse/` | 35 |
-| `experiments/` | 27 |
-| `benchmarks/` | 7 |
-| `demos.md` | 1 |
-
-Those were left out deliberately — `setup` covers the supported surface,
-Chipyard and Zephyr, and the experimental commands that use those directories
-are marked `[experimental]` in `rb --help`.
-
-## It is a 24-file changeset
-
-Only **two files** exist on `setup` and not on `main`:
-
-```
-rb-env.sh
-tools/bench/acceptance.sh
+```console
+git diff main setup -- <path>
+git log --oneline setup -- <path>        # and the same on main
 ```
 
-Everything else is a shared path with different content — **22 files**:
+## What is where, by directory (2026-09-25)
 
-| Area | Files |
+| Only on `setup` | |
 | --- | --- |
-| `tools/rb/` | `cli.py`, `boards.py`, `artifacts.py`, `environments.py` |
-| bench tooling | `tools/bench/usbreset.py`, `tools/bench/drone-ddr-check.sh` |
-| hardware | `hardware/pwm/run.sh`, `hardware/pwm/tb_motor_pwm.cpp`, `hardware/spioverjtag/setup-openfpgaloader.sh` |
-| docs | `setup.md`, `flight-on-fpga.md`, `hm01b0-camera-bringup.md`, `motor-pwm-bringup.md`, `te0712-*-bringup.md`, `verification.md`, `repository-layout.md`, `README.md` |
-| tests | `tests/test_rb.py` |
-| config | `.gitignore`, `.gitmodules` |
+| `rb-env.sh` | the shell setup `rb` scripts use |
+| `tools/flight/`, `tools/modelblaster/`, `tools/flow-cal.py` | flight presets and `rb fly`'s predecessors; DroNet prep; flow calibration |
+| `workloads/esp_bridge`, `esp_motors`, `motor_safe`, `motor_duty` | the ESP images (Wi-Fi bridge and motor gates) and the motor commander |
+| `hardware/padtest/`, `hardware/modelblaster/` | the bare-metal motor-pad test; DroNet GDB scripts |
+| `backends/modelblaster`, `artifacts/modelblaster/` | the models tier and its committed kernels |
+| most of `docs/` | the flight tutorial, ESP offload, telemetry, remote bench, camera colour, accelerator shells, `docs/history/` |
 
-So the sane move is to **port those 24 files onto `main`**, not to swap branches.
-`main` keeps its research directories; `rb` gains the fixes.
+| Only on `main` | |
+| --- | --- |
+| `backends/RoSE`, `backends/XPU-RT` | the co-simulation and scheduling backends behind `rb rose`, `hil`, `xpurt`, `schedule` |
+| `dse/`, `experiments/`, `benchmarks/`, `demos.md` | design-space exploration, area studies and the research record behind `rb dse` and most of `rb area` |
+| `hardware/diag/`, `tools/collect-elfs.py` | older diagnostics and ELF publishing |
+| docs on RoSE, XPU-RT, FireSim, the KU040 and FPGA optimisation | |
 
-## What those changes are
+Both carry `rb`, `tools/rb/`, `tools/bench/`, `workloads/`, `integration/`,
+`hardware/{zephyr,openocd,ospi,pwm,flight,bench,spioverjtag,pcb}`, `tests/` and
+`backends/{chipyard,zephyr-chipyard-sw}`, but with different contents in about
+fifty shared files -- most of `tools/rb/`, several overlays, the shared docs --
+and different submodule pins.
 
-Worth knowing before porting, because several are behavioural rather than
-cosmetic:
+## Folding it back
 
-- **`rb` no longer requires Chipyard to build or program.** `Board.generated_dts`
-  and `Board.bitstream` fall back to collected directories (`RB_DTS_DIR`,
-  `RB_BITSTREAM_DIR`). This is what makes a Mac usable at all.
-- **Host portability.** The SDK sysroot and version are discovered rather than
-  hardcoded; OpenOCD runs through the ELF loader only when one exists; serial
-  discovery knows macOS device names; FTDI discovery falls back to libusb.
-- **`rb doctor` and `rb env status` stopped reporting `ok` for empty or
-  half-installed directories.** Three separate instances of the same bug.
-- **Two errors that misdirected the reader** — the missing-bitstream error told a
-  Mac to run Chipyard, and the RAM check suggested a mode belonging to a
-  different workload.
-- **`rb debug` loads and runs by default** (`--no-run` restores the old
-  behaviour), and `RB_CMAKE_ARGS` / `RB_EXTRA_CPPFLAGS` exist because the flight
-  controller's knobs are CMake cache variables and C++ defines respectively.
-- Two scripts stopped pointing at one particular checkout by absolute path.
+Not a branch swap: replacing `main` with `setup` would drop the research
+surface above. The workable route is a port onto `main`:
 
-`git log --oneline main..setup` will not work (no common ancestor); use
-`git diff main setup -- <path>` per file instead.
-
-## The one thing to decide first
-
-Whether `main`'s copies of those 22 files have changed since this branch was
-cut. If they have not, the port is a file-by-file checkout. If they have, the
-diffs need reading — `setup`'s versions were written against a specific state
-and verified there.
+1. Add the setup-only directories.
+2. For each shared path, read `git diff main setup -- <path>` and take
+   `setup`'s version where `main` has not moved, or merge by hand where it has.
+   `tools/rb/` is the part that needs care: `setup`'s `rb` has flows `main`
+   lacks (`fly`, `ground`, `flightlog`, ESP modes, presets) and `main`'s has
+   research flows `setup` does not carry.
+3. Reconcile the submodule pins. `setup`'s Chipyard pin is on the
+   `arty200t-dual-uart` branch of the fork, and its zephyr-chipyard-sw pin
+   carries the flight firmware that flew.
+4. Run the suite on the result (`python3 -m unittest discover -s tests`); on
+   `main` the RoSE, XPU-RT and area tests have their data and should run rather
+   than skip.

@@ -1,5 +1,12 @@
 # Wireless telemetry and the ground-station dashboard
 
+> **Bring-up record (2026-09-21)**, written before any of it ran on the drone. It has since:
+> `esp_bridge --mode motors` is an `rb` mode, is the ESP image every flight T01-T56 (2026-09-23/24)
+> used, and was reflashed with `rb flash` on 2026-09-25; its ceiling is now 98 %, not 25 %.
+> Dashboard ESTOP is a real kill with that image and a `ROSE_UART_CMD` flight controller (every
+> flight preset sets it). To fly, use [`tutorial-flight.md`](tutorial-flight.md). Sections 2, 3, 6
+> and 7 (scheduling, bandwidth, the `RBLINK` fields) remain the reference.
+
 This is the ordered bring-up for getting the drone's telemetry onto a laptop over
 WiFi, and a dashboard showing it. It is written to be followed at a **different
 bench from the one that wrote it** — everything below was built and, where it
@@ -15,8 +22,8 @@ checked by symbol in step 0, not asserted.
 ## 0. The short version
 
 ```bash
-cd /scratch2/loren/riskybird-dev-setup           # or wherever the checkout is
-export RB_DTS_DIR=$HOME/riskybird-dts            # no elaborated DTS in this worktree
+source ./rb-env.sh                               # from the top of the checkout
+export RB_DTS_DIR=$HOME/riskybird-dts            # if rb-env.sh did not find the published DTS
 
 # --- the ESP: WiFi bridge, NO motor path in this image ---------------------
 ./rb build esp_bridge --target esp32c6
@@ -257,7 +264,7 @@ Everything here was built in this checkout. Real output:
 | what | build | result |
 |---|---|---|
 | `esp_bridge` default (unchanged behaviour) | `rb build esp_bridge --target esp32c6` | FLASH 583336 B (13.91 %), sram0 188544 B (43.09 %) |
-| `esp_bridge` **motors** (the merge) | west, with `esp_bridge-motors.overlay` + `conf/motors.conf` | FLASH 650264 B (15.50 %), sram0 197792 B (45.21 %) |
+| `esp_bridge` **motors** (the merge) | `rb build esp_bridge --target esp32c6 --mode motors` (then built by hand with west; same overlay and conf) | FLASH 650264 B (15.50 %), sram0 197792 B (45.21 %) |
 | `flight_controller --mode telem` | `rb build … --config RocketArty200TDroneFullDDRDmaFlowConfig` | RAM 410512 B |
 | `flight_controller --mode esp-motors` + telemetry overlay + `ROSE_TELEM_DIV=80` | as above plus `RB_CMAKE_ARGS` | RAM 416624 B |
 
@@ -285,45 +292,16 @@ RBLINK string    default=0 motors=1
 | `tools/bench/riskybird-dash.py` | the dashboard (stdlib only, self-contained page) |
 | `tools/bench/riskybird-wifi-macos.sh` | the macOS join/verify script, now with a `dash` subcommand and telemetry-vs-noise classification in `verify` |
 
-### One thing someone else has to do
+### Building and flashing the motors image
 
-`rb` rejects `--mode motors` for `esp_bridge` because the mode list lives in
-`tools/rb/boards.py`, which another workstream owns this session. **One line:**
-
-```python
-    "esp_bridge": _workload(
-        "esp_bridge",
-+       modes=("default", "motors"),
-        targets=("esp32c6",),
-```
-
-Until that lands, build the merged image with the identical west command `rb`
-would have run:
+`--mode motors` selects `hardware/zephyr/targets/esp32c6/workloads/esp_bridge-motors.overlay`
+and `workloads/esp_bridge/conf/motors.conf`, and sets the gate ceiling
+(`ESP_LINK_MAX_DUTY_PCT`, 98 for flight):
 
 ```bash
-R=$PWD
-west build -b esp32c6_devkitc/esp32c6/hpcore \
-  -d $R/build/zephyr/esp32c6/esp_bridge/motors -p auto $R/workloads/esp_bridge -- \
-  -DRB_ROOT=$R -DRB_TARGET=esp32c6 -DDTC=/usr/bin/dtc \
-  -DDTS_ROOT=$R/hardware/zephyr \
-  -DKCONFIG_ROOT=$R/hardware/zephyr/Kconfig.workload \
-  "-DDTC_OVERLAY_FILE=$R/hardware/zephyr/targets/esp32c6/target.overlay;$R/hardware/zephyr/targets/esp32c6/workloads/esp_bridge-motors.overlay" \
-  "-DEXTRA_CONF_FILE=$R/hardware/zephyr/targets/esp32c6/target.conf;$R/workloads/esp_bridge/conf/motors.conf"
-
-# and flash it the way rb flash would:
-west flash -d $R/build/zephyr/esp32c6/esp_bridge/motors -- --esp-device /dev/tty.usbmodemXXXX
+rb build esp_bridge --target esp32c6 --mode motors
+rb flash esp_bridge --target esp32c6 --mode motors     # --port <esp-port> if more than one ESP
 ```
-
-Both need the Zephyr environment `rb` builds for itself — a bare `west` on your
-PATH will not find the SDK. Get a shell that has it with:
-
-```bash
-source ./rb-env.sh        # puts rb on PATH
-rb env shell zephyr       # NOT `rb env enter`; the subcommands are status|setup|shell
-```
-
-then run the two commands above inside it. Adding the `boards.py` line makes all
-of this unnecessary.
 
 ---
 
@@ -453,8 +431,8 @@ Everything up to this point is reversible and cannot move a motor.
 > investigation came from — and replaces `esp_motors`. Only one of the four can
 > be on the chip.
 
-Build and flash it with the commands in section 4 (or `rb build/flash esp_bridge
---mode motors` once `boards.py` has the mode). Expect:
+Build and flash it with the commands in section 4. Expect (the ceiling line
+reads 98% with today's build; this capture was taken at the original 25%):
 
 ```
 === RiskyBird ESP link: FPGA uart <-> WiFi UDP + 4x motor gates ===
@@ -505,22 +483,22 @@ Still props off. Press **ESTOP** on the dashboard. The banner must change to
 **KILL LATCHED AT THE ESP** and `RBLINK` must show `kill=1` with `duty=[0 0 0 0]`.
 Press **RESET** and watch it clear.
 
-> **The ESTOP button has never done anything on this carrier until now.** The
-> flight controller has no uart1 command reader at all: every `rose_cmd_*` hook in
-> `main.cpp` is inside `#if defined(CONFIG_WIFI)`, which is only true on the
-> ESP-native build, and the `telem_wifi.c` that would call them is not in this
-> checkout. The bridge writes the command bytes into the FPGA's receiver, nothing
-> reads them, and the bridge generates the ACK itself — so it has always *looked*
-> like it worked. In the merged image ESTOP is executed **at the ESP, one
-> component before the MOSFET**, with no dependency on the FPGA still running.
-> That is the strongest single argument for merging.
+> **ESTOP is executed at the ESP, one component before the MOSFET**, with no
+> dependency on the FPGA still running: the bridge latches `kill=1` and zeroes
+> all four gates, and only an explicit RESET or a power cycle clears it. A
+> flight controller built with `ROSE_UART_CMD` (every flight preset) also reads
+> the forwarded ESTOP / DISARM / RESET / HOVER_Z / PROFILE lines from uart1 and
+> acts on them. Without that knob the FPGA drops every
+> forwarded command, and the dashboard's ACK -- which the bridge generates
+> itself -- means only "delivered to the FPGA UART".
 >
-> **Trust the banner and `kill=1`, not the ACK.** `DISARM` and `HOVER_Z` still do
-> nothing on this carrier.
+> **Trust the banner and `kill=1`, not the ACK.** And use ESTOP, not DISARM, to
+> stop a flight: in the no-gesture autoflight builds DISARM can re-arm.
 
 Only after all of the above: props on, battery connected (motor and flight tests
 do nothing useful on USB-C alone), and the procedure in
-`docs/flight-safety-bench-procedure.md`.
+[`tutorial-flight.md`](tutorial-flight.md) (the 2026-09-21 bench procedure is kept in
+`docs/history/flight-safety-bench-procedure.md`).
 
 ---
 
@@ -669,7 +647,6 @@ Everything behavioural. The drone was not at this bench. Specifically:
 - the SSID: `riskybird-5674` is this script's default and may not be this board
 
 **Known, not fixed here (owned elsewhere):**
-- `boards.py` needs the one-line mode addition (section 4)
 - `hardware/zephyr/fpga-esp-uart.overlay` and
   `hardware/zephyr/targets/esp32c6/workloads/esp_motors.overlay` still say 115200
   is unverified. It is now measured — 693 frames, zero CRC and zero noise errors.

@@ -35,8 +35,10 @@ verification at the end of each step exercises.
 | `xpurt`, `schedule` | workload-mix scheduling and policy replay |
 | `dse`, `area` | design-space exploration and FPGA resource characterisation |
 
-They work here and are used in this repository's own experiments, but they are in progress:
-their setup is not documented, and their interfaces are expected to change. Note that step 2b
+Their backends and data -- `backends/RoSE`, `backends/XPU-RT`, `dse/`, `experiments/` -- live
+on the `main` branch and are not carried here, so on `setup` they cannot run (`rb area` only in
+part). On `main` they are in progress: their setup is not documented, and their interfaces are
+expected to change. Note that step 2b
 *does* pull several gigabytes of their dependencies -- `gymnasium`, `torch`, CUDA runtime
 libraries, `stable-baselines3` -- into the Zephyr environment as a side effect. None of it is
 needed for the supported surface; it is simply part of the environment the backend defines, and
@@ -652,8 +654,11 @@ brew install openfpgaloader          # macOS
 sudo apt install openfpgaloader      # Debian/Ubuntu
 ```
 
-`hardware/spioverjtag/setup-openfpgaloader.sh` builds it from source if your
-distribution's package is too old; set `OFL_PREFIX` to choose where it lands.
+For the KU040 only, `hardware/spioverjtag/setup-openfpgaloader.sh` builds a
+pinned upstream openFPGALoader together with this repository's
+`xcku040-sfva784` spiOverJtag bridge, which that board's flash needs; set
+`OFL_PREFIX` to choose where it lands. The drone (TE0712, `--board te0712_8`)
+needs none of that -- the distribution package above is enough.
 
 **Verify.** `rb doctor` has no line for openFPGALoader, so the only way to prove
 `rb` found it is to run the real command. With no board attached it should reach
@@ -669,6 +674,23 @@ That error is the pass condition here -- it means the binary was found and ran.
 `rb: command not found`-style output, or a complaint about the bitstream path,
 is not. (This needs step 3c's bitstream first; come back to it if you are
 reading in order.)
+
+> **`rb program` writes the SPI flash, persistently, then loads SRAM.** It runs
+> `openFPGALoader --write-flash` and then a second, SRAM-only load of the same
+> image; `rb debug --program` does the same. Whatever was in the flash before is
+> gone, and it is what the board will try to boot at every power-up.
+>
+> **Use SRAM for now (2026-09-25).** The only FullDDR bitstream (built
+> 2026-09-03) predates the TE0712 SPI-boot properties in fpga-shells `80831d8`
+> (`SPI_32BIT_ADDR` and friends, 2026-09-23), so a flash write of it verifies
+> but the FPGA never configures from it: measured 2026-09-24, STAT `0x5000190c`,
+> `DONE=0`, and an all-ones debug TAP. `rb fly` programs SRAM only
+> ([`tutorial-flight.md`](tutorial-flight.md)). To program SRAM by hand:
+> `openFPGALoader --board te0712_8 --busdev-num <bus:dev> --write-sram --bitstream <file.bit>`
+> (`rb bench` prints the exact line for the attached adapter). Making flash boot real needs a FullDDR
+> rebuild at the current Chipyard pin and a cold power-cycle test; that has not
+> been done. Even then a power loss restores only the shell -- the ELF lives in
+> DDR and has to be reloaded.
 
 ### 3b. OpenOCD
 
@@ -872,11 +894,18 @@ rb program --board arty200t --config <Config> --usb-location <bitstream-location
 rb console --port /dev/ttyUSB5 --baudrate 115200
 ```
 
+`rb program` rewrites the SPI flash before it loads SRAM, so this replaces
+whatever shell the board boots at power-up -- see the note under 3a.
+
 ### The hardware acceptance check
 
 Everything above can be verified with no board. This is the sequence that closes
 the remaining gap, in order, each step meaningful on its own. Run it the first
 time a board is attached.
+
+Every `rb program` and `rb debug --program` below writes the SPI flash as well
+as SRAM (see the note under 3a); to leave the flash alone, program SRAM by hand
+with openFPGALoader and drop `--program`.
 
 All six in one command, stopping at the first failure:
 
@@ -967,7 +996,15 @@ would need them, ending in one verdict.
 
 The ESP32-C6 and FPGA both connect directly to the same four MOSFET gate nets;
 there is no hardware arbitration. Provision each board with the passive
-`motor_safe` ESP image before allowing the FPGA to own those nets. Do this with
+`motor_safe` ESP image before allowing the FPGA to own those nets.
+
+> This is the bench-check arrangement, where the FPGA owns the gates. **A drone
+> that flies runs `esp_bridge --mode motors` on the ESP instead**, which owns all
+> four gates and takes duty frames from the FPGA over uart1
+> ([`esp-motor-offload.md`](esp-motor-offload.md)); flashing it replaces
+> `motor_safe`, and flashing `motor_safe` replaces it. The bootup check below
+> never drives a motor unless it is built `--mode motors`, so it is safe under
+> either ESP image. Do this with
 the battery disconnected and the propellers removed:
 
 ```console
@@ -1013,7 +1050,7 @@ $ ./rb debug bootup_check --target arty200t \
 ```
 
 Eight stages on the console, then a summary and `BOARD READY` or
-`BOARD NOT READY`. Measured on a healthy board:
+`BOARD NOT READY`. Measured on the drone (the ToF `WARN` is a real fault; see below):
 
 ```
 [  OK  ] main memory (DDR3)   4 MiB at 0x82000000 verified address-in-address
@@ -1039,55 +1076,47 @@ different scenes give different ranges. What a healthy frame must show is a
 non-uniform, unsheared image; a range that is a single value means the data bus
 is stuck, and the workload already fails that case by itself.
 
-> **Known issue: alternating columns differ in brightness.** Every photograph
-> this repository has produced carries a fine vertical comb, averaging about 8%.
-> It is measured on every capture -- `frame-to-png.py` prints a
-> `column comb:` line -- and it is **reported, not corrected**, because the
-> obvious correction does not work.
+> **The camera is Bayer colour, and a greyscale view of it shows a comb.**
+> Earlier versions of this page reported "alternating columns differ in
+> brightness", about 8%, with a phase that flips between captures, and blamed
+> sampling timing in the capture RTL. That was wrong. The HM01B0 on the drone is
+> a Bayer colour sensor (blue at `r0c0`, greens on the anti-diagonal, red at
+> `r1c1`), and the comb is the colour filter mosaic seen in greyscale; its
+> phase flips because a capture does not start on a fixed pixel of the mosaic,
+> which is why every frame's phases have to be assigned from the frame itself
+> (`frame-to-colour.py` does this). Nothing in the
+> capture core needs to change. Settled 2026-09-22 with a colour photograph off
+> the drone -- see [`hm01b0-colour-investigation.md`](hm01b0-colour-investigation.md).
 >
-> What it is not. It is not fixed-pattern column noise: the phase FLIPS between
-> captures. Four frames of one scene measured even/odd ratios of 0.9232, 0.9231,
-> 1.0833, 1.0831 -- same size, opposite sign -- and frames one column apart
-> align three times better than frames aligned as captured (mean |difference|
-> 3.25 at a one-column shift against 10.79 at zero). The capture simply does not
-> start on a fixed pixel parity. A stored calibration would be exactly wrong
-> half the time.
+> Three things hid it, all since fixed in
+> `integration/zephyr/camera/src/camera.c`: the auto-exposure target had never
+> been set (it sat at 60 DN, leaving ~28 DN of signal), `FRAME_LEN` capped
+> integration so AE pegged the gain, and black-level correction clamped ~99% of
+> every frame to one value. The defaults are now `RB_CAMERA_AE_TARGET` 64,
+> `RB_CAMERA_FRAME_LEN` 4000, `RB_CAMERA_AE_SETTLE_MS` 6000 and
+> `RB_CAMERA_BLC_CFG` 0x00. `frame-to-png.py`'s old "capture defect repair"
+> erased the blue channel and is now off by default. To see colour:
 >
-> It is also not a constant gain, which is what makes it interesting. Equalising
-> the two parities took the mean ratio to 1.002 while the adjacent-pixel
-> difference ROSE, from 6.39 to 6.91. Measured against local brightness,
-> mean(even - odd) runs -4.4 at level 32-63, -19.9 at 64-95, -39.6 at 96-127 and
-> -58.4 at 128-159: an implied ratio sliding from 0.91 to 0.66 as the scene
-> brightens.
+> ```console
+> python3 hardware/ospi/frame-to-colour.py bootup-frame.raw 326 2
+> ```
 >
-> An error proportional to the signal swing, on alternate samples, with a start
-> phase that is not pinned, is what an under-settled sample looks like -- one
-> pulled toward its neighbour because it is read before the bus has arrived.
-> That points at sampling timing in the capture core, so **the fix belongs in
-> the capture RTL** (sampling edge or an added pipeline stage), which is a
-> silicon-tier change and needs a rebuilt bitstream to test.
->
-> An earlier version of this note blamed the sensor's analog column path and a
-> missing vendor calibration table, on the grounds that the walking-1s test
-> pattern comes back clean. That evidence is weaker than it looked: the pattern
-> carries three values and almost no slew, so it cannot exercise a settling
-> problem. The pattern build is still worth having -- build with
-> `RB_EXTRA_CPPFLAGS="-DRB_CAMERA_TEST_PATTERN=1"` -- but it does not exonerate
-> the datapath.
+> **A near-constant frame means the clamp or the exposure, not the scene.** At
+> maximum analog gain a live readout cannot produce a hundred thousand
+> identical pixels.
 
 > **The first capture after changing the sensor's configuration can time out.**
 > Observed once, going from a test-pattern build back to a photograph build:
 > `[ FAIL ] HM01B0 camera  timeout -- the frame did not complete`. Two
 > consecutive re-runs then passed with no change. Re-run before investigating.
 >
-> A likely contributor, recorded as a lead rather than a diagnosis: the HM01B0
-> commits configuration writes through a group-parameter hold, and this tree
-> never uses it. `HM01B0_REG_GRP_PARAM_HOLD` is defined in `hm01b0.h` with the
-> comment `1 = hold, 0 = commit` and is written **zero** times anywhere, so a
-> `TEST_PATTERN` or `MODE_SELECT` change is not explicitly committed and the
-> first frame after it can be inconsistent. Fixing that properly means adopting
-> the vendor sequence, which is the same outstanding work as the column gain
-> above.
+> The driver now brackets its exposure and frame-timing writes (AE target,
+> `FRAME_LEN`/`MAX_INTG`, the optional full-readout block) with
+> `HM01B0_REG_GRP_PARAM_HOLD`, hold then commit. The `TEST_PATTERN` and
+> `MODE_SELECT` writes that open streaming are still not bracketed, so the
+> first frame after changing them remains the likely suspect. At `FRAME_LEN`
+> 4000 a frame takes ~118 ms, and the shared driver's capture timeout was raised to 20 s to
+> match.
 
 **`attempted 'gdb' connection rejected` on a clean run is benign.** OpenOCD logs
 it, then immediately logs `accepting 'gdb' connection on tcp/3333`, and the
@@ -1099,14 +1128,34 @@ adapter; find it with `pgrep -af openocd` and check
 `/sys/bus/usb/devices/<loc>:1.0/driver`, where `usbfs` means held and empty
 means free.
 
-**The ToF `WARN` is a population question, not a fault.** Four XSHUT slots are
-declared -- ADS7128 channels 1, 2 and 3 for the side headers and 6 for the
-down-facing sensor -- because that is what `rb_tof_scan_xshut` measured on this
-board. Slots holding nothing report absent. `2 up` with the down sensor present
-is a board carrying one side sensor; the check deliberately does not collapse an
-empty header and a broken sensor into the same line.
+**The ToF `WARN` is a real fault.** The drone is meant to carry three
+time-of-flight sensors: two side VL53L5CX through the ADS7128 XSHUT lines and
+the down-facing VL53L1X. Measured 2026-09-10, only one side sensor and the down
+sensor answer:
+
+```
+ch1 side  VL53L5CX   at 0x31 (id 0xf002)
+ch2 side  -- absent (err -116)
+ch3 side  -- absent (err -116)
+ch6 down  VL53L1X    at 0x34 (id 0xeacc)
+no unclaimed channel answers at 0x29
+```
+
+The all-channel scan rules out the missing side sensor sitting on an undeclared
+channel, so it is dead, unpopulated or its XSHUT line is broken. Do not "fix"
+the WARN by trimming the declared channels to the two that answer. The down
+sensor is unaffected, so altitude work and flight can proceed.
 
 **Motors are opt-in through the mode, and need the battery.**
+
+> **`--mode motors` is the legacy FPGA-PWM path.** It drives the gates from the
+> FPGA's SiFive PWM blocks, which is not how the drone flies. FPGA ball F13, motor
+> 4's gate, has a dead output driver (measured with the bare-metal pad test in
+> `hardware/padtest/`), so motor 4 stays still in this sweep however healthy it
+> is. And if the ESP is running `esp_bridge --mode motors` it is driving the same
+> four gates, and the two fight through their 47R resistors. Run this sweep only
+> with `motor_safe` on the ESP; to check motors on a flying drone use
+> `rb fly motors` ([`tutorial-flight.md`](tutorial-flight.md)).
 
 ```console
 $ ./rb debug bootup_check --target arty200t \
@@ -1157,7 +1206,8 @@ rb debug hello_world --target arty200t --config RocketArty200TDroneFullDDRConfig
 ```
 
 `--program` loads the bitstream first, so this one command covers programming
-and loading. It loads and then **runs** the workload; add `--no-run` to stop at
+and loading. Like `rb program` it writes the SPI flash persistently before it
+loads SRAM; `rb fly` is the SRAM-only path for flight images. It loads and then **runs** the workload; add `--no-run` to stop at
 a GDB prompt instead, and `--gdb-script <file>` to drive a scripted session and
 exit.
 
@@ -1172,25 +1222,17 @@ Optional, and it needs step 2 finished -- the suite resolves real backend paths:
 python3 -m unittest discover -s tests
 ```
 
-**This suite is a silicon-tier check.** It resolves paths into
-`backends/chipyard`, so on the bench tier a large minority of it fails for that
-reason alone and nothing is wrong with your install:
+Read the summary line, not a remembered count; the suite grows with the tree.
+Parts of it are silicon-tier: they resolve paths into `backends/chipyard`, so
+on the bench tier they are expected to skip or fail for that reason alone.
+Others need data that lives only on `main` (`experiments/`, `dse/`, the RoSE
+and XPU-RT backends) and skip here. A failure in a module that touches neither
+-- `test_fly`, `test_ground`, `test_flightlog`, `test_uplink_cmd`, for example --
+is a real one. To run one module:
 
-| | result |
-| --- | --- |
-| silicon tier, Linux, both backends present | `Ran 245 tests ... OK` |
-| bench tier, Linux, no Chipyard | `Ran 233 tests ... failures=18, errors=27` |
-| bench tier, macOS, no Chipyard | `Ran 233 tests ... failures=7, errors=40` |
-
-The failing modules are the same on both bench-tier platforms -- `test_xpurt`,
-`test_area`, `test_pwm`, `test_rb`, `test_fingerprint` (and `test_soc` on
-macOS) -- though how a given case lands on the failure/error line varies by
-platform, so do not read anything into the split. Every one of them traces back
-to Chipyard being absent: `fingerprint.py` raises `FingerprintError`, and
-`test_pwm` reads the pin binder from a path under `backends/chipyard`.
-
-If you are on the bench tier, this command tells you nothing about your install
-and can be skipped. `verification.md` lists which modules pass where.
+```console
+python3 -m unittest tests.test_fly -v
+```
 
 ### Where to go next
 
@@ -1198,11 +1240,12 @@ The install is done; these are the pages that use it.
 
 | Want to | Read |
 | --- | --- |
+| **Fly the drone** | [`tutorial-flight.md`](tutorial-flight.md) -- `rb fly`, the presets that flew, the ground station, known issues |
 | Make first contact with the drone bench | [`drone-initial-bringup.md`](drone-initial-bringup.md) -- adapters, console, and what a dead JTAG link actually looks like |
 | Understand a board that will not configure | [`te0712-drone-carrier-ddr-bringup.md`](te0712-drone-carrier-ddr-bringup.md) -- **read this before concluding a board is broken** |
-| Take a picture | [`hm01b0-camera-bringup.md`](hm01b0-camera-bringup.md) |
-| Drive motors | [`motor-pwm-bringup.md`](motor-pwm-bringup.md) -- propellers off, battery connected |
-| Run the flight controller | [`flight-on-fpga.md`](flight-on-fpga.md) |
+| Take a picture | [`hm01b0-camera-bringup.md`](hm01b0-camera-bringup.md), and [`hm01b0-colour-investigation.md`](hm01b0-colour-investigation.md) for colour |
+| Understand how the motors are driven | [`esp-motor-offload.md`](esp-motor-offload.md) -- from the ESP32-C6; [`motor-pwm-bringup.md`](motor-pwm-bringup.md) is the legacy FPGA path |
+| Port or modify the flight controller | [`flight-on-fpga.md`](flight-on-fpga.md) |
 
 Two things that will otherwise cost you a bench session:
 

@@ -1,5 +1,13 @@
 # Handoff prompt
 
+> **Historical record (2026-09-21), not instructions.** A session prompt for the
+> first tethered-flight attempt. Superseded by [`../tutorial-flight.md`](../tutorial-flight.md)
+> and [`../esp-motor-offload.md`](../esp-motor-offload.md). Known-wrong claims: the dashboard
+> ESTOP "does nothing" (it is a real kill with `esp_bridge --mode motors` and a `ROSE_UART_CMD`
+> flight controller); duty frames at 50 Hz (flight images run ~247 frames/s); the camera
+> "returns no colour" (it is a Bayer colour sensor, [`../hm01b0-colour-investigation.md`](../hm01b0-colour-investigation.md)).
+
+
 Paste the block below into a fresh Claude Code session on the machine that has
 the drone attached. It is written to be self-contained: it names the one document
 to read, states the constraints that are not negotiable, and says what to do
@@ -16,9 +24,9 @@ connected to this machine and is TETHERED to cables, so it cannot fly away, but
 it HAS PROPELLERS ON and its motors WILL SPIN AT FLIGHT-LIKE POWER.
 
 READ THIS FIRST, before touching anything:
-    docs/esp-motor-offload-handoff.md
+    docs/history/esp-motor-offload-handoff.md
 and then:
-    docs/tethered-flight-attempt.md
+    docs/history/tethered-flight-attempt.md
 
 Both are in this repo, on the `setup` branch. They were written on the Linux
 build host by the session that did the work, for you specifically. The handoff
@@ -132,7 +140,7 @@ START HERE, in this order:
      `undefined node label 'spi0'`.
   3. Prove the guard can see: battery out, tilt the frame by hand, watch `acc`
      in the telemetry follow.
-  4. Only then connect the battery, and follow docs/tethered-flight-attempt.md.
+  4. Only then connect the battery, and follow docs/history/tethered-flight-attempt.md.
 
 DO NOT, without checking with the owner first:
   - raise any duty cap beyond the tethered procedure's value

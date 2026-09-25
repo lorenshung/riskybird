@@ -1,5 +1,13 @@
 # Handoff: ground station → controller session (merge, then one machine)
 
+> **Historical record (2026-09-23/24), not instructions.** A handoff between the
+> ground-station and flight-controller sessions. Superseded by [`../tutorial-flight.md`](../tutorial-flight.md)
+> and `rb fly`. Known-wrong claims: the flight firmware "exists only in a working copy" (it is
+> committed, pinned as zephyr-chipyard-sw `834b9c6`, and its knobs are `tools/flight/presets/`);
+> `flight.sh` lives in a scratchpad (it is `tools/flight/legacy/flight.sh`, replaced by `rb fly`);
+> the gitlink is "still `4af12b9`".
+
+
 From the Mac ground-station session (2026-09-23/24, trials T01–T56) to the controller session that
 builds and loads the flight firmware. Goal: **build, load, fly and publish logs from one machine.**
 
@@ -46,7 +54,7 @@ git fetch origin && git merge origin/setup        # or rebase your local commits
    climb/hold/descend profile, SAFE_MAX_HEIGHT_M, FLIGHT_MAX_MS) exists only in your working copy of
    `zephyr-chipyard-sw`. Commit it there and push it to that repo's remote. Then **bump the gitlink in
    `setup`** and push. Without this, another machine builds the Sept 21 firmware.
-2. **`flight.sh`.** Every reload and commit went through `/tmp/claude-2629/.../scratchpad/flight.sh`,
+2. **`flight.sh`.** Every reload and commit went through a session scratchpad copy of `flight.sh`,
    which is in no repo. Move it to `tools/bench/flight.sh`, with no absolute or `/tmp` paths and USB
    locations derived from `rb bench`, or make it `rb fly commit`. Include the exact
    `rb build flight_controller --mode ... --config ...` line it uses.

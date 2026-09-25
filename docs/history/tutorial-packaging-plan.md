@@ -1,5 +1,14 @@
 # From remote bench to in-person tutorial: packaging plan
 
+> **Historical record (2026-09-24/25), not instructions.** The plan that became
+> `rb fly`. Superseded by [`../tutorial-flight.md`](../tutorial-flight.md), which carries its known
+> issues. What changed from the proposal: `rb flight` shipped as `rb fly`, `rb esp flash` as
+> `rb flash esp_bridge --mode motors`, `rb motors test` as `rb fly motors`, and the presets are
+> named `t16/t21/t23/t27-hover-*`; the firmware is committed (zephyr-chipyard-sw `834b9c6`);
+> `tools/rb-ext.py` is gone. The flash-boot failure now has a cause: the only FullDDR bitstream
+> predates the TE0712 SPI-boot properties.
+
+
 Status (2026-09-25): items 1-4 are done as `rb fly` and the `flight_controller` preset modes; see docs/tutorial-flight.md. Item 5 is covered by the per-session logs `rb fly` writes to `results/fly/`; item 6 (`rb release flight`) remains. The inventory below is the original proposal, kept as the record.
 
 ## Goal

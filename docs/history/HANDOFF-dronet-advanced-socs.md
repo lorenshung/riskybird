@@ -1,5 +1,14 @@
 # Handoff: RiskyBird drone stack → the accelerator SoCs (DroNet)
 
+> **Historical record (2026-09-24), not instructions.** A session prompt for moving
+> the drone stack onto the accelerator shells. Superseded by [`../accel-shells-bringup.md`](../accel-shells-bringup.md)
+> and [`../dronet-on-accel-socs.md`](../dronet-on-accel-socs.md). Known-wrong claims: the dashboard
+> ESTOP "does not stop the drone" (real with `esp_bridge --mode motors` + `ROSE_UART_CMD`, used in
+> T01-T42); `esp_bridge --mode motors` "cannot be selected and has never run on hardware" (it is an
+> `rb` mode and is the flying ESP image); fork submodules commit on `trenz` (the chipyard pin is on
+> `arty200t-dual-uart`).
+
+
 You are picking up the RiskyBird drone project: a quadrotor whose flight computer is a
 Chipyard RISC-V SoC on an FPGA. The goal of this session is to build out DroNet (and related
 vision workloads) on the more advanced SoCs — Gemmini and Saturn configs — **but first to verify
@@ -306,9 +315,9 @@ capture → a no-motor `flight_controller` telemetry run with the pack out → t
 ## Repository state and tooling
 
 - **Two working trees of the same repo, on unrelated histories** (`git merge-base` finds nothing):
-  - `/scratch2/loren/riskybird-dev` — branch `main`: the research surface (DSE, experiments, RoSE,
+  - the `main` checkout (`riskybird-dev`) — branch `main`: the research surface (DSE, experiments, RoSE,
     XPU-RT, KU040 work) and **this session's uncommitted work**.
-  - `/scratch2/loren/riskybird-dev-setup` — branch `setup`: **ahead on capability** — the `rb` with
+  - the `setup` checkout (`riskybird-dev-setup`) — branch `setup`: **ahead on capability** — the `rb` with
     `telem/esp-motors/autoflight` modes, the clock/FPU derivation above, `esp_bridge`/`esp_motors`/
     `motor_safe` workloads, `hardware/flight/*.gdb`, the bench dashboard/watch scripts, and
     ModelBlaster/DroNet (`rb modelblaster`, `backends/modelblaster`).
@@ -353,7 +362,7 @@ reports, check its evidence yourself before relying on it.
 ```text
 Restore the down-facing altitude sensor (VL53L1X) in the RiskyBird flight controller build.
 
-THE SYMPTOM. In /scratch2/loren/riskybird-dev, `./rb build flight_controller --target arty200t
+THE SYMPTOM. In the main checkout, `./rb build flight_controller --target arty200t
 --config RocketArty200TDroneFullDDRConfig` produces an image with no altitude sensor at all: the
 generated devicetree has no `tof` alias and CONFIG_VL53L1X is not set, so HAVE_TOF is 0. On
 hardware (2026-09-22) the telemetry read tofv=0 on every one of 1086 lines, z sat at a dead -3.1 m,
@@ -364,8 +373,8 @@ IT HAS WORKED. The user is certain, and there is evidence: earlier flight-contro
 this bench read `tofv=1 tofh=0.030`. The down VL53L1X is physically present and answers -- the
 bootup_check workload brings it up on ADS7128 XSHUT channel 6 and reads id 0xeacc.
 
-THE STRONG LEAD -- verify it, do not just trust it. The sibling tree
-/scratch2/loren/riskybird-dev-setup already carries a fix, and the dev tree lacks every piece of it:
+THE STRONG LEAD -- verify it, do not just trust it. The sibling setup
+checkout already carries a fix, and the dev tree lacks every piece of it:
   - hardware/zephyr/targets/fpga/workloads/flight_controller.overlay declares `vl53l1x@30`
     (compatible "st,vl53l1x") and a `tof = &vl53l1x;` alias. Its own comment describes this exact
     failure: "Without the node the estimator ran with tofv=0 on every sample and z dead-reckoned".

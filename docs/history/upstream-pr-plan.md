@@ -1,5 +1,12 @@
 # Proposing our work back to `ucb-bar/zephyr-chipyard-sw`
 
+> **Historical record (2026-09-22), not instructions.** The plan behind the patch
+> series in [`../upstream-pr/`](../upstream-pr/README.md), which supersedes it. Known-wrong claims:
+> the uplink command reader (`ROSE_UART_CMD`) is "unverified on hardware" (every flight T01-T42,
+> 2026-09-23/24, was built with it and flown with the dashboard ESTOP live); the submodule
+> revisions quoted (`4af12b9`) predate the current pin (`834b9c6`).
+
+
 Prepared 2026-09-22. **Nothing here has been executed.** No branch has been
 created, no commit made, nothing pushed, no PR opened. This is the plan and the
 exact commands; running them is a separate decision.
