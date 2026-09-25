@@ -31,6 +31,7 @@ from __future__ import annotations
 import os
 import re
 import select
+import subprocess
 import sys
 import termios
 import threading
@@ -236,10 +237,28 @@ class Bench:
     esp: str | None
 
 
-def _holders(path: str) -> list[str]:
-    """Other processes with this device open (Linux /proc; empty elsewhere or if unknown)."""
-    if not path.startswith("/dev/") or not Path("/proc").is_dir():
+def _holders_lsof(path: str) -> list[str]:
+    """macOS (no /proc): ask lsof. Empty if lsof is missing or says nothing."""
+    try:
+        out = subprocess.run(["lsof", "-F", "pc", path], capture_output=True, text=True,
+                             timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
         return []
+    found, pid = [], None
+    for line in out.splitlines():
+        if line.startswith("p"):
+            pid = line[1:]
+        elif line.startswith("c") and pid and int(pid) != os.getpid():
+            found.append(f"pid {pid}: {line[1:]}")
+    return found
+
+
+def _holders(path: str) -> list[str]:
+    """Other processes with this device open (Linux /proc, macOS lsof; empty if unknown)."""
+    if not path.startswith("/dev/"):
+        return []
+    if not Path("/proc").is_dir():
+        return _holders_lsof(path)
     try:
         target = os.path.realpath(path)
     except OSError:
@@ -269,7 +288,7 @@ def discover(args) -> Bench:
                 if a["pid"] in cli.MPSSE_PRODUCT_IDS and not cli.is_foreign_adapter(a)]
     bit = dbg = None
     want_dbg = getattr(args, "debug_location", None) or os.environ.get("RB_FTDI_LOCATION")
-    want_bit = getattr(args, "bitstream_location", None)
+    want_bit = getattr(args, "bitstream_location", None) or os.environ.get("RB_BITSTREAM_LOCATION")
     probed = []
     for a in adapters:
         if want_dbg and a["location"] == want_dbg:
@@ -328,9 +347,12 @@ def discover(args) -> Bench:
 def _require(bench: Bench, *, bitstream=False, debug=False, console=False, esp=False) -> None:
     missing = []
     if bitstream and bench.bitstream is None:
-        missing.append("bitstream adapter (config TAP) -- pass --bitstream-location")
+        missing.append("bitstream adapter (config TAP) -- pass --bitstream-location "
+                       "(or set RB_BITSTREAM_LOCATION)")
     if debug and bench.debug is None:
-        missing.append("debug adapter -- pass --debug-location (rb probe-ftdi --idcode)")
+        missing.append("debug adapter -- pass --debug-location (or set RB_FTDI_LOCATION). Before the "
+                       "shell is programmed the debug TAP reads all ones, so it is inferred as the "
+                       "bitstream adapter's twin on the same hub; on separate hubs or buses it cannot be")
     if console and not bench.console:
         missing.append("FPGA console port -- pass --console (or set RB_CONSOLE_PORT)")
     if esp and not bench.esp:

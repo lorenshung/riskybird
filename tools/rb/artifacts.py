@@ -60,6 +60,48 @@ def serial_devices() -> list[Path]:
     return devices
 
 
+ESPRESSIF_VENDOR = 0x303A
+
+
+def macos_location_prefix(bus: int, ports) -> str:
+    """The locationID macOS builds a serial node name from, as that name spells it.
+
+    locationID packs the libusb bus number into the top byte and one port per nibble
+    below it; the node name is its hex with the trailing zeros dropped. Measured on the
+    drone bench Mac: bus 1 ports 1.3 -> 0x01130000 -> "113" (cu.usbserial-11300/-11301),
+    bus 0 port 1 -> 0x00100000 -> "1" (the ESP32-C6's cu.usbmodem101).
+    """
+    location = bus << 24
+    for i, port in enumerate(list(ports)[:6]):
+        location |= (port & 0xF) << (20 - 4 * i)
+    return f"{location:x}".rstrip("0")
+
+
+def macos_espressif_ports() -> list[Path]:
+    """cu.usbmodem nodes that belong to an attached Espressif USB device (VID 0x303a).
+
+    On macOS the node name carries no vendor string, so "which usbmodem is the ESP" is
+    answered from USB instead: the device's bus/port chain gives the name prefix. Empty
+    without pyusb or without such a device -- callers fall back to asking for --port.
+    """
+    try:
+        import usb.core  # type: ignore
+    except ImportError:
+        return []
+    found: list[Path] = []
+    try:
+        devices = list(usb.core.find(find_all=True, idVendor=ESPRESSIF_VENDOR))
+    except Exception:
+        return []
+    for device in devices:
+        ports = getattr(device, "port_numbers", None) or ()
+        if not ports:
+            continue
+        prefix = macos_location_prefix(device.bus, ports)
+        found.extend(sorted(Path("/dev").glob(f"cu.usbmodem{prefix}[0-9][0-9]")))
+    return found
+
+
 def select_serial_port(role: str, explicit: str | None = None) -> Path:
     if explicit:
         port = Path(explicit)
@@ -99,6 +141,11 @@ def select_serial_port(role: str, explicit: str | None = None) -> Path:
     ]
     if len(preferred) == 1:
         return preferred[0]
+    if role == "esp" and not preferred:
+        # macOS: no by-id names, so identify the ESP by its USB vendor instead.
+        espressif = [p for p in macos_espressif_ports() if p in devices]
+        if len(espressif) == 1:
+            return espressif[0]
 
     choices = "\n  ".join(str(device) for device in devices)
     raise RuntimeError(

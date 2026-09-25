@@ -22,6 +22,7 @@ from pathlib import Path
 from . import (
     __version__,
     area,
+    artifacts,
     dse,
     fingerprint,
     flightlog,
@@ -1925,6 +1926,29 @@ def _sysfs_text(path: Path) -> str:
         return ""
 
 
+def macos_serial_node(bus: int, ports: Sequence[int], interface: int, serial: str = "",
+                      exists=os.path.exists) -> str | None:
+    """The /dev/cu.* node macOS creates for one USB serial interface, or None.
+
+    Two naming schemes, both measured on the drone bench Mac:
+      * with a USB serial number:    cu.usbserial-<serial><A|B...>  (A = interface 0)
+      * with none (the drone's blank-EEPROM FT2232H pair, and the ESP32-C6's CDC port):
+        cu.usbserial-<L><NN> / cu.usbmodem-<L><NN>, where <L> is the IORegistry locationID
+        in hex with its trailing zeros dropped and <NN> the interface number, two digits.
+        locationID packs the libusb bus into the top byte and one port per nibble below it:
+        bus 1 ports 1.3 -> 0x01130000 -> "113" -> cu.usbserial-11300 / -11301.
+    Only a node that exists is returned: a scheme that does not match this host must fail
+    closed (None), never hand back a plausible path to the wrong device.
+    """
+    prefix = artifacts.macos_location_prefix(bus, ports)
+    candidates = []
+    if serial and serial != "(none)":
+        candidates.append(f"/dev/cu.usbserial-{serial}{chr(ord('A') + interface)}")
+    candidates += [f"/dev/cu.usbserial-{prefix}{interface:02d}",
+                   f"/dev/cu.usbmodem{prefix}{interface:02d}"]
+    return next((c for c in candidates if exists(c)), None)
+
+
 def _ftdi_adapters_libusb() -> list[dict[str, str]]:
     """FTDI discovery for hosts with no sysfs -- macOS, principally.
 
@@ -1935,11 +1959,10 @@ def _ftdi_adapters_libusb() -> list[dict[str, str]]:
     match -- which is the whole reason for using libusb rather than parsing
     system_profiler, whose Location ID is a different numbering.
 
-    Interface-to-tty mapping is deliberately absent. It is a Linux ftdi_sio
-    property: macOS's FTDI driver names its nodes /dev/cu.usbserial-<serial><A|B>
-    with no kernel link back to the interface, so claiming a mapping would be
-    guessing. `rb doctor` lists the cu.* nodes; match them by the trailing
-    letter (A = channel A/interface 0, B = channel B/interface 1).
+    Interface-to-tty mapping has no kernel link on macOS (that is a Linux
+    ftdi_sio property), but the driver's node NAMES are deterministic -- see
+    macos_serial_node(). Each interface gets the node that name predicts only if
+    that node exists; otherwise it stays "?" and callers treat it as unknown.
     """
     try:
         import usb.core  # type: ignore
@@ -1964,10 +1987,13 @@ def _ftdi_adapters_libusb() -> list[dict[str, str]]:
             except Exception:
                 return ""
 
+        serial = _describe(device.iSerialNumber)
         channels = []
         try:
             for interface in device[0]:
-                channels.append(f"if{interface.bInterfaceNumber}=?")
+                number = interface.bInterfaceNumber
+                node = macos_serial_node(device.bus, ports, number, serial) if ports else None
+                channels.append(f"if{number}={node[len('/dev/'):] if node else '?'}")
         except Exception:
             pass
 
@@ -1979,7 +2005,7 @@ def _ftdi_adapters_libusb() -> list[dict[str, str]]:
                 "pid": f"{device.idProduct:04x}",
                 "manufacturer": _describe(device.iManufacturer),
                 "product": _describe(device.iProduct),
-                "serial": _describe(device.iSerialNumber) or "(none)",
+                "serial": serial or "(none)",
                 "ttys": " ".join(sorted(set(channels))) or "(none)",
                 "detached": False,
             }
@@ -2111,7 +2137,9 @@ def _tty_for(adapter: dict, interface: int) -> str:
     """
 
     match = re.search(rf"if{interface}=(\S+)", adapter.get("ttys", ""))
-    if match is None:
+    if match is None or match.group(1) == "?":
+        # "?" is libusb discovery saying "no node found": returning /dev/? would pass
+        # every startswith("/dev/") check downstream and get opened as a console.
         return "-"
     node = match.group(1)
     return node if node == "detached" else f"/dev/{node}"

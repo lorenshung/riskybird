@@ -153,5 +153,17 @@ explained in [`wireless-telemetry-bringup.md`](wireless-telemetry-bringup.md) se
   over open floor.
 - **One side ToF is missing** (the drone is meant to carry three, two answer), so `bootup_check`'s
   ToF WARN is a real fault. The down sensor, the one flight uses, is unaffected.
-- On macOS, pass `--console /dev/cu.usbserial-...` to `rb fly` if the FPGA console is not found
-  automatically (the drone's adapters have blank EEPROM serials).
+- **macOS** (measured on the bench Mac, 2026-09-25: `rb bench` probe, `rb fly load`, `rb fly stop`).
+  The console and ESP ports are found automatically: blank-EEPROM FTDI channels are named from the
+  USB location (`1-1.3` -> `/dev/cu.usbserial-11300` / `-11301`), and the ESP32-C6 is picked out by
+  its Espressif VID (`/dev/cu.usbmodem101`). What is **not** automatic: before the shell is
+  programmed the debug TAP reads all ones, so the debug adapter is inferred as the bitstream
+  adapter's twin *on the same hub*. When the two adapters sit on different hubs or buses (as on
+  that Mac: `1-1.3` and `2-1`) it refuses rather than guess. Take both from `rb bench` and export
+  them for the session:
+  ```bash
+  export RB_BITSTREAM_LOCATION=1-1.3   # "bitstream" row: xc7a200t config TAP
+  export RB_FTDI_LOCATION=2-1          # the other drone adapter (debug)
+  ```
+  Opening the ESP console resets the ESP, and the SoftAP drops for about 8 s. macOS then joins
+  another network, so run `rb ground up` once after every `rb fly load` / `commit` / `status`.
