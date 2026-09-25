@@ -1,18 +1,19 @@
-"""The accelerator-shell contracts: the post-link ISA scan, and where a picked
-kernel's source is found.
+"""The accelerator-shell contracts: the post-link ISA scan, and the published
+DroNet codegen for the Gemmini+Saturn shells.
 
 Pure host tests. Nothing here needs Chipyard, a toolchain or a board.
 """
 
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from tools.rb import modelblaster as mb
-from tools.rb.boards import FP16_SCALAR_FPU_CONFIGS, INT_NOPERMUTE_VECTOR_CONFIGS
+from tools.rb.boards import FP16_SCALAR_FPU_CONFIGS, INT_NOPERMUTE_VECTOR_CONFIGS, ROOT
 from tools.rb.cli import isa_contract_offences
 
 
@@ -87,6 +88,47 @@ class KernelPathTests(unittest.TestCase):
 
     def test_a_path_that_resolves_nowhere_is_none(self) -> None:
         self.assertIsNone(mb.resolve_kernel_path("/nowhere/at/all.c"))
+
+
+PUBLISHED = {
+    # directory: (target, board config it was benched on)
+    "gemmini_q31_rvv_softfp-gray-nhwc":
+        ("gemmini_q31_rvv_softfp", "RocketArty200TDroneGemminiSaturnFp16At35Config"),
+    "gemmini_q31_rvv_zve64x-gray-nhwc":
+        ("gemmini_q31_rvv_zve64x", "RocketArty200TDroneGemminiSaturnIntAt35Config"),
+}
+
+
+class PublishedCodegenTests(unittest.TestCase):
+    """The committed DroNet directories must build without a simulator."""
+
+    def test_each_directory_is_complete_and_verified(self) -> None:
+        for name, (target, _config) in PUBLISHED.items():
+            with self.subTest(name=name):
+                gen = ROOT / "artifacts" / "modelblaster" / "dronet" / "int8" / name
+                for required in ("model.c", "kernels.c", "weights.c", "kernel_picks.json",
+                                 mb.CODEGEN_MARKER):
+                    self.assertTrue((gen / required).is_file(), required)
+                self.assertEqual(mb.target_of(gen), target)
+                status = mb.verification_status(gen)
+                self.assertTrue(status and status.get("verified"))
+                self.assertEqual(status.get("drift_atol"), 3)
+
+    def test_picked_kernels_are_named_inside_the_backend(self) -> None:
+        # Paths from the codegen host would not resolve on a clean install.
+        for name in PUBLISHED:
+            with self.subTest(name=name):
+                gen = ROOT / "artifacts" / "modelblaster" / "dronet" / "int8" / name
+                picks = json.loads((gen / "kernel_picks.json").read_text())["picks"]
+                for op, pick in picks.items():
+                    path = pick.get("path")
+                    if path is not None:
+                        self.assertTrue(path.startswith("kernels/"), f"{op}: {path}")
+
+    def test_nopermute_directory_keeps_linear_on_the_scalar_reference(self) -> None:
+        gen = ROOT / "artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_zve64x-gray-nhwc"
+        picks = json.loads((gen / "kernel_picks.json").read_text())["picks"]
+        self.assertEqual(picks["linear_s8"]["source"], "reference")
 
 
 if __name__ == "__main__":

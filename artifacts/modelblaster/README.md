@@ -36,11 +36,41 @@ and every kernel must inherit that soft-float ABI:
 | `dronet/int8/gemmini_q31_softfp` | 2 LSB | maxpool, relu, sigmoid | ≤2 | not yet run |
 | `dronet/int8/scalar` | bit-exact | nothing | **0** | not yet run |
 
-**Expect the 93% shell to be SLOW.** `conv2d_s8` is on scalar reference in both
-of its directories and it is ~99% of the network, so this will land near the
-15.8 s of the bit-exact run and a little worse again for 35 MHz against 40. The
-reason to run it is that a 93%-LUT bitstream carrying both accelerators has
-never executed anything — not to beat 188 ms.
+**Those two are the slow way onto the 93% shell.** `conv2d_s8` is on scalar
+reference in both of them and it is ~99% of the network. The fast way is the
+next section, which is what the Gemmini+Saturn shells actually run.
+
+## Two more directories: Dima's recipe on the Gemmini+Saturn shells
+
+Grayscale input, conv0 and maxpool fused into one Gemmini call, NHWC islands,
+and the `gemmini_q31_rvv` kernels compiled for an integer-only vector unit
+(`zve64x`, never `v`, which GCC expands to imply F and D). The C in the two
+directories is identical apart from the backend name; the targets differ in
+flags, and the noPermute one keeps `linear_s8` on the scalar reference
+because the RVV one compiles to `vmv4r.v`, which that Saturn decodes as
+illegal. Both were accepted at 3 LSB.
+
+| directory | shell | kernel flags | measured on the board (2026-09-24) |
+| --- | --- | --- | --- |
+| `dronet/int8/gemmini_q31_rvv_softfp-gray-nhwc` | `RocketArty200TDroneGemminiSaturnFp16At35Config` | `rv64imac_zve64x` / lp64, image `CONFIG_FPU=n` | **13.36 fps** (WALL 2620-2622 at 35 kHz), err 3, `[114,127]`, 3/3 |
+| `dronet/int8/gemmini_q31_rvv_zve64x-gray-nhwc` | `RocketArty200TDroneGemminiSaturnIntAt35Config` | `rv64imafdc_zve64x` / lp64d | **14.57 fps** (WALL 2401-2402), err 3, `[114,127]`, 3/3 |
+
+For comparison, `gemmini_q31-drift2` on Gemmini16At40 measured 5.32 fps
+(WALL 7515-7526 at 40 kHz) in the same session.
+
+    rb modelblaster build --board arty200t \
+        --config RocketArty200TDroneGemminiSaturnIntAt35Config \
+        --gen-dir artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_zve64x-gray-nhwc \
+        --ram-console
+
+`rb modelblaster generate` cannot express this recipe, so it has its own
+script: `tools/modelblaster/dronet_gray_nhwc.py --target <target>` regenerates
+either directory, and on 2026-09-24 it reproduced both byte for byte from a
+clean clone (`kernel_picks.json` excepted: it now names each kernel by its path
+inside ModelBlaster rather than by the codegen host's scratch directory). It
+is silicon-tier only, because its gate runs spike with a Q0.31 Gemmini model
+the script builds itself; the script's docstring says why Chipyard's own
+`libgemmini.so` cannot serve.
 
 The gate's per-op results for dronet / int8 / gemmini_q31, measured on spike
 against an all-reference baseline — each kernel swapped in alone, so these are
