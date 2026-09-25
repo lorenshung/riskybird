@@ -1,9 +1,10 @@
 # ---------------------------------------------------------------------------
 # build.tcl - self-contained non-project Vivado batch flow for padtest_top
 #   /ecad/tools/xilinx/Vivado/2023.1/bin/vivado -mode batch -nojournal -nolog \
-#       -source /scratch2/loren/riskybird-dev/hardware/padtest/build.tcl
+#       -source hardware/padtest/build.tcl
 # ---------------------------------------------------------------------------
-set d /scratch2/loren/riskybird-dev/hardware/padtest
+# This script's own directory, so the flow runs from any checkout.
+set d [file dirname [file normalize [info script]]]
 set part xc7a200tfbg484-2
 
 file mkdir $d/out

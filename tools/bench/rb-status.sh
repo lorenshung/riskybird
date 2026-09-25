@@ -43,7 +43,8 @@
 # what it actually says: "no vbat in telemetry" means UNKNOWN, not "no battery".
 set -u
 
-REPO="${RB_REPO:-/scratch2/loren/riskybird-dev-setup}"
+# The checkout this script lives in, two levels up from tools/bench.
+REPO="${RB_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 LOGDIR="${RB_LOGDIR:-$HOME/riskybird-logs}"
 ESP_LOG="$LOGDIR/esp-live.log"
 FPGA_LOG="$LOGDIR/fpga-console.log"

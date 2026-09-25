@@ -44,7 +44,8 @@
 set -u
 
 SESSION="${RB_SESSION:-riskybird}"
-REPO="${RB_REPO:-/scratch2/loren/riskybird-dev-setup}"
+# The checkout this script lives in, two levels up from tools/bench.
+REPO="${RB_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 LOGDIR="${RB_LOGDIR:-$HOME/riskybird-logs}"
 KEEP_DAYS="${RB_LOG_KEEP_DAYS:-14}"
 MAX_MB="${RB_LOG_MAX_MB:-32}"

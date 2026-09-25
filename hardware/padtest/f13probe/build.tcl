@@ -1,11 +1,12 @@
 # ---------------------------------------------------------------------------
 # build.tcl - self-contained non-project Vivado batch flow for f13probe_top
 #   /ecad/tools/xilinx/Vivado/2023.1/bin/vivado -mode batch -nojournal -nolog \
-#       -source /scratch2/loren/riskybird-dev/hardware/padtest/f13probe/build.tcl
+#       -source hardware/padtest/f13probe/build.tcl
 # Outputs are named f13probe.* in this subdirectory; the earlier padtest.bit is
 # in the parent directory and is never touched.
 # ---------------------------------------------------------------------------
-set d /scratch2/loren/riskybird-dev/hardware/padtest/f13probe
+# This script's own directory, so the flow runs from any checkout.
+set d [file dirname [file normalize [info script]]]
 set part xc7a200tfbg484-2
 
 file mkdir $d/out

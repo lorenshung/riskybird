@@ -27,11 +27,13 @@
  * path an application opens by name, not somewhere printf should go. Point the
  * console here and every diagnostic disappears into the ESP.
  *
- * The baud rate below is a starting point, not a measured value: nothing in
- * this repository records what the ESP firmware runs at. 115200 matches the
- * console and is the common default. If the link produces framing garbage
- * rather than silence, the rate is the first thing to change -- garbage means
- * a real signal at the wrong rate, silence means no signal at all.
+ * The baud rate below is measured, not assumed: the ESP firmware (esp_bridge,
+ * esp_motors) runs its end at 115200, and on 2026-09-21 the link carried 1212
+ * motor_link frames with zero CRC, noise or loss errors; every flight of
+ * 2026-09-23/24 then ran over it. If a changed firmware produces framing
+ * garbage rather than silence, the rate is the first thing to check --
+ * garbage means a real signal at the wrong rate, silence means no signal at
+ * all.
  */
 
 / {

@@ -2,9 +2,10 @@
 # verify.tcl - reopen the routed checkpoint and prove each motor pad has a real
 # OBUF at a real IOB, and that its driver flop resets to 0.
 #   /ecad/tools/xilinx/Vivado/2023.1/bin/vivado -mode batch -nojournal -nolog \
-#       -source /scratch2/loren/riskybird-dev/hardware/padtest/verify.tcl
+#       -source hardware/padtest/verify.tcl
 # ---------------------------------------------------------------------------
-set d /scratch2/loren/riskybird-dev/hardware/padtest
+# This script's own directory, so the flow runs from any checkout.
+set d [file dirname [file normalize [info script]]]
 open_checkpoint $d/out/post_route.dcp
 
 puts "===== PADTEST POST-ROUTE PAD VERIFICATION ====="

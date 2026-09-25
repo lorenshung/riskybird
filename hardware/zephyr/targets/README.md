@@ -27,10 +27,17 @@ settings specific to that workload:
 | PMW3901 SCLK / MOSI / MISO | GPIO6 / GPIO7 / GPIO18 |
 | PMW3901 software CS / reset / LED_N | GPIO19 / GPIO2 / GPIO3 |
 | motor 1 / 2 / 3 / 4 PWM | GPIO21 / GPIO20 / GPIO23 / GPIO22 |
-| four VL53L5CX XSHUT controls | ADS7128 GPIO1 / GPIO2 / GPIO3 / GPIO4 |
+| ToF XSHUT controls | ADS7128 GPIO1 / GPIO2 / GPIO3 (side), GPIO6 (down) |
 
-The four ToF sensors share I2C with the ADS7128 at `0x17`. They start at
-`0x29` and are assigned `0x31`–`0x34` at each boot. The one ESP base-board
+The ESP owns the four motor gates in the configuration that flies
+(`esp_bridge --mode motors`, driven by the FPGA's duty frames); see the motor
+safety section of `workloads/README.md`.
+
+The drone is meant to carry three ToF sensors -- two side VL53L5CX and the
+down-facing VL53L1X -- sharing I2C with the ADS7128 at `0x17`. A scan found
+only GPIO1, 2, 3 and 6 gating anything, and on the current board only GPIO1's
+side sensor and the down sensor answer. They start at `0x29` and are assigned
+`0x31`–`0x34` at each boot. The one ESP base-board
 contract defines the BMI088 accelerometer at `0x18` and gyroscope at `0x68`.
 The FPGA overlays use those same sensor addresses because the intent is to
 connect the same base board.
@@ -73,11 +80,18 @@ The shared workload mapping is:
 | motor 4 | PWM1 channel 1 |
 | ADS7128, BMI088, and ToF sensors | I2C0 |
 
-This is not a verified FPGA connector map. The current harness ties SPI
-inputs off and does not expose GPIO/PWM/SPI through physical package pins.
-The next FPGA hardware step is to add explicit I/O binders and XDC constraints
-for each board, then elaborate, synthesize, route, inspect DRC/timing, and
-bench-test the pins before enabling `rb run`.
+On arty100t and ku040 this is not a verified FPGA connector map: those
+harnesses tie SPI inputs off and do not expose GPIO/PWM/SPI through physical
+package pins, and `rb run` refuses them.
+
+The arty200t drone shells (`RocketArty200TDroneFullDDRConfig`, the default for
+drone workloads on that board) do bind these pins on the TE0712 carrier, and
+have flown. Two differences from the table above: they add a second UART for
+the ESP link at `0x10021000` on PLIC source 11, which moves GPIO to 12–14, SPI
+to 15 and OSPI to 16 (`hardware/zephyr/fpga-esp-uart.overlay`, asserted
+against the generated DTS at build time); and ball F13, motor 4's PWM output,
+is dead, which is why the flying configuration moves every motor gate to the
+ESP.
 
 For KU040, use only constraints proven for the custom
 `XCKU040-SFVA784-1-C` board. Connector constraints from commercial KU040

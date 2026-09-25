@@ -3,7 +3,8 @@
 #   * E22/B20/R17 are real OBUFs at real IOBs with PULLDOWN and INIT=0 drivers
 #   * F13 is an IBUF (NOT an OBUF) with PULLTYPE = PULLUP and is not driven
 # ---------------------------------------------------------------------------
-set d /scratch2/loren/riskybird-dev/hardware/padtest/f13probe
+# This script's own directory, so the flow runs from any checkout.
+set d [file dirname [file normalize [info script]]]
 open_checkpoint $d/out/f13probe_post_route.dcp
 
 puts "===== F13PROBE POST-ROUTE PAD VERIFICATION ====="

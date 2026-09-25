@@ -5,7 +5,7 @@
  * else, so keep this size truthful: an oversized workload must fail at link
  * time rather than run off the end of the scratchpad on hardware.
  *
- * For reference, the images recorded in docs/verification.md against a 32 KiB
+ * For reference, the images recorded in docs/history/verification.md against a 32 KiB
  * map: state/replay 19,168 B (58.50%), state/bmi088 23,824 B (72.71%),
  * mpc/replay 32,000 B (97.66%).
  */

@@ -37,7 +37,7 @@ else
     echo "!! no 'MOTOR GATE' lines seen. Either the ESP is running other firmware,"
     echo "   or it is driving the gates itself -- readings below would be confounded."
     echo "   Flash motor_safe before trusting this:"
-    echo "     cd /scratch2/loren/riskybird-dev-setup && ./rb build motor_safe --target esp32c6 && ./rb flash motor_safe --target esp32c6"
+    echo "     cd $PWD && ./rb build motor_safe --target esp32c6 && ./rb flash motor_safe --target esp32c6"
     echo "   captured instead:"; echo "$ESPTXT" | tail -5
 fi
 
