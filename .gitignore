@@ -27,6 +27,10 @@ hardware/pwm/obj_dir/
 bootup-frame.raw
 bootup-frame.png
 bootup-frame-colour.png
+# hardware/ospi/bootup-capture-halt.gdb's frame and RAM console, same reason.
+capture-frame.raw
+capture-frame.png
+capture-ramconsole.bin
 
 # Vivado outputs for the bare-metal pad tests. The Verilog, XDC, TCL and the
 # build/verify logs ARE tracked -- they are the evidence that F13's output
