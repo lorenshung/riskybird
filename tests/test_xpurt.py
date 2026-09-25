@@ -17,8 +17,28 @@ from tempfile import TemporaryDirectory
 from tools.rb import xpurt
 from tools.rb.boards import ROOT
 
+# The XPU-RT backend and the dse/ tree live on main. The setup branch has only
+# the zephyr-chipyard-sw profiles, so tests that need either skip there.
+needs_xpurt = unittest.skipUnless(
+    (xpurt.XPURT / "scripts" / "run_xpurt_schedule.py").is_file(),
+    "backends/XPU-RT lives on main; not on the setup branch",
+)
+needs_dse_workloads = unittest.skipUnless(
+    xpurt.WORKLOAD_DIR.is_dir(),
+    "dse/workloads lives on main; not on the setup branch",
+)
+needs_profile_targets = unittest.skipUnless(
+    xpurt.PROFILE_TARGET_DIR.is_dir(),
+    "dse/profile-targets lives on main; not on the setup branch",
+)
+needs_forest_schedule = unittest.skipUnless(
+    xpurt.FOREST_SCHEDULE.is_file(),
+    "the forest schedule is in backends/XPU-RT, which lives on main; not on the setup branch",
+)
+
 
 class DiscoveryTests(unittest.TestCase):
+    @needs_xpurt
     def test_profiles_are_found_across_both_layouts(self) -> None:
         """Chipyard sweeps sit under a sweep tag; the QNN tree does not."""
         profiles = xpurt.discover_profiles()
@@ -60,16 +80,19 @@ class DiscoveryTests(unittest.TestCase):
 
 
 class WorkloadTests(unittest.TestCase):
+    @needs_dse_workloads
     def test_flight_workloads_resolve_to_real_graphs(self) -> None:
         for wl in xpurt.load_workloads(["mlp_control", "dronet", "yolov8_nano"]):
             with self.subTest(workload=wl.name):
                 self.assertTrue(wl.graph.is_file(), f"{wl.graph} missing")
 
+    @needs_dse_workloads
     def test_mpc_is_the_only_safety_critical_entry(self) -> None:
         loaded = xpurt.load_workloads(["mlp_control", "dronet", "yolov8_nano"])
         critical = [w.name for w in loaded if w.criticality == "safety-critical"]
         self.assertEqual(critical, ["mlp_control"])
 
+    @needs_dse_workloads
     def test_periodic_workloads_carry_a_deadline(self) -> None:
         for wl in xpurt.load_workloads(["mlp_control", "dronet"]):
             with self.subTest(workload=wl.name):
@@ -83,6 +106,7 @@ class WorkloadTests(unittest.TestCase):
 
 
 class SpecTests(unittest.TestCase):
+    @needs_dse_workloads
     def test_dispatch_paths_are_absolute(self) -> None:
         """Relative paths resolve against XPU-RT's base, which lacks our layout."""
         with TemporaryDirectory() as tmp:
@@ -101,6 +125,7 @@ class SpecTests(unittest.TestCase):
                 self.assertTrue(os.path.isabs(path), f"{path} is not absolute")
                 self.assertTrue(Path(path).is_file())
 
+    @needs_dse_workloads
     def test_spec_records_hardware_pairing_and_periods(self) -> None:
         with TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -118,6 +143,7 @@ class SpecTests(unittest.TestCase):
         self.assertEqual(data["networks"]["mlp_control"]["period"], 20)
         self.assertNotIn("period", data["networks"]["yolov8_nano"])
 
+    @needs_dse_workloads
     def test_derived_machine_block_replaces_the_hand_written_one(self) -> None:
         """A single-hart SoC gets one core and no CPU_E, not a typed-in pair."""
         with TemporaryDirectory() as tmp:
@@ -151,6 +177,7 @@ class SpecTests(unittest.TestCase):
         self.assertEqual(xpurt.topo_tag_for_cores(2), "topo_0_1")
         self.assertEqual(xpurt.topo_tag_for_cores(4), "topo_0_1_2_3")
 
+    @needs_dse_workloads
     def test_spec_topo_tag_is_derived_from_the_machine(self) -> None:
         with TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -220,6 +247,7 @@ class WorkspaceTests(unittest.TestCase):
         xpurt.WORKSPACE = self._real
         self._tmp.cleanup()
 
+    @needs_xpurt
     def test_mirror_symlinks_backend_code_and_owns_the_rest(self) -> None:
         """abspath does not follow symlinks, so the mirror becomes the repo base."""
         ws = xpurt.build_workspace()
@@ -240,6 +268,7 @@ class WorkspaceTests(unittest.TestCase):
         self.assertFalse(str(self._real).startswith(str(xpurt.XPURT)))
         self.assertTrue(str(self._real).startswith(str(ROOT / "dse")))
 
+    @needs_xpurt
     def test_profile_links_land_where_the_loader_globs(self) -> None:
         ws = xpurt.build_workspace()
         relevant = [
@@ -260,6 +289,7 @@ class WorkspaceTests(unittest.TestCase):
                     )
                     self.assertTrue(matches, f"loader would find nothing under {target}")
 
+    @needs_xpurt
     def test_linking_is_idempotent(self) -> None:
         ws = xpurt.build_workspace()
         relevant = [p for p in xpurt.discover_profiles() if p.target == "firesim_rocket_saturn"]
@@ -415,6 +445,7 @@ class RetimeTests(unittest.TestCase):
                 self.assertEqual(report.capture_mhz, 1000.0)
                 self.assertTrue(report.capture_consistent)
 
+    @needs_xpurt
     def test_retimed_profiles_land_where_the_loader_globs(self) -> None:
         with TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -480,6 +511,7 @@ class RetimeTests(unittest.TestCase):
 
 
 class ProfileTargetTests(unittest.TestCase):
+    @needs_profile_targets
     def test_the_firesim_target_is_declared_not_extracted(self) -> None:
         got = xpurt.load_profile_target("firesim_rocket_saturn")
         self.assertIsNotNone(got)
@@ -490,6 +522,7 @@ class ProfileTargetTests(unittest.TestCase):
 
 
 class ForestReplayTests(unittest.TestCase):
+    @needs_forest_schedule
     def test_tracked_demo_schedule_has_expected_replay_contract(self) -> None:
         summary = xpurt.forest_schedule_summary(xpurt.FOREST_SCHEDULE)
         self.assertGreater(summary["period_ms"], 0.0)
@@ -498,6 +531,7 @@ class ForestReplayTests(unittest.TestCase):
         self.assertIn("yolov8_nano", summary["models"])
         self.assertIn("input sampled at job start", summary["timing_semantics"])
 
+    @needs_forest_schedule
     def test_forest_plot_labels_schedule_timing_as_replayed(self) -> None:
         summary = xpurt.forest_schedule_summary(xpurt.FOREST_SCHEDULE)
         with TemporaryDirectory() as tmp:

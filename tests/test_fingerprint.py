@@ -244,6 +244,10 @@ class IdentityTests(unittest.TestCase):
         )
         self.assertEqual(fp.compare(shorthand, spelled), [])
 
+    @unittest.skipUnless(
+        (Path(__file__).resolve().parents[1] / "dse" / "profile-targets").is_dir(),
+        "dse/profile-targets lives on main; not on the setup branch",
+    )
     def test_declared_profile_target_is_loadable_and_diverges_from_the_config(self) -> None:
         from tools.rb import xpurt
 

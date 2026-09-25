@@ -37,12 +37,17 @@ class RegistryTests(unittest.TestCase):
             {"arty100t", "arty200t", "ku040", "esp32c6", "firesim", "rose-spike"},
         )
         self.assertIn("state", WORKLOADS)
-        self.assertIn("sensor_bringup", WORKLOADS)
         self.assertIn("vl35l5cx_test", WORKLOADS)
+        # Removed: the VL53L0X diagnostics (the drone carries VL53L1X and
+        # VL53L5CX) and the ESP-hosted sensor_bringup.
+        for name in ("i2c_expander", "tof_sensor", "sensor_bringup"):
+            self.assertNotIn(name, WORKLOADS)
         self.assertEqual(WORKLOADS["motor_safe"].targets, ("esp32c6",))
 
     def test_separate_drone_diagnostics_are_registered_for_all_targets(self) -> None:
-        expected_targets = set(TARGETS) - {"rose-spike"}
+        # Every target with a peripheral bus. FireSim's base devicetree has no
+        # I2C, SPI or PWM, so none of these can compile there.
+        expected_targets = set(TARGETS) - {"rose-spike", "firesim"}
         for name in (
             "ads7128_test",
             "bmi088_test",
@@ -60,12 +65,69 @@ class RegistryTests(unittest.TestCase):
             ("address", "ranging"),
         )
         self.assertEqual(WORKLOADS["vl35l5cx_test"].default_mode, "address")
-        self.assertEqual(WORKLOADS["sensor_bringup"].targets, ("esp32c6",))
-        for name in ("i2c_expander", "tof_sensor"):
+
+    def test_firesim_carries_only_peripheral_free_workloads(self) -> None:
+        firesim = TARGETS["firesim"]
+        on_firesim = {
+            name for name, workload in WORKLOADS.items() if workload.supports(firesim)
+        }
+        self.assertEqual(on_firesim, {"hello_world", "state", "mpc", "ddr_stress"})
+        self.assertTrue(WORKLOADS["state"].supports(firesim, "replay"))
+        self.assertFalse(WORKLOADS["state"].supports(firesim, "bmi088"))
+        self.assertTrue(WORKLOADS["mpc"].supports(firesim, "replay"))
+        self.assertFalse(WORKLOADS["mpc"].supports(firesim, "hil"))
+
+    def test_drone_workloads_default_to_the_drone_shell_on_arty200t(self) -> None:
+        arty200t = BOARDS["arty200t"]
+        for name in (
+            "bootup_check", "sensor_check", "flight_controller", "flight_estimator",
+            "esp_uart", "motor_duty", "camera_photo",
+        ):
+            workload = WORKLOADS[name]
             self.assertEqual(
-                set(WORKLOADS[name].targets),
-                {"arty100t", "esp32c6"},
+                workload.board_for(arty200t, None).config,
+                "RocketArty200TDroneFullDDRConfig",
+                name,
             )
+            # An explicit --config still wins.
+            self.assertEqual(
+                workload.board_for(arty200t, "RocketArty200TDroneDDRConfig").config,
+                "RocketArty200TDroneDDRConfig",
+            )
+        # Non-drone workloads keep the board default.
+        for name in ("hello_world", "ddr_stress"):
+            self.assertEqual(
+                WORKLOADS[name].board_for(arty200t, None).config, arty200t.config
+            )
+
+    def test_legacy_workloads_and_modes_are_marked(self) -> None:
+        for name in (
+            "motor_1", "motor_2", "motor_3", "motor_4", "esp_motors",
+            "sensor_check", "state", "mpc", "camera_bringup",
+        ):
+            self.assertTrue(WORKLOADS[name].legacy, name)
+            self.assertTrue(WORKLOADS[name].legacy_note(WORKLOADS[name].default_mode))
+        fc = WORKLOADS["flight_controller"]
+        self.assertFalse(fc.legacy)
+        for mode in ("motors", "autoflight"):
+            self.assertIn("F13", fc.legacy_note(mode))
+        for mode in ("default", "flow", "esp-motors", "telem"):
+            self.assertEqual(fc.legacy_note(mode), "", mode)
+        self.assertIn("F13", WORKLOADS["bootup_check"].legacy_note("motors"))
+        self.assertEqual(WORKLOADS["bootup_check"].legacy_note("default"), "")
+
+    def test_flow_modes_compile_flow_in(self) -> None:
+        for name in ("flight_controller", "flight_estimator"):
+            defines = dict(WORKLOADS[name].defines_for("flow"))
+            self.assertEqual(defines.get("ROSE_FLOW"), "1", name)
+            self.assertEqual(defines.get("CS_GPIO_PIN"), "0", name)
+        # The estimator's uplink reader needs uart1 on the drone shell.
+        self.assertEqual(
+            dict(WORKLOADS["flight_estimator"].defines_for("default")).get(
+                "CONFIG_UART_SIFIVE_PORT_1"
+            ),
+            "y",
+        )
 
     def test_esp_is_a_zephyr_target_not_an_fpga_board(self) -> None:
         self.assertIsNone(TARGETS["esp32c6"].fpga_board)
@@ -164,6 +226,10 @@ class RegistryTests(unittest.TestCase):
             self.assertFalse(selected.is_scratchpad_config, config)
             self.assertEqual(selected.config_memory_size, board.memory_size, config)
 
+    @unittest.skipUnless(
+        (ROOT / "backends" / "chipyard" / "build.sbt").is_file(),
+        "backends/chipyard is not initialised",
+    )
     def test_registry_scratchpad_flags_match_the_chipyard_configs(self) -> None:
         """Every KU040 config's registry classification must follow the ddr
         argument it actually elaborates with, not just its name."""

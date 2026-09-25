@@ -39,6 +39,7 @@ BOARD_PINS = (
     ROOT / "arty_files/te0712-rd/board_files/TE0712_200_2C/1.0/part0_pins.xml"
 )
 MOTOR_CONFIG = "RocketArty200TMotorSpadConfig"
+CHIPYARD_READY = (ROOT / "backends/chipyard/build.sbt").is_file()
 GENERATED = (
     ROOT / "backends/chipyard/fpga/generated-src"
     / f"chipyard.fpga.arty200t.Arty200THarness.{MOTOR_CONFIG}"
@@ -194,6 +195,7 @@ class PackagePinTests(unittest.TestCase):
         self.assertTrue(motor_pins <= used)
 
 
+@unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
 class BinderTests(unittest.TestCase):
     def setUp(self) -> None:
         self.binder = BINDER.read_text(encoding="utf-8")
@@ -224,11 +226,9 @@ class BinderTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.configs = CONFIGS.read_text(encoding="utf-8")
-
+    @unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
     def test_motor_config_exists_and_punches_the_pwm_ports_through(self) -> None:
-        body = self.configs.split(f"class {MOTOR_CONFIG}", 1)
+        body = CONFIGS.read_text(encoding="utf-8").split(f"class {MOTOR_CONFIG}", 1)
         self.assertEqual(len(body), 2, f"{MOTOR_CONFIG} is missing")
         body = body[1].split("new chipyard.RocketConfig)", 1)[0]
         self.assertIn("WithArty200TPWM", body)

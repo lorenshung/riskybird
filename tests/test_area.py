@@ -17,10 +17,14 @@ from tempfile import TemporaryDirectory
 from tools.rb import area, plotting
 from tools.rb.boards import BOARDS, CHIPYARD, ROOT
 
+# The setup branch carries neither the experiments/ tree nor an initialised
+# Chipyard; tests over either skip there rather than fail.
+CHIPYARD_READY = (CHIPYARD / "build.sbt").is_file()
+EXPERIMENTS = ROOT / "experiments"
 
 # A faithful excerpt of `report_utilization` on an UltraScale part. The numbers
 # are the recorded RocketKU040OspiConfig post-route result from
-# docs/verification.md.
+# docs/history/verification.md.
 ULTRASCALE_FLAT = """Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 ----------------------------------------------------------------------
 | Tool Version : Vivado v.2023.1 (lin64) Build 3865809
@@ -412,7 +416,7 @@ class CollectionTests(unittest.TestCase):
         Vivado read.
         """
         board = BOARDS["ku040"]
-        if not board.generated_dts.is_file():
+        if not any(board.generated_dir.glob("*.dts")):   # a collected DTS is not elaboration
             self.skipTest("RocketKU040OspiConfig has not been elaborated")
         with TemporaryDirectory() as tmp:
             report = self._fixture(Path(tmp))
@@ -550,6 +554,7 @@ class MakeCommandTests(unittest.TestCase):
             area.make_command(BOARDS["ku040"], "everything", force=False)
 
 
+@unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
 class BackendIntegrationTests(unittest.TestCase):
     """The Chipyard-side hook must stay present, visible, and self-contained."""
 
@@ -586,8 +591,12 @@ class BackendIntegrationTests(unittest.TestCase):
             self.assertNotIn("UCIO-1", text)
 
 
+@unittest.skipUnless(
+    (EXPERIMENTS / "studies").is_dir(),
+    "experiments/studies lives on main; not on the setup branch",
+)
 class StudyDefinitionTests(unittest.TestCase):
-    STUDIES = ROOT / "experiments" / "studies"
+    STUDIES = EXPERIMENTS / "studies"
 
     def test_every_study_is_valid_and_self_describing(self) -> None:
         studies = sorted(self.STUDIES.glob("*.json"))
@@ -627,8 +636,12 @@ class StudyDefinitionTests(unittest.TestCase):
                     self.assertIn(f"class {config}", defined)
 
 
+@unittest.skipUnless(
+    (EXPERIMENTS / "fpga-configs" / "manifest.json").is_file(),
+    "experiments/fpga-configs lives on main; not on the setup branch",
+)
 class ImportArchiveTests(unittest.TestCase):
-    ARCHIVE = ROOT / "experiments" / "fpga-configs"
+    ARCHIVE = EXPERIMENTS / "fpga-configs"
 
     def test_archive_is_marked_reference_only(self) -> None:
         manifest = json.loads((self.ARCHIVE / "manifest.json").read_text())

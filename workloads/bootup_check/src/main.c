@@ -6,10 +6,11 @@
  * verdict, ending in a single summary table.
  *
  * This is a liveness check, not a characterization. Depth belongs to the
- * per-peripheral workloads -- sensor_check for sensor values, ddr_stress for
- * memory, tof_sensor for ranging, camera_photo for a frame, motor_N for one
- * motor at a time. What this one adds is that they are all exercised in one
- * pass, in boot order, so a board is either ready or it names what is not.
+ * per-peripheral workloads -- flight_estimator for sensor values, ddr_stress
+ * for memory, vl35l5cx_test --mode ranging for the side ToFs, camera_photo for
+ * a frame, motor_duty for one motor at a time. What this one adds is that
+ * they are all exercised in one pass, in boot order, so a board is either
+ * ready or it names what is not.
  *
  * Order matters and is not arbitrary:
  *
@@ -229,7 +230,7 @@ static struct rb_tof_array tof;
  * point of a per-sensor status: one empty header must not hide the other three.
  *
  * sensors[] is left NULL: this stage proves the parts come up and answer at
- * their new addresses, which needs no driver. Ranging is tof_sensor's job.
+ * their new addresses, which needs no driver. Ranging is vl35l5cx_test's job.
  */
 static const struct rb_tof_array_config tof_config = {
 	.i2c = DEVICE_DT_GET(DT_NODELABEL(i2c0)),

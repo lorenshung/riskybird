@@ -487,6 +487,22 @@ class Workload:
     # One line per mode saying where its values come from (a preset file, the
     # trials it flew), printed at build time and recorded with the build.
     mode_notes: tuple[tuple[str, str], ...] = ()
+    # What superseded this workload, if something did. A legacy workload still
+    # builds -- main has images and docs that name it -- but `rb workloads`
+    # marks it and every build prints the note as a warning, so a stale
+    # bring-up image is never mistaken for the path that flies.
+    legacy: str = ""
+    # The same, for one mode of a workload that is otherwise current.
+    mode_legacy: tuple[tuple[str, str], ...] = ()
+    # Modes that build on fewer targets than the workload does. A mode listed
+    # here builds only on the targets it names; unlisted modes build on all of
+    # self.targets.
+    mode_targets: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # The config a board builds this workload against when --config is not
+    # given, by board name. Every drone workload needs a drone shell, and the
+    # board default (the OSPI config) is not one, so without this each of them
+    # failed unless the operator remembered --config.
+    default_configs: tuple[tuple[str, str], ...] = ()
 
     def base_mode(self, mode: str) -> str | None:
         return dict(self.mode_bases).get(mode)
@@ -525,12 +541,28 @@ class Workload:
     def mode_note(self, mode: str) -> str:
         return dict(self.mode_notes).get(mode, "")
 
+    def legacy_note(self, mode: str) -> str:
+        """The mode's own legacy note, else the workload's, else ""."""
+        return dict(self.mode_legacy).get(mode, "") or self.legacy
+
+    def default_config(self, board_name: str) -> str | None:
+        return dict(self.default_configs).get(board_name)
+
+    def board_for(self, board: Board, config: str | None) -> Board:
+        """The board with --config applied, or this workload's default for it."""
+        return board.with_config(config if config is not None else self.default_config(board.name))
+
     def mode_conf(self, mode: str) -> Path | None:
         path = self.source_dir / "conf" / f"{self.layout_mode(mode)}.conf"
         return path if path.is_file() else None
 
-    def supports(self, target: ZephyrTarget) -> bool:
-        return target.name in self.targets
+    def mode_target_names(self, mode: str) -> tuple[str, ...]:
+        return dict(self.mode_targets).get(mode, self.targets)
+
+    def supports(self, target: ZephyrTarget, mode: str | None = None) -> bool:
+        if target.name not in self.targets:
+            return False
+        return mode is None or target.name in self.mode_target_names(mode)
 
     def minimum_ram(self, mode: str) -> int:
         return next(
@@ -561,6 +593,10 @@ def _workload(
     cppflags_by_mode: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (),
     mode_bases: tuple[tuple[str, str], ...] = (),
     mode_notes: tuple[tuple[str, str], ...] = (),
+    legacy: str = "",
+    mode_legacy: tuple[tuple[str, str], ...] = (),
+    mode_targets: tuple[tuple[str, tuple[str, ...]], ...] = (),
+    default_configs: tuple[tuple[str, str], ...] = (),
 ) -> Workload:
     return Workload(
         name=name,
@@ -577,14 +613,46 @@ def _workload(
         cppflags_by_mode=cppflags_by_mode,
         mode_bases=mode_bases,
         mode_notes=mode_notes,
+        legacy=legacy,
+        mode_legacy=mode_legacy,
+        mode_targets=mode_targets,
+        default_configs=default_configs,
     )
 
 
 # General board diagnostics do not make sense on the RoSE bridge target.  The
 # MPC workload opts into that target explicitly below.
 ALL_TARGETS = tuple(name for name in TARGETS if name != "rose-spike")
-I2C_TARGETS = ALL_TARGETS
-LEGACY_VL53L0X_TARGETS = ("arty100t", "esp32c6")
+# FireSim runs the base chipyard devicetree: a console, the CLINT and main
+# memory, and no I2C, SPI, GPIO or PWM. A workload that touches a peripheral
+# cannot even compile there -- its devicetree alias does not exist -- so only
+# console- and memory-only workloads are registered for it.
+PERIPHERAL_TARGETS = tuple(name for name in ALL_TARGETS if name != "firesim")
+I2C_TARGETS = PERIPHERAL_TARGETS
+# The drone carrier's shell, for workloads that need its periphery (the second
+# UART, the sensor bus, the camera OSPI). RocketArty200TOspiConfig, the board
+# default, has none of the drone periphery, so a drone workload built without
+# --config failed on every arty200t build.
+DRONE_DEFAULT_CONFIGS = (("arty200t", "RocketArty200TDroneFullDDRConfig"),)
+# The same sentence for every mode that drives the motor pins from the FPGA.
+FPGA_PWM_LEGACY = (
+    "drives the FPGA PWM pins: motor 4's pin F13 is dead, and this fights the "
+    "ESP for the motor gates when the ESP runs esp_bridge motors; the flying "
+    "path is esp-motors + esp_bridge --mode motors"
+)
+MOTOR_N_LEGACY = (
+    "superseded by flight_controller --mode esp-motors with esp_bridge --mode "
+    "motors on the ESP (and motor_duty for a bench spin); it " + FPGA_PWM_LEGACY
+)
+
+# What `--mode flow` is for. The overlay alone names the bus (flow-spi = &spi0);
+# the flow path itself is compiled in by ROSE_FLOW, and the PMW3901's chip-select
+# on this carrier is gpio0 pin 0 rather than the ESP32-C6's 19 (see
+# pmw3901_test.overlay). Without both, main.cpp prints "flow-spi alias present
+# but ROSE_FLOW=0" and the mode builds an image with no flow in it -- which is
+# what it did until these were declared here.
+FLOW_DEFINES = (("ROSE_FLOW", "1"), ("CS_GPIO_PIN", "0"))
+
 
 WORKLOADS = {
     # Console-only bring-up probe. Enabled for every target because it touches
@@ -603,14 +671,29 @@ WORKLOADS = {
         modes=("replay", "bmi088"),
         default_mode="replay",
         targets=ALL_TARGETS,
+        # Replay touches no peripheral; the BMI088 is on the I2C bus.
+        mode_targets=(("bmi088", PERIPHERAL_TARGETS),),
         summary="Madgwick state estimator with replay or BMI088 input",
+        legacy=(
+            "superseded by flight_controller (and flight_estimator for the "
+            "estimator alone); on a stationary board this Madgwick settles to "
+            "roll -178.7 deg where the flight estimator reads 0.10"
+        ),
     ),
     "mpc": _workload(
         "mpc",
         modes=("replay", "hil", "rose"),
         default_mode="replay",
         targets=tuple(TARGETS),
+        # hil exchanges frames over a UART the FireSim console does not
+        # provide.
+        mode_targets=(("hil", tuple(name for name in TARGETS if name != "firesim")),),
         summary="TinyMPC replay, UART HIL, or RoSE lockstep controller",
+        legacy=(
+            "superseded by flight_controller, whose esp-motors mode flies the "
+            "PID cascade; TinyMPC is unsafe on this airframe (see the "
+            "esp-motors notes in tools/rb/boards.py)"
+        ),
     ),
     "ads7128_test": _workload(
         "ads7128_test",
@@ -622,11 +705,6 @@ WORKLOADS = {
         targets=I2C_TARGETS,
         summary="BMI088 accelerometer and gyroscope diagnostic",
     ),
-    "i2c_expander": _workload(
-        "i2c_expander",
-        targets=LEGACY_VL53L0X_TARGETS,
-        summary="Legacy one-ToF ADS7128 GPIO6 diagnostic",
-    ),
     # Whole-board sensor check plus a go/no-go for the state estimator. Needs the
     # drone periphery (I2C for the sensor bus, SPI + GPIO for the flow sensor)
     # and the camera OSPI, i.e. one of the full drone shells.
@@ -635,6 +713,8 @@ WORKLOADS = {
         targets=("arty200t",),
         summary="All on-board sensors in one pass, ending in a state-estimator go/no-go",
         minimum_ram_by_mode=(("default", 0x8000),),
+        default_configs=DRONE_DEFAULT_CONFIGS,
+        legacy="superseded by bootup_check, which covers every sensor here in boot order",
     ),
     # One pass over every peripheral a flight needs, in boot order, ending in a
     # board-ready verdict. Needs the drone periphery for the same reason
@@ -649,6 +729,8 @@ WORKLOADS = {
         # a 32 KB scratchpad shell cannot run this at all. 256 KB excludes them
         # by contract rather than at link time.
         minimum_ram_by_mode=(("default", 0x40000), ("motors", 0x40000)),
+        default_configs=DRONE_DEFAULT_CONFIGS,
+        mode_legacy=(("motors", FPGA_PWM_LEGACY),),
     ),
     # The ESP link lives only in the full drone shells, which are arty200t-only
     # today. Requires a shell that elaborates serial@10021000; rb appends
@@ -679,9 +761,7 @@ WORKLOADS = {
     ),
     # The FPGA half of a thrust / motor-identification bench test: holds a
     # fixed duty on chosen motors by sending the same motor_link frames the
-    # flight controller sends. Driven by `rb fly motors`. Registered here from
-    # tools/rb-ext.py, where it waited while this file was being edited
-    # elsewhere.
+    # flight controller sends. Driven by `rb fly motors`.
     "motor_duty": _workload(
         "motor_duty",
         targets=("arty200t",),
@@ -690,12 +770,14 @@ WORKLOADS = {
             "to the ESP32-C6 (motor identification / thrust bench test)"
         ),
         safety="props-on-RESTRAINED (docs/flight-calibration-procedures.md)",
+        default_configs=DRONE_DEFAULT_CONFIGS,
     ),
     "esp_uart": _workload(
         "esp_uart",
         targets=("arty200t",),
         summary="Second UART (ESP32 link on E13/F14): TX proof and RX rate sweep",
         minimum_ram_by_mode=(("default", 0x8000),),
+        default_configs=DRONE_DEFAULT_CONFIGS,
     ),
     # The HM01B0 target exists on both Arty parts. The 200T entry is the drone
     # carrier's own DVP pinout (bank-13 B2B pins), which is a different set of
@@ -705,6 +787,10 @@ WORKLOADS = {
         targets=("arty100t", "arty200t"),
         summary="HM01B0 I2C control and pixel-capture bring-up",
         minimum_ram_by_mode=(("default", 0x8000),),
+        legacy=(
+            "superseded by bootup_check (its camera stage) and camera_photo "
+            "(one full frame) on the drone shell"
+        ),
     ),
     # One photograph, for a shell where the camera is already proven. The RAM
     # floor is the point: a frame is 326*242 = 78892 bytes plus the image, so
@@ -734,7 +820,14 @@ WORKLOADS = {
         targets=("arty200t",),
         summary="RoSE estimator alone: attitude, altitude and sensor validity, no controller",
         minimum_ram_by_mode=(("default", 0x80000),),
-        cmake_defines=(("ROSE_ESTIMATOR_ONLY", "1"),),
+        # CONFIG_UART_SIFIVE_PORT_1 for the same reason flight_controller sets
+        # it: on a shell with the ESP UART, main.cpp's uplink reader
+        # (ROSE_UART_CMD, on by default whenever the esp-uart alias exists)
+        # references uart1, and without the port the link fails with an
+        # undefined __device_dts_ord_* in uart_cmd_reply.
+        cmake_defines=(("ROSE_ESTIMATOR_ONLY", "1"), ("CONFIG_UART_SIFIVE_PORT_1", "y")),
+        cmake_defines_by_mode=(("flow", FLOW_DEFINES),),
+        default_configs=DRONE_DEFAULT_CONFIGS,
     ),
     "flight_controller": _workload(
         "flight_controller",
@@ -763,6 +856,7 @@ WORKLOADS = {
         # always-armed bench path, which is the trap FLIGHT_BUILD.md warns
         # about and the reason this is declarative rather than documented.
         cmake_defines_by_mode=(
+            ("flow", FLOW_DEFINES),
             (
                 "telem",
                 (
@@ -908,7 +1002,7 @@ WORKLOADS = {
                     # also runs at ~35 ms/iteration against the PID cascade's
                     # ~1.3 ms, and the offload run that tilted to 90 degrees
                     # with nothing cutting the motors was the slow one (see
-                    # docs/flight-safety-bench-procedure.md section 2.3).
+                    # docs/history/flight-safety-bench-procedure.md section 2.3).
                     ("ROSE_USE_PID", "1"),
                     # Already the CMakeLists default; stated anyway because the
                     # comment sitting directly above that default still claims
@@ -993,7 +1087,7 @@ WORKLOADS = {
                     # by ROSE_USE_PID above. The sample's 5000-iteration default
                     # was ~175 s of bench time at TinyMPC's 35 ms/iter and is
                     # ~6.5 s at the PID cascade's 1.3 ms. Every step of
-                    # docs/flight-safety-bench-procedure.md part A -- tilt the
+                    # docs/history/flight-safety-bench-procedure.md part A -- tilt the
                     # frame past 40 degrees by hand, drop-test free fall, halt
                     # the core and watch the ESP failsafe cut within 125 ms,
                     # wait out the 5 s commitment window -- needs the loop alive
@@ -1051,12 +1145,15 @@ WORKLOADS = {
         ),
         safety="propellers-off",
         minimum_ram_by_mode=(("default", 0x80000),),
+        default_configs=DRONE_DEFAULT_CONFIGS,
+        mode_legacy=(("motors", FPGA_PWM_LEGACY), ("autoflight", FPGA_PWM_LEGACY)),
     ),
     "camera_photo": _workload(
         "camera_photo",
         targets=("arty200t",),
         summary="Capture one full HM01B0 frame into RAM for JTAG readout",
         minimum_ram_by_mode=(("default", 0x20000),),
+        default_configs=DRONE_DEFAULT_CONFIGS,
     ),
     # Main-memory stress. Registered for the FPGA targets only: it walks a
     # window at 0x8200_0000, which exists on a DDR-backed shell and on nothing
@@ -1098,27 +1195,31 @@ WORKLOADS = {
     ),
     "motor_1": _workload(
         "motor_1",
-        targets=ALL_TARGETS,
+        targets=PERIPHERAL_TARGETS,
         summary="One-motor PWM diagnostic",
         safety="propellers-off",
+        legacy=MOTOR_N_LEGACY,
     ),
     "motor_2": _workload(
         "motor_2",
-        targets=ALL_TARGETS,
+        targets=PERIPHERAL_TARGETS,
         summary="Two-motor PWM diagnostic",
         safety="propellers-off",
+        legacy=MOTOR_N_LEGACY,
     ),
     "motor_3": _workload(
         "motor_3",
-        targets=ALL_TARGETS,
+        targets=PERIPHERAL_TARGETS,
         summary="Three-motor PWM diagnostic",
         safety="propellers-off",
+        legacy=MOTOR_N_LEGACY,
     ),
     "motor_4": _workload(
         "motor_4",
-        targets=ALL_TARGETS,
+        targets=PERIPHERAL_TARGETS,
         summary="Four-motor interactive PWM diagnostic",
         safety="propellers-off",
+        legacy=MOTOR_N_LEGACY,
     ),
     "motor_safe": _workload(
         "motor_safe",
@@ -1150,21 +1251,16 @@ WORKLOADS = {
             "receive-timeout failsafe"
         ),
         safety="propellers-off",
+        legacy=(
+            "superseded by esp_bridge --mode motors, which drives the same four "
+            "gates with the same failsafe and also carries telemetry and the "
+            "dashboard ESTOP"
+        ),
     ),
     "pmw3901_test": _workload(
         "pmw3901_test",
-        targets=ALL_TARGETS,
+        targets=PERIPHERAL_TARGETS,
         summary="PMW3901 SPI optical-flow diagnostic",
-    ),
-    "sensor_bringup": _workload(
-        "sensor_bringup",
-        targets=("esp32c6",),
-        summary="Legacy PMW3901 plus one VL53L1X/ADS7128 GPIO6 diagnostic",
-    ),
-    "tof_sensor": _workload(
-        "tof_sensor",
-        targets=LEGACY_VL53L0X_TARGETS,
-        summary="Legacy single VL53L0X diagnostic",
     ),
     "vl35l5cx_test": _workload(
         "vl35l5cx_test",

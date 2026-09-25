@@ -978,6 +978,28 @@ def write_build_record(target, workload, mode: str, board, elf: Path) -> Path:
     return record
 
 
+def _warn_legacy(workload: Workload, mode: str) -> None:
+    """Print a legacy workload's note loudly enough to survive west's output."""
+    note = workload.legacy_note(mode)
+    if not note:
+        return
+    what = workload.name if not dict(workload.mode_legacy).get(mode) else f"{workload.name} --mode {mode}"
+    rule = "rb: " + "!" * 72
+    print(f"{rule}\nrb: LEGACY: {what} -- {note}\n{rule}", file=sys.stderr, flush=True)
+
+
+def _workload_board(board: Board, workload: Workload, config: str | None) -> Board:
+    """--config if given, else the workload's default config for this board."""
+    selected = workload.board_for(board, config)
+    if config is None and selected.config != board.config:
+        print(
+            f"rb: {workload.name} builds against {selected.config} on "
+            f"{board.name} by default (--config overrides)",
+            flush=True,
+        )
+    return selected
+
+
 def zephyr_build(
     target: ZephyrTarget,
     workload: Workload,
@@ -1000,6 +1022,22 @@ def zephyr_build(
             f"{workload.name} is not enabled for target {target.name}; "
             f"currently enabled for: {supported}"
         )
+    if not workload.supports(target, mode):
+        raise RbError(
+            f"{workload.name} --mode {mode} is not enabled for target "
+            f"{target.name}; that mode builds for: "
+            + ", ".join(workload.mode_target_names(mode))
+        )
+    if target.kind == "rose" or (workload.name == "mpc" and mode == "rose"):
+        # Refused here rather than left to CMake, which reports the missing
+        # module as a zephyr_module.cmake error that names neither RoSE nor
+        # the branch it lives on.
+        _require_main_backend(
+            rose.ROSE_MODULE / "zephyr" / "module.yml",
+            "the RoSE Zephyr module",
+            f"{workload.name} --mode {mode} on {target.name}",
+        )
+    _warn_legacy(workload, mode)
     if (
         workload.name == "vl35l5cx_test"
         and mode == "ranging"
@@ -1358,6 +1396,7 @@ def zephyr_build(
     record = write_build_record(target, workload, mode, board, elf)
     if workload.mode_note(mode):
         print(f"rb: {workload.name} --mode {mode}: {workload.mode_note(mode)}")
+    _warn_legacy(workload, mode)
     print(f"rb: build record {record}")
     if board is not None and (
         board.config in FP16_SCALAR_FPU_CONFIGS
@@ -1477,7 +1516,7 @@ def cmd_zephyr(args: argparse.Namespace) -> int:
         return 0 if zephyr_elf(target, workload, mode).is_file() else 1
     board = target.fpga_board
     if board is not None:
-        board = board.with_config(args.config)
+        board = _workload_board(board, workload, args.config)
     elif args.config is not None:
         raise RbError("--config applies only to FPGA targets")
     zephyr_build(target, workload, mode, args.pristine, board)
@@ -1714,8 +1753,8 @@ def cmd_debug(args: argparse.Namespace) -> int:
     target = get_target(args.target)
     if target.fpga_board is None:
         raise RbError("OpenOCD/GDB debug is currently available only for FPGA targets")
-    board = target.fpga_board.with_config(args.config)
     workload = get_workload(args.workload)
+    board = _workload_board(target.fpga_board, workload, args.config)
     mode = args.mode or workload.default_mode
     elf = zephyr_build(
         target, workload, mode, args.pristine, board,
@@ -1847,7 +1886,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     workload = get_workload(args.workload)
     board = target.fpga_board
     if board is not None:
-        board = board.with_config(args.config)
+        board = _workload_board(board, workload, args.config)
     elif args.config is not None:
         raise RbError("--config applies only to FPGA targets")
     zephyr_build(
@@ -2439,6 +2478,21 @@ DSE_SCRIPTS = ROOT / "dse" / "scripts"
 DSE_PLOTS = ROOT / "dse" / "plots"
 
 
+def _require_main_backend(path: Path, what: str, command: str) -> None:
+    """One line, not a traceback, when an experimental backend is not here.
+
+    The research facets -- XPU-RT scheduling, the DSE scripts and data, RoSE --
+    live on main. The setup branch carries the drone stack only, so on it these
+    commands can only say where the rest is.
+    """
+    if path.exists():
+        return
+    raise RbError(
+        f"{command} needs {what} at {path.relative_to(ROOT)}, which is not "
+        "here: it lives on main, not on the setup branch"
+    )
+
+
 def _run_plot_script(script: str, argv: list[str]) -> int:
     """Invoke a facet-local plotting script with the interpreter running us.
 
@@ -2447,6 +2501,7 @@ def _run_plot_script(script: str, argv: list[str]) -> int:
     truth instead of a second copy of the rendering code.
     """
     path = DSE_SCRIPTS / script
+    _require_main_backend(DSE_SCRIPTS, "the DSE plotting scripts", "this command")
     if not path.is_file():
         raise RbError(f"plotting script missing: {path}")
     return subprocess.call([sys.executable, str(path), *argv], cwd=ROOT)
@@ -2578,7 +2633,11 @@ def cmd_xpurt(args: argparse.Namespace) -> int:
         mix = args.mix or "_".join(workloads)
         name = f"{mix}_{args.config or args.hw_p or LEGACY_HW[0]}"
 
-        ws = xpurt.build_workspace(force=args.rebuild_workspace)
+        _require_main_backend(xpurt.XPURT, "the XPU-RT backend", "rb xpurt run")
+        try:
+            ws = xpurt.build_workspace(force=args.rebuild_workspace)
+        except xpurt.XpurtError as exc:
+            raise RbError(str(exc)) from exc
         relevant = [p for p in xpurt.discover_profiles() if p.target == args.target]
 
         # What machine is this schedule claiming to describe? A config name is
@@ -2807,7 +2866,9 @@ def cmd_xpurt(args: argparse.Namespace) -> int:
             dl_s = f"{dl:.0f}" if dl else "-"
             print(f"  {net:16s} {v['instances']:>4} {v['worst_latency']:>14.3f} {dl_s:>9s} {verdict:>8s}")
 
-        DSE_PLOTS = xpurt.DSE_PLOTS
+        # Not `DSE_PLOTS = xpurt.DSE_PLOTS`: assigning the name anywhere in
+        # this function made it local to the whole of it, so `rb xpurt ops`
+        # and `gantt` died with UnboundLocalError before reaching this branch.
         DSE_PLOTS.mkdir(parents=True, exist_ok=True)
         if out["gantt"].is_file():
             dest = DSE_PLOTS / out["gantt"].name
@@ -2840,6 +2901,7 @@ def cmd_rose(args: argparse.Namespace) -> int:
         if args.rose_action == "doctor":
             return rose.doctor(args.ready, args.python)
         if args.rose_action == "build":
+            _require_main_backend(rose.ROSE, "the RoSE backend", "rb rose build")
             if args.component in ("bridge", "all"):
                 rose.build_bridge(force=args.force)
             if args.component in ("guest", "all"):
@@ -2945,6 +3007,7 @@ def cmd_hil(args: argparse.Namespace) -> int:
         raise RbError("the implemented HIL scenario is `replay mpc-hover`")
     if args.executor != "rose-spike":
         raise RbError("mpc-hover currently requires --executor rose-spike")
+    _require_main_backend(rose.ROSE, "the RoSE backend", "rb hil replay mpc-hover")
     try:
         if args.rebuild:
             rose.build_bridge(force=True)
@@ -2977,6 +3040,7 @@ def cmd_schedule(args: argparse.Namespace) -> int:
         raise RbError("the implemented schedule replay is `forest-trail`")
     if args.policy != "xpurt":
         raise RbError("forest-trail currently requires --policy xpurt")
+    _require_main_backend(xpurt.XPURT, "the XPU-RT backend", "rb schedule replay forest-trail")
     try:
         xpurt.run_forest_trail(
             dronet=args.dronet_weights,
@@ -3542,7 +3606,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     board = target.fpga_board
     if board is None:
         raise RbError(f"FPGA target {target.name} has no physical board definition")
-    board = board.with_config(args.config)
+    board = _workload_board(board, workload, args.config)
     if workload.name in DRONE_FPGA_WORKLOADS:
         if "DroneLogic" not in board.config:
             raise RbError(
@@ -3616,14 +3680,24 @@ def cmd_workloads(args: argparse.Namespace) -> int:
     print("WORKLOAD          MODES          TARGETS                  STATUS/SAFETY")
     for workload in WORKLOADS.values():
         status = "blocked" if workload.blocked_reason else workload.safety
+        if workload.legacy:
+            status = f"LEGACY, {status}"
         targets = ",".join(workload.targets) or "none"
         print(
             f"{workload.name:17} {','.join(workload.modes):14} "
             f"{targets:24} {status}"
         )
         print(f"  {workload.summary}")
+        if workload.legacy:
+            print(f"  legacy: {workload.legacy}")
+        for mode, note in workload.mode_legacy:
+            print(f"  legacy --mode {mode}: {note}")
         if workload.blocked_reason is not None:
             print(f"  blocked: {workload.blocked_reason}")
+        for mode, names in workload.mode_targets:
+            print(f"  --mode {mode} targets: {','.join(names)}")
+        for board_name, config in workload.default_configs:
+            print(f"  {board_name} default config: {config}")
         for mode, minimum in workload.minimum_ram_by_mode:
             print(
                 f"  {mode} requirement: at least {minimum // 1024} KiB "
@@ -3651,7 +3725,10 @@ def _add_fpga_config(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--config",
         metavar="CLASS",
-        help="Chipyard FPGA config class (default: board's RiskyBird OSPI config)",
+        help=(
+            "Chipyard FPGA config class (default: the drone shell for drone "
+            "workloads, else the board's RiskyBird OSPI config; see: rb workloads)"
+        ),
     )
 
 
@@ -4482,7 +4559,23 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with restored_terminal():
             return int(args.func(args) or 0)
-    except (RbError, modelblaster.ModelBlasterError, ValueError) as exc:
+    except (
+        RbError,
+        modelblaster.ModelBlasterError,
+        # The facet modules' own operator-facing errors. Most commands already
+        # translate them to RbError; this is the backstop for any path that
+        # does not, which otherwise ended in a raw traceback (`rb xpurt run`
+        # did, with XPU-RT absent).
+        xpurt.XpurtError,
+        rose.RoseError,
+        dse.DseError,
+        area.AreaError,
+        fingerprint.FingerprintError,
+        soc.SocError,
+        timing.TimingError,
+        plotting.PlotError,
+        ValueError,
+    ) as exc:
         # ModelBlasterError is an operator-facing diagnostic like RbError -- a
         # missing backend, an unverified kernel set, a codegen dependency that
         # is not installed. Printing a traceback for those buried the sentence

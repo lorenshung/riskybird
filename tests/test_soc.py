@@ -19,7 +19,9 @@ from tools.rb.boards import get_board
 
 def _elaborated(config: str):
     board = get_board("ku040").with_config(config)
-    if not board.generated_dts.is_file():
+    # Not generated_dts: with RB_DTS_DIR set that falls back to a collected DTS, and the
+    # fingerprint reads Chipyard's elaboration directory, which a bench-tier tree lacks.
+    if not any(board.generated_dir.glob("*.dts")):
         raise unittest.SkipTest(f"{config} has not been elaborated in this tree")
     return fp.for_board(board)
 
