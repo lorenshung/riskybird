@@ -179,7 +179,10 @@ the reason the flight controller is not part of this branch's support.
   `docs/accel-shells-bringup.md` §5.
 - **The flight controller cannot fly Fp16At35.** Soft-float, its loop takes
   391 ms per iteration, 11x the 50 MHz loop and 3.3x the ESP's 120 ms receive
-  failsafe.
+  failsafe. The period is host-timestamped: `tools/bench/tsreader.py` logs the
+  console and `python3 tools/bench/fcstats.py <prefix>.ts.log` reduces it
+  (390.9 ms/it on that run; the same reduction gives 43.0 ms/it on
+  Gemmini16At40).
 - **IntAt40 misses timing** (WNS -0.067 ns, even with the explore directive).
   IntAt35 is the same design at 35 MHz, and it closes.
 - **Capture misalignment.** The first capture after programming usually comes
