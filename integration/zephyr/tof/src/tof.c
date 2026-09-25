@@ -663,18 +663,35 @@ int rb_tof_array_init(
 	}
 
 #if defined(CONFIG_RB_VL53L5CX_RANGING)
-	for (uint8_t index = 0U; index < RB_TOF_SENSOR_COUNT; index++) {
+	/*
+	 * Only the populated slots that came up as a VL53L5CX, and only those
+	 * the board declared a ranging device for. This used to walk all
+	 * RB_TOF_SENSOR_COUNT slots and fail on the first NULL or unready one,
+	 * which made a board with fewer than five VL53L5CX -- every board, since
+	 * the down sensor is a VL53L1X -- unable to range at all, and handed the
+	 * VL53L1X to the VL53L5CX firmware upload. Same tolerance as the address
+	 * pass above: one bad sensor is recorded, not fatal.
+	 */
+	for (uint8_t index = 0U; index < sensor_count(array); index++) {
 		const struct device *sensor = array->config.sensors[index];
 
-		if (sensor == NULL || !device_is_ready(sensor)) {
-			return -ENODEV;
+		if (array->status[index] != 0 ||
+		    array->kinds[index] != RB_TOF_KIND_VL53L5CX ||
+		    sensor == NULL) {
+			continue;
 		}
-		result = vl53l5cx_reinit(sensor);
+		result = device_is_ready(sensor) ? vl53l5cx_reinit(sensor)
+						 : -ENODEV;
 		if (result != 0) {
-			return result;
+			array->status[index] = result;
+			continue;
 		}
+		array->ranging_mask |= (uint8_t)BIT(index);
 	}
-	array->ranging = true;
+	array->ranging = array->ranging_mask != 0U;
+	if (!array->ranging) {
+		return -ENODEV;
+	}
 #endif
 
 	return 0;
@@ -947,6 +964,9 @@ int rb_tof_fetch(
 	if (!array->ranging) {
 		return -EAGAIN;
 	}
+	if (!rb_tof_ranging_sensor(array, sensor_index)) {
+		return -ENODEV;
+	}
 
 	const struct device *sensor = array->config.sensors[sensor_index];
 	struct vl53l5cx_grid grid;
@@ -982,6 +1002,12 @@ int rb_tof_fetch(
 	(void)sensor_index;
 	return -ENOTSUP;
 #endif
+}
+
+bool rb_tof_ranging_sensor(const struct rb_tof_array *array, uint8_t sensor_index)
+{
+	return array != NULL && sensor_index < RB_TOF_SENSOR_COUNT &&
+	       (array->ranging_mask & BIT(sensor_index)) != 0U;
 }
 
 bool rb_tof_ranging_available(void)

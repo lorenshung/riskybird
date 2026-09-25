@@ -11,11 +11,15 @@
 #define I2C_NODE DT_NODELABEL(i2c0)
 
 #if defined(CONFIG_RB_VL53L5CX_RANGING)
-#define TOF0_NODE DT_ALIAS(tof0)
-#define TOF1_NODE DT_ALIAS(tof1)
-#define TOF2_NODE DT_ALIAS(tof2)
-#define TOF3_NODE DT_ALIAS(tof3)
-#define TOF4_NODE DT_ALIAS(tof4)
+/*
+ * The ranging device for slot n, or NULL when the target's overlay declares no
+ * tof<n>. The overlays declare a VL53L5CX node only for the slots that can hold
+ * one, so a slot with no alias -- the down VL53L1X, or an unused slot -- is
+ * skipped by rb_tof_array_init's ranging pass instead of failing the build.
+ */
+#define TOF_DEVICE(n)                                                      \
+	COND_CODE_1(DT_NODE_EXISTS(DT_ALIAS(tof##n)),                      \
+		    (DEVICE_DT_GET(DT_ALIAS(tof##n))), (NULL))
 #endif
 
 static struct rb_tof_array tof_array;
@@ -24,11 +28,11 @@ static const struct rb_tof_array_config tof_config = {
 	.i2c = DEVICE_DT_GET(I2C_NODE),
 #if defined(CONFIG_RB_VL53L5CX_RANGING)
 	.sensors = {
-		DEVICE_DT_GET(TOF0_NODE),
-		DEVICE_DT_GET(TOF1_NODE),
-		DEVICE_DT_GET(TOF2_NODE),
-		DEVICE_DT_GET(TOF3_NODE),
-		DEVICE_DT_GET(TOF4_NODE),
+		TOF_DEVICE(0),
+		TOF_DEVICE(1),
+		TOF_DEVICE(2),
+		TOF_DEVICE(3),
+		TOF_DEVICE(4),
 	},
 #endif
 	/*
@@ -43,8 +47,12 @@ static const struct rb_tof_array_config tof_config = {
 	 *    VL53 part answers, so nothing here is wired directly: every ToF on
 	 *    this board is behind the expander.
 	 *
-	 * The parts are mixed -- three VL53L5CX and one VL53L1X -- so the kind
-	 * is detected per sensor rather than declared.
+	 * The parts are mixed -- VL53L5CX on the side channels, the down
+	 * VL53L1X on 6 -- so the kind is detected per sensor rather than
+	 * declared. The board is meant to carry three (two side plus the down
+	 * one); bootup_check on 2026-09-10 found only channel 1's side sensor
+	 * and the down sensor answering, so a missing side sensor here is a
+	 * real fault, not a config to trim.
 	 */
 	.sensor_count = 4,
 	.xshut_channels = { 1, 2, 3, 6, RB_TOF_XSHUT_DIRECT },
@@ -141,9 +149,13 @@ int main(void)
 			continue;
 		}
 
-		for (uint8_t index = 0U; index < RB_TOF_SENSOR_COUNT; index++) {
+		for (uint8_t index = 0U; index < RB_TOF_ACTIVE; index++) {
 			struct rb_tof_frame frame;
 
+			/* Not a ranging slot: absent, or the down VL53L1X. */
+			if (!rb_tof_ranging_sensor(&tof_array, index)) {
+				continue;
+			}
 			result = rb_tof_fetch(&tof_array, index, &frame);
 			if (result != 0) {
 				printf(

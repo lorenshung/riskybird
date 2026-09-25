@@ -39,9 +39,12 @@ enum rb_tof_kind {
 #define RB_TOF_XSHUT_DIRECT 0xFFU
 
 /*
- * Stable RiskyBird contract for the RiskyBird ToF array: four VL53L5CX sensors
- * whose XSHUT lines hang off the ADS7128 GPIO expander, plus one wired directly
- * to the bus. All addresses are 7-bit I2C addresses.
+ * Stable RiskyBird contract for the RiskyBird ToF array: up to
+ * RB_TOF_SENSOR_COUNT sensors whose XSHUT lines hang off the ADS7128 GPIO
+ * expander, or that are wired directly to the bus. The drone carrier is meant
+ * to carry three -- two side VL53L5CX and the down VL53L1X on GPIO6 -- and on
+ * the current board only one side sensor answers. All addresses are 7-bit I2C
+ * addresses.
  */
 struct rb_tof_array_config {
 	const struct device *i2c;
@@ -95,6 +98,8 @@ struct rb_tof_array {
 	 * up. rb_tof_array_init returns 0 if any sensor came up.
 	 */
 	int status[RB_TOF_SENSOR_COUNT];
+	/* Slots rb_tof_array_init brought up for grid ranging (bit n = slot n). */
+	uint8_t ranging_mask;
 	bool ranging;
 };
 
@@ -203,6 +208,13 @@ int rb_tof_fetch(
 	struct rb_tof_frame *frame);
 
 bool rb_tof_ranging_available(void);
+
+/*
+ * Whether slot sensor_index can be ranged: it came up as a VL53L5CX and the
+ * board declared a ranging device for it. Always false without
+ * CONFIG_RB_VL53L5CX_RANGING.
+ */
+bool rb_tof_ranging_sensor(const struct rb_tof_array *array, uint8_t sensor_index);
 
 #ifdef __cplusplus
 }
