@@ -195,8 +195,8 @@ export RB_DTS_DIR=$HOME/riskybird-dts
 # Flow capture (FPGA)
 ./rb build pmw3901_test --target arty200t --config RocketArty200TDroneFullDDRConfig
 
-# Fixed-duty commander (FPGA). See the note below about rb-ext.py.
-./tools/rb-ext.py build motor_duty --target arty200t \
+# Fixed-duty commander (FPGA). `rb fly motors` builds and drives it for you.
+./rb build motor_duty --target arty200t \
     --config RocketArty200TDroneFullDDRConfig
 
 # The motor driver (ESP32-C6) — the other end of the link
@@ -221,20 +221,8 @@ Successfully created ESP32-C6 image.
 .../build/zephyr/esp32c6/esp_motors/default/zephyr/zephyr.elf
 ```
 
-**Why `./tools/rb-ext.py` and not `./rb` for `motor_duty`.** `tools/rb/boards.py`
-is the single registry of workloads, and a workload that is not in it cannot be
-named on an `rb` command line at all. That file was being edited elsewhere while
-`motor_duty` was written, so the registry row lives in `tools/rb-ext.py`
-instead: it adds the row to the same dictionary at run time and then hands the
-*whole* command line to `rb`'s own `main()`, so every subcommand, flag and
-safety check behaves identically. Check which you need:
-
-```bash
-./rb workloads | grep -q motor_duty && echo "use ./rb" || echo "use ./tools/rb-ext.py"
-```
-
-When the row is pasted into `WORKLOADS` in `boards.py`, delete `tools/rb-ext.py`
-and use `./rb` everywhere. Nothing else depends on it.
+`motor_duty` is registered in `tools/rb/boards.py` like every other workload (it briefly lived in a
+`tools/rb-ext.py` side registry, now removed), so plain `./rb` builds it.
 
 ### 3.2 Prove the frame-rate interlock (do this once; it takes 30 seconds)
 
@@ -242,7 +230,7 @@ This is the §0 hazard, checked rather than trusted. Ask for a frame rate that
 would fail its own measurement:
 
 ```bash
-RB_EXTRA_CFLAGS="-DMOTOR_DUTY_HZ=5" ./tools/rb-ext.py build motor_duty \
+RB_EXTRA_CFLAGS="-DMOTOR_DUTY_HZ=5" ./rb build motor_duty \
     --target arty200t --config RocketArty200TDroneFullDDRConfig
 ```
 
@@ -828,7 +816,7 @@ Flash the ESP driver and the FPGA commander:
 ./rb console --port <fpga-console-port>
 
 # terminal B -- program, load, then `continue` at the gdb prompt
-./tools/rb-ext.py debug motor_duty --target arty200t \
+./rb debug motor_duty --target arty200t \
     --config RocketArty200TDroneFullDDRConfig --program \
     --program-usb-location <bitstream-ftdi> --usb-location <debug-ftdi> --no-run
 (gdb) continue
@@ -904,7 +892,7 @@ is not the break-away that matters — the prop is most of the load):
 ```bash
 RB_EXTRA_CFLAGS="-DMOTOR_DUTY_SWEEP_START=300 -DMOTOR_DUTY_SWEEP_STEP=50 \
                  -DMOTOR_DUTY_SWEEP_STOP=1600" \
-  ./tools/rb-ext.py build motor_duty --target arty200t \
+  ./rb build motor_duty --target arty200t \
       --config RocketArty200TDroneFullDDRConfig
 ```
 
@@ -1002,7 +990,7 @@ Both ceilings must move, in the same session:
 # FPGA commander: ceiling 80.00 %, sweep 25 % -> 80 % in 5 % steps
 RB_EXTRA_CFLAGS="-DMOTOR_DUTY_MAX=8000 -DMOTOR_DUTY_SWEEP_START=2500 \
                  -DMOTOR_DUTY_SWEEP_STEP=500 -DMOTOR_DUTY_SWEEP_STOP=8000" \
-  ./tools/rb-ext.py build motor_duty --target arty200t \
+  ./rb build motor_duty --target arty200t \
       --config RocketArty200TDroneFullDDRConfig
 
 # ESP driver: its OWN, independent ceiling
@@ -1152,14 +1140,14 @@ export RB_DTS_DIR=$HOME/riskybird-dts     # no elaborated DTS in this worktree
 
 # --- builds -------------------------------------------------------------
 ./rb build pmw3901_test --target arty200t --config RocketArty200TDroneFullDDRConfig
-./tools/rb-ext.py build motor_duty --target arty200t --config RocketArty200TDroneFullDDRConfig
+./rb build motor_duty --target arty200t --config RocketArty200TDroneFullDDRConfig
 ./rb build esp_motors --target esp32c6
 
 # --- run (drone shells load over JTAG: rb debug, NOT rb run) ------------
 ./rb console --port <fpga-console-port>          # terminal A, attach FIRST
 ./rb debug pmw3901_test --target arty200t --config RocketArty200TDroneFullDDRConfig \
     --program --program-usb-location <bit> --usb-location <dbg> --no-run
-./tools/rb-ext.py debug motor_duty --target arty200t --config RocketArty200TDroneFullDDRConfig \
+./rb debug motor_duty --target arty200t --config RocketArty200TDroneFullDDRConfig \
     --program --program-usb-location <bit> --usb-location <dbg> --no-run
 #   then `continue` at the gdb prompt
 ./rb flash esp_motors --target esp32c6 --port <esp-port>

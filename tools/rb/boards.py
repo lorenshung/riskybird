@@ -474,17 +474,59 @@ class Workload:
     # builds as a pile of -D flags to remember, which is precisely how a build
     # ends up flying with a safety knob silently absent.
     cmake_defines_by_mode: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
+    # Preprocessor definitions by mode, appended to Zephyr's EXTRA_CPPFLAGS.
+    # The counterpart of cmake_defines_by_mode for knobs that are a bare
+    # `#ifndef X / #define X` in the source rather than a CMake cache variable
+    # (the flight controller's T_CLIMB_MS, ATT_GAIN, TOF_STEP_REJECT_M, ...):
+    # passed as -DX on the CMake line those do nothing at all.
+    cppflags_by_mode: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
+    # A mode that is another mode plus knobs. It builds with its base's
+    # overlays, .conf fragments and definitions, then its own on top -- so a
+    # flight preset is `esp-motors` exactly, plus the values that flew.
+    mode_bases: tuple[tuple[str, str], ...] = ()
+    # One line per mode saying where its values come from (a preset file, the
+    # trials it flew), printed at build time and recorded with the build.
+    mode_notes: tuple[tuple[str, str], ...] = ()
+
+    def base_mode(self, mode: str) -> str | None:
+        return dict(self.mode_bases).get(mode)
+
+    def layout_mode(self, mode: str) -> str:
+        """The mode whose overlays and .conf fragments this mode builds with."""
+        seen = {mode}
+        while (base := self.base_mode(mode)) is not None and base not in seen:
+            seen.add(base)
+            mode = base
+        return mode
+
+    def _chain(self, mode: str) -> list[str]:
+        chain = [mode]
+        while (base := self.base_mode(chain[-1])) is not None and base not in chain:
+            chain.append(base)
+        return list(reversed(chain))   # base first, the mode itself last
 
     def defines_for(self, mode: str) -> tuple[tuple[str, str], ...]:
-        """Workload-wide definitions, then this mode's, which may override."""
+        """Workload-wide definitions, then the base mode's, then this mode's."""
         merged = dict(self.cmake_defines)
-        for selected_mode, defines in self.cmake_defines_by_mode:
-            if selected_mode == mode:
-                merged.update(defines)
+        for link in self._chain(mode):
+            for selected_mode, defines in self.cmake_defines_by_mode:
+                if selected_mode == link:
+                    merged.update(defines)
         return tuple(merged.items())
 
+    def cppflags_for(self, mode: str) -> tuple[tuple[str, str], ...]:
+        merged: dict[str, str] = {}
+        for link in self._chain(mode):
+            for selected_mode, defines in self.cppflags_by_mode:
+                if selected_mode == link:
+                    merged.update(defines)
+        return tuple(merged.items())
+
+    def mode_note(self, mode: str) -> str:
+        return dict(self.mode_notes).get(mode, "")
+
     def mode_conf(self, mode: str) -> Path | None:
-        path = self.source_dir / "conf" / f"{mode}.conf"
+        path = self.source_dir / "conf" / f"{self.layout_mode(mode)}.conf"
         return path if path.is_file() else None
 
     def supports(self, target: ZephyrTarget) -> bool:
@@ -516,6 +558,9 @@ def _workload(
     cmake_defines_by_mode: tuple[
         tuple[str, tuple[tuple[str, str], ...]], ...
     ] = (),
+    cppflags_by_mode: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (),
+    mode_bases: tuple[tuple[str, str], ...] = (),
+    mode_notes: tuple[tuple[str, str], ...] = (),
 ) -> Workload:
     return Workload(
         name=name,
@@ -529,6 +574,9 @@ def _workload(
         minimum_ram_by_mode=minimum_ram_by_mode,
         cmake_defines=cmake_defines,
         cmake_defines_by_mode=cmake_defines_by_mode,
+        cppflags_by_mode=cppflags_by_mode,
+        mode_bases=mode_bases,
+        mode_notes=mode_notes,
     )
 
 
@@ -611,11 +659,37 @@ WORKLOADS = {
     # format to translate and does not need changing when telemetry gains fields.
     "esp_bridge": _workload(
         "esp_bridge",
+        # `default` has no motor code at all (the four motor pins are hogged as
+        # pulled-down inputs). `motors` is the image that flies: it also owns
+        # the four gates, decodes the FPGA's duty frames, runs the 120 ms
+        # failsafe and executes a dashboard ESTOP locally. See
+        # docs/wireless-telemetry-bringup.md.
+        modes=("default", "motors"),
         targets=("esp32c6",),
         summary=(
             "WiFi modem for the FPGA flight controller: UART <-> UDP "
-            "telemetry :14550 and commands :14551"
+            "telemetry :14550 and commands :14551 (--mode motors also drives "
+            "the four motor gates)"
         ),
+        # The collective duty ceiling applied at the gate, after everything the
+        # FPGA did. 98 for flight: just above the flight controller's own 0.95
+        # cap, so it backstops a mis-built FPGA image without ever being the
+        # constraint that binds (T05-T27 flew with 90-98).
+        cmake_defines_by_mode=(("motors", (("ESP_LINK_MAX_DUTY_PCT", "98"),)),),
+    ),
+    # The FPGA half of a thrust / motor-identification bench test: holds a
+    # fixed duty on chosen motors by sending the same motor_link frames the
+    # flight controller sends. Driven by `rb fly motors`. Registered here from
+    # tools/rb-ext.py, where it waited while this file was being edited
+    # elsewhere.
+    "motor_duty": _workload(
+        "motor_duty",
+        targets=("arty200t",),
+        summary=(
+            "Hold a fixed duty on chosen motors by sending motor_link frames "
+            "to the ESP32-C6 (motor identification / thrust bench test)"
+        ),
+        safety="props-on-RESTRAINED (docs/flight-calibration-procedures.md)",
     ),
     "esp_uart": _workload(
         "esp_uart",
@@ -1104,6 +1178,87 @@ WORKLOADS = {
         minimum_ram_by_mode=(("ranging", 0x30000),),
     ),
 }
+
+
+# ---- flight presets: the builds that flew, as data ------------------------------------------
+#
+# Every flight in the 2026-09-23/24 campaign was built as
+#   RB_CMAKE_ARGS="..." RB_EXTRA_CPPFLAGS="..." rb build flight_controller --mode esp-motors
+# and a flag silently dropped or sent down the wrong channel was the commonest failure (rb debug
+# rebuilding without them; a -D a file never reads). Each file in tools/flight/presets/ records
+# the exact values of one configuration that flew, and becomes a mode of flight_controller here:
+# `esp-motors` plus those values. So the build is asked for by name --
+#   rb build flight_controller --target arty200t --config RocketArty200TDroneFullDDRConfig \
+#       --mode t21-hover-1.0m
+# -- and the same file is what `rb flightlog push --build-file` records.
+FLIGHT_PRESETS_DIR = ROOT / "tools" / "flight" / "presets"
+
+
+def _parse_preset(path: Path) -> tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...], str]:
+    """(CMake -D definitions, preprocessor definitions, one-line note) from a preset file."""
+    import shlex
+
+    cmake: list[tuple[str, str]] = []
+    cpp: list[tuple[str, str]] = []
+    note = ""
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            if not note and "flew:" in line:
+                note = line.split("flew:", 1)[1].strip()
+            continue
+        match = re.match(r"^(?:export\s+)?(RB_CMAKE_ARGS|RB_EXTRA_CPPFLAGS)=(.*)$", line)
+        if not match:
+            continue
+        target = cmake if match.group(1) == "RB_CMAKE_ARGS" else cpp
+        value = " ".join(shlex.split(match.group(2)))   # unquote the shell assignment
+        for token in shlex.split(value):
+            if not token.startswith("-D") or "=" not in token:
+                raise ValueError(f"{path.name}: unsupported token {token!r} (only -DNAME=VALUE)")
+            name, value = token[2:].split("=", 1)
+            target.append((name, value))
+    if not cmake and not cpp:
+        raise ValueError(f"{path.name}: no RB_CMAKE_ARGS / RB_EXTRA_CPPFLAGS line")
+    return tuple(cmake), tuple(cpp), note
+
+
+def flight_presets() -> dict[str, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...], str]]:
+    if not FLIGHT_PRESETS_DIR.is_dir():
+        return {}
+    return {path.stem: _parse_preset(path) for path in sorted(FLIGHT_PRESETS_DIR.glob("*.env"))}
+
+
+def _with_flight_presets(workload: Workload) -> Workload:
+    presets = flight_presets()
+    imu = (
+        # Motor-incapable IMU sign test (`rb fly imu`): `default` has no motors
+        # alias at all, and ROSE_IMU_DEBUG replaces the telemetry line with raw
+        # body-frame accel/gyro so each axis sign can be checked by hand.
+        "imu-test",
+        (("ROSE_USE_PID", "1"), ("ROSE_USE_EKF", "0"), ("CTRL_ITERS", "0"), ("ROSE_TELEM_DIV", "100")),
+        (("ROSE_IMU_DEBUG", "1"),),
+        "motor-incapable IMU sign test (default mode + ROSE_IMU_DEBUG)",
+    )
+    modes = tuple(workload.modes) + tuple(presets) + (imu[0],)
+    return replace(
+        workload,
+        modes=modes,
+        cmake_defines_by_mode=tuple(workload.cmake_defines_by_mode)
+        + tuple((name, cmake) for name, (cmake, _cpp, _note) in presets.items())
+        + ((imu[0], imu[1]),),
+        cppflags_by_mode=tuple(workload.cppflags_by_mode)
+        + tuple((name, cpp) for name, (_cmake, cpp, _note) in presets.items())
+        + ((imu[0], imu[2]),),
+        mode_bases=tuple(workload.mode_bases)
+        + tuple((name, "esp-motors") for name in presets)
+        + ((imu[0], "default"),),
+        mode_notes=tuple(workload.mode_notes)
+        + tuple((name, note) for name, (_cmake, _cpp, note) in presets.items())
+        + ((imu[0], imu[3]),),
+    )
+
+
+WORKLOADS["flight_controller"] = _with_flight_presets(WORKLOADS["flight_controller"])
 
 
 def get_board(name: str) -> Board:

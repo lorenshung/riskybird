@@ -25,6 +25,7 @@ from . import (
     dse,
     fingerprint,
     flightlog,
+    fly,
     ground,
     modelblaster,
     plotting,
@@ -930,6 +931,49 @@ def generated_clock_conf(board: Board) -> Path | None:
     return path
 
 
+def _git_describe(path: Path) -> str:
+    try:
+        rev = subprocess.run(["git", "-C", str(path), "rev-parse", "--short=12", "HEAD"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--", "."],
+                               capture_output=True, text=True, check=True).stdout.strip()
+        return rev + ("-dirty" if dirty else "")
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def write_build_record(target, workload, mode: str, board, elf: Path) -> Path:
+    """What this build was, next to its ELF: rb-build.txt in the build directory.
+
+    One file that answers "what flew?" without the shell history: the mode and
+    the preset it came from, every CMake and preprocessor knob the mode set, any
+    RB_* environment override on top, the source revisions, and the image hash.
+    `rb fly commit` prints its path and `rb flightlog push --build-file` takes it.
+    """
+    import hashlib
+
+    lines = [
+        f"workload:     {workload.name}",
+        f"mode:         {mode}" + (f"   (base: {workload.layout_mode(mode)})" if workload.layout_mode(mode) != mode else ""),
+    ]
+    if workload.mode_note(mode):
+        lines.append(f"flew:         {workload.mode_note(mode)}")
+    lines += [
+        f"target:       {target.name}" + (f"  config: {board.config}" if board is not None else ""),
+        f"setup rev:    {_git_describe(ROOT)}",
+        f"firmware rev: {_git_describe(ZEPHYR_BACKEND)}",
+        f"elf sha1:     {hashlib.sha1(elf.read_bytes()).hexdigest()[:16]}",
+        "cmake:        " + " ".join(f"-D{n}={v}" for n, v in workload.defines_for(mode)),
+        "cppflags:     " + " ".join(f"-D{n}={v}" for n, v in workload.cppflags_for(mode)),
+    ]
+    for var in ("RB_CMAKE_ARGS", "RB_EXTRA_CPPFLAGS", "RB_EXTRA_CFLAGS"):
+        if os.environ.get(var):
+            lines.append(f"{var}: {os.environ[var]}")
+    record = elf.parent.parent / "rb-build.txt"
+    record.write_text("\n".join(lines) + "\n")
+    return record
+
+
 def zephyr_build(
     target: ZephyrTarget,
     workload: Workload,
@@ -1098,10 +1142,12 @@ def zephyr_build(
     if target.common_conf.is_file():
         conf_files.append(target.common_conf)
 
-    workload_overlay = target.workload_overlay(workload.name, mode)
+    # A preset mode builds with its base mode's overlays and .conf fragments.
+    layout = workload.layout_mode(mode)
+    workload_overlay = target.workload_overlay(workload.name, layout)
     if workload_overlay is not None:
         overlays.append(workload_overlay)
-    conf_files.extend(target.workload_confs(workload.name, mode))
+    conf_files.extend(target.workload_confs(workload.name, layout))
     mode_conf = workload.mode_conf(mode)
     if mode_conf is not None:
         conf_files.append(mode_conf)
@@ -1230,10 +1276,13 @@ def zephyr_build(
         # that defines like ROSE_AUTOFLIGHT must go here: passed any other way
         # they are silently ignored and the build quietly falls through to a
         # different flight mode.
+        # The mode's own preprocessor knobs first (a flight preset's T_CLIMB_MS,
+        # ATT_GAIN, ...), then RB_EXTRA_CPPFLAGS, so an explicit override wins.
+        cppflags = " ".join(f"-D{name}={value}" for name, value in workload.cppflags_for(mode))
         if os.environ.get("RB_EXTRA_CPPFLAGS"):
-            cmake_args.append(
-                f"-DEXTRA_CPPFLAGS={os.environ['RB_EXTRA_CPPFLAGS']}"
-            )
+            cppflags = (cppflags + " " + os.environ["RB_EXTRA_CPPFLAGS"]).strip()
+        if cppflags:
+            cmake_args.append(f"-DEXTRA_CPPFLAGS={cppflags}")
     # Application CMake cache knobs, appended last so they win. Distinct from
     # RB_EXTRA_CPPFLAGS: these are cache variables an application's CMakeLists
     # reads with set(... CACHE ...) and then turns into compile definitions
@@ -1302,6 +1351,10 @@ def zephyr_build(
     elf = zephyr_elf(target, workload, mode, ram_console)
     if not elf.is_file():
         raise RbError(f"west completed but ELF was not found: {elf}")
+    record = write_build_record(target, workload, mode, board, elf)
+    if workload.mode_note(mode):
+        print(f"rb: {workload.name} --mode {mode}: {workload.mode_note(mode)}")
+    print(f"rb: build record {record}")
     if board is not None and (
         board.config in FP16_SCALAR_FPU_CONFIGS
         or board.config in INT_NOPERMUTE_VECTOR_CONFIGS
@@ -2838,6 +2891,31 @@ def cmd_flightlog(args: argparse.Namespace) -> int:
     raise RbError(f"unsupported flightlog action: {args.flightlog_action}")
 
 
+def cmd_fly(args: argparse.Namespace) -> int:
+    """The flight bench: program, load, commit, status, stop (see tools/rb/fly.py)."""
+    try:
+        action = args.fly_action
+        if action in ("load", "commit"):
+            return fly.load_and_check(args, commit=(action == "commit"))
+        if action == "program":
+            fly._confirm_pack_out(args)
+            fly.program_sram(args, fly.discover(args))
+            return 0
+        if action == "status":
+            return fly.status(args)
+        if action == "stop":
+            return fly.gdb_step(args, fly.FLIGHT_GDB / "stop.gdb")
+        if action == "where":
+            return fly.gdb_step(args, fly.FLIGHT_GDB / "where.gdb")
+        if action == "imu":
+            return fly.imu(args)
+        if action == "motors":
+            return fly.motors(args)
+    except fly.FlyError as exc:
+        raise RbError(str(exc)) from exc
+    raise RbError(f"unsupported fly action: {action}")
+
+
 def cmd_hil(args: argparse.Namespace) -> int:
     """Run a closed-loop HIL/co-simulation scenario under one supervisor."""
     if args.hil_action != "replay" or args.scenario != "mpc-hover":
@@ -3898,6 +3976,55 @@ def build_parser() -> argparse.ArgumentParser:
     gnd_mon.add_argument("extra", nargs=argparse.REMAINDER,
                          help="passed to riskybird-flightready.py (e.g. --relay 0)")
     gnd_mon.set_defaults(func=cmd_ground)
+
+    fly_p = sub.add_parser(
+        "fly",
+        help="flight bench: program the shell, load + verify a flight preset, commit, stop",
+        description="Build, program, load, verify and commit a flight image, or stop one. "
+        "Presets are flight_controller modes from tools/flight/presets/ (rb workloads).",
+    )
+    fly_sub = fly_p.add_subparsers(dest="fly_action", required=True)
+
+    def _fly_common(p, *, mode_required=False, program=False):
+        p.add_argument("--target", default=fly.DEFAULT_TARGET)
+        p.add_argument("--config", default=fly.DEFAULT_CONFIG)
+        p.add_argument("--debug-location", help="USB location of the debug adapter (default: by IDCODE)")
+        p.add_argument("--bitstream-location", help="USB location of the bitstream adapter (default: by IDCODE)")
+        p.add_argument("--console", help="FPGA console serial port (default: the debug adapter's channel B)")
+        p.add_argument("--esp-port", help="ESP32-C6 USB serial port (default: auto)")
+        if mode_required is not None:
+            p.add_argument("--mode", required=mode_required,
+                           help="flight_controller mode / flight preset, e.g. t21-hover-1.0m")
+        if program:
+            p.add_argument("--pack-out", action="store_true",
+                           help="confirm the LiPo is disconnected (re-programming the shell with it in is unsafe)")
+            p.add_argument("--no-program", action="store_true",
+                           help="skip re-programming the FullDDR shell (it is already fresh)")
+            p.add_argument("--pristine", choices=("auto", "always", "never"), default="auto")
+        p.set_defaults(func=cmd_fly)
+        return p
+
+    _fly_common(fly_sub.add_parser("commit", help="program SRAM, load, verify banner + ESP link, write the commit key"),
+                mode_required=True, program=True)
+    _fly_common(fly_sub.add_parser("load", help="as commit, without the commit key (dry bench)"),
+                mode_required=True, program=True)
+    prog = _fly_common(fly_sub.add_parser("program", help="the FullDDR shell into SRAM"), mode_required=None)
+    prog.add_argument("--pack-out", action="store_true")
+    prog.add_argument("--flash", action="store_true", help="write the SPI flash first (slow), then SRAM")
+    st = _fly_common(fly_sub.add_parser("status", help="ESP link health from its console (RESETS the ESP)"),
+                     mode_required=None)
+    st.add_argument("--seconds", type=float, default=2.5)
+    st.add_argument("--yes", action="store_true", help="skip the 'nothing is flying?' prompt")
+    _fly_common(fly_sub.add_parser("stop", help="halt the core; the ESP cuts all motors within 120 ms"))
+    _fly_common(fly_sub.add_parser("where", help="halt, backtrace, resume"))
+    im = _fly_common(fly_sub.add_parser("imu", help="guided IMU sign test on a motor-incapable image"),
+                     mode_required=None, program=True)
+    mo = _fly_common(fly_sub.add_parser("motors", help="spin each motor alone (motor identification)"),
+                     mode_required=None)
+    mo.add_argument("--duty", type=int, default=20, help="percent, 5..25 (default 20)")
+    mo.add_argument("--ms", type=int, default=1500, help="spin time per motor (default 1500)")
+    mo.add_argument("--motor", type=int, nargs="+", default=[1, 2, 3, 4], choices=[1, 2, 3, 4])
+    mo.add_argument("--yes", action="store_true", help="skip the typed confirmation")
 
     flog = sub.add_parser(
         "flightlog",
