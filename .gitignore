@@ -39,3 +39,7 @@ hardware/padtest/*/out/
 # guide runs it from. Same reasoning as the camera captures above: a tool you run
 # every bench session must not dirty the tree every bench session.
 riskybird-logs/
+
+# Local run output: bench logs, captures, per-session results. Flight logs are
+# published to the separate flight-logs repo (rb flightlog push), not committed here.
+results/
