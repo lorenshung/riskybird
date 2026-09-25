@@ -40,11 +40,25 @@ SCRATCHPAD_MEMORY_SIZE = 0x8000
 # CONFIG_FLOAT_HARD, so any fp32 arithmetic compiles to fadd.s and faults at
 # run time with nothing in the build to warn about it.
 #
-# Keep in sync with WithRocketFPU16 call sites in
-# backends/chipyard/fpga/src/main/scala/arty200t/AccelConfigs.scala.
+# Keep in sync with the WithRocketFPU16 configs, direct or inherited through
+# `new <Parent>`, in backends/chipyard/fpga/src/main/scala/arty200t/*.scala;
+# tests/test_rb_clock_fpu.py checks it whenever Chipyard is checked out.
+# ku040/Configs.scala also uses WithRocketFPU16; those shells are not listed
+# here, so rb still builds them with CONFIG_FPU=y.
 FP16_SCALAR_FPU_CONFIGS = frozenset({
     "RocketArty200TDroneGemminiSaturnFp16Config",
     "RocketArty200TDroneGemminiSaturnFp16At35Config",
+    # Area and trace variants of the same shell (RbAreaExperiments*.scala,
+    # TacitAccelConfigs.scala, TacitDropConfigs.scala). None is benched, but
+    # each has the FP16-only FPU, so an image built for one needs the same
+    # fragment and the same post-link check.
+    "RocketArty200TDroneGemminiSaturnFp16NoLoopConvConfig",
+    "RocketArty200TDroneGemminiSaturnFp16At35TacitConfig",
+    "RocketArty200TDroneGemminiSaturnFp16At35Tacit256Config",
+    "RocketArty200TDroneGemminiSaturnFp16At35TacitFullNoLoopConvConfig",
+    "RocketArty200TDroneGemminiSaturnFp16TraceBaseConfig",
+    "RocketArty200TDroneGemminiSaturnFp16At35TacitTrimConfig",
+    "RocketArty200TDroneGemminiSaturnFp16At35TacitTrim1024Config",
 })
 # Shells whose Saturn is VectorParams.intOnlyParams.copy(noPermute = true):
 # integer-only vector (zve64x -- no vector FP) with the PermuteUnit removed, so

@@ -5,11 +5,13 @@ and CONFIG_FPU=y. The accelerator shells run at 35-40 MHz, and Fp16At35's
 scalar FPU implements only Zfh, so rb appends generated fragments after
 fpga.conf and then disassembles the linked image. These tests pin the
 derivation, its call site in zephyr_build, and the wrapper around
-isa_contract_offences() (whose classification tests/test_accel_socs.py covers).
+isa_contract_offences() (whose classification tests/test_accel_socs.py covers),
+and the FP16 config list against the Scala that defines those shells.
 
 Pure host tests: the build is never run, and objdump is replaced by fixture
 listings. RealShellTests reads collected DTS files when RB_DTS_DIR provides
-them and skips otherwise.
+them, and Fp16ListSyncTests reads backends/chipyard when it is checked out;
+each skips otherwise.
 """
 
 from __future__ import annotations
@@ -17,14 +19,15 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import re
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tools.rb import cli
-from tools.rb.boards import BOARDS, TARGETS, WORKLOADS
+from tools.rb import boards, cli
+from tools.rb.boards import BOARDS, FP16_SCALAR_FPU_CONFIGS, TARGETS, WORKLOADS
 from tools.rb.cli import isa_contract_offences
 
 FP16 = "RocketArty200TDroneGemminiSaturnFp16At35Config"
@@ -234,6 +237,45 @@ class RealShellTests(unittest.TestCase):
             self.assertEqual(cli.dts_timebase_hz(board), hz, config)
         if not checked:
             self.skipTest("no arty200t drone shell DTS present (set RB_DTS_DIR)")
+
+
+def with_rocket_fpu16_configs(scala_dir: Path) -> set[str]:
+    """Rocket*Config classes in scala_dir that use WithRocketFPU16, directly or
+    through a `new <Parent>` chain."""
+    bodies: dict[str, str] = {}
+    for path in sorted(scala_dir.glob("*.scala")):
+        # Comments mention WithRocketFPU16 freely; only code counts.
+        text = re.sub(r"/\*.*?\*/", "", path.read_text(), flags=re.S)
+        text = re.sub(r"//[^\n]*", "", text)
+        for chunk in re.split(r"^(?=class )", text, flags=re.M):
+            match = re.match(r"class (\w+)", chunk)
+            if match:
+                bodies[match.group(1)] = chunk
+    fp16 = {name for name, body in bodies.items() if "WithRocketFPU16" in body}
+    while True:
+        grown = fp16 | {
+            name for name, body in bodies.items()
+            if any(re.search(rf"\bnew {parent}\b", body) for parent in fp16)
+        }
+        if grown == fp16:
+            return {n for n in fp16 if n.startswith("Rocket") and n.endswith("Config")}
+        fp16 = grown
+
+
+class Fp16ListSyncTests(unittest.TestCase):
+    """FP16_SCALAR_FPU_CONFIGS is a name list, so it can fall behind the Scala."""
+
+    def test_list_matches_the_scala_sources(self) -> None:
+        scala_dir = boards.CHIPYARD / "fpga" / "src" / "main" / "scala" / "arty200t"
+        if not scala_dir.is_dir():
+            self.skipTest(f"Chipyard not checked out: {scala_dir}")
+        configs = with_rocket_fpu16_configs(scala_dir)
+        self.assertIn(FP16, configs)
+        self.assertEqual(
+            set(FP16_SCALAR_FPU_CONFIGS), configs,
+            "boards.FP16_SCALAR_FPU_CONFIGS is out of sync with the "
+            "WithRocketFPU16 configs in arty200t/*.scala",
+        )
 
 
 # Trimmed `objdump -d --no-show-raw-insn` output in the layout a real Zephyr
