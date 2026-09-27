@@ -23,7 +23,12 @@
 #ifndef RISKYBIRD_CAMERA_H_
 #define RISKYBIRD_CAMERA_H_
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* What the capture observed. Populated as far as the sequence got, so a failed
  * capture still says how far it got and what the core saw. */
@@ -60,6 +65,17 @@ struct rb_camera_capture {
 	 * different faults and the second is survivable.
 	 */
 	int program_ok;
+	/*
+	 * What the pixel-clock check saw, so a "pclk" failure says which of
+	 * "the sensor never left standby" (mode_select != 0x01) and "it streams
+	 * but nothing reaches the core" (mode_select == 0x01, counts flat) it is.
+	 * mode_select is MODE_SELECT read back after the streaming write, 0xff if
+	 * the read failed or was not reached; the counts are the core's FVLDCNT /
+	 * LVLDCNT at the last PCLK check.
+	 */
+	uint8_t mode_select;
+	uint32_t fvld_count;
+	uint32_t lvld_count;
 };
 
 #define RB_CAMERA_PROGRAM_OFF      1    /* not built in */
@@ -84,5 +100,57 @@ uint32_t rb_camera_capacity(void);
 int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 			    struct rb_camera_capture *out,
 			    const char **stage, const char **detail);
+
+/*
+ * The same sequence, split at its seams, for a caller that cannot sit in
+ * rb_camera_capture_frame() for ~6.3 s -- the flight controller taking one
+ * picture mid-hover. rb_camera_capture_frame() is exactly
+ * prepare -> arm -> poll done -> finish, so the two paths cannot drift.
+ *
+ *   rb_camera_prepare  MCLK, SCCB setup, streaming, AE settle (blocks ~6.3 s,
+ *                      uses I2C). Leaves the sensor streaming and the core
+ *                      enabled but NOT armed: it keeps draining, so nothing
+ *                      overflows while the caller waits. Call before the
+ *                      control loop starts.
+ *   rb_camera_arm      four register writes; no I2C, no printk, no sleep.
+ *                      Safe inside a control loop.
+ *   rb_camera_done     non-blocking; true once `want` pixels are held.
+ *   rb_camera_frames   frames seen so far (FVLDCNT), to arm just after one
+ *                      increments. Optional.
+ *   rb_camera_finish   sensor standby over I2C, then drain `want` pixels into
+ *                      dst (~79k register reads). NOT for a control loop: call
+ *                      it after landing.
+ * Once armed and complete, the core holds the frame and discards everything
+ * after it, so the sensor may keep streaming until finish(); the OVERFLOW flag
+ * that sets is surplus data, not lost data.
+ */
+int rb_camera_prepare(uint32_t want, struct rb_camera_capture *out,
+		      const char **stage, const char **detail);
+void rb_camera_arm(uint32_t want);
+bool rb_camera_done(uint32_t want);
+uint32_t rb_camera_frames(void);
+int rb_camera_finish(uint8_t *dst, uint32_t want, struct rb_camera_capture *out,
+		     const char **stage, const char **detail);
+
+/*
+ * Recovery, for a caller that retries prepare (the flight controller). Neither
+ * is called by rb_camera_capture_frame(), so the proven single-shot path is
+ * unchanged.
+ *
+ *   rb_camera_sensor_reset  MCLK on, MODE_SELECT=standby, SW_RESET, then waits
+ *                           for the model id to answer again. Puts the sensor
+ *                           back in its power-up state whatever a previous
+ *                           image left it in: nothing on this board power-cycles
+ *                           it between loads, and a failed prepare leaves it
+ *                           streaming. 0, or negative if it did not come back.
+ *   rb_camera_standby       MODE_SELECT=standby, best effort. For a prepare
+ *                           that is giving up, so the next image starts clean.
+ */
+int rb_camera_sensor_reset(void);
+void rb_camera_standby(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* RISKYBIRD_CAMERA_H_ */

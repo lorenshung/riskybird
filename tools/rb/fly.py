@@ -10,6 +10,7 @@ checked by eye: the boot banner, the ESP link, the frame rate, the commit.
     rb fly status                               ESP link: frames/s, gap, kill, flags (resets the ESP!)
     rb fly stop                                 halt the core -> the ESP cuts all motors in 120 ms
     rb fly where                                halt, backtrace, resume
+    rb fly photo                                halt, read the camera photo out over JTAG -> PNG
     rb fly program [--flash]                    FullDDR shell into SRAM (or flash, then SRAM)
     rb fly imu                                  guided IMU sign test (motor-incapable image)
     rb fly motors --duty 20 --ms 1500           spin each motor alone (motor identification)
@@ -46,6 +47,7 @@ FLIGHT_GDB = ROOT / "hardware" / "flight"
 FREERUN = FLIGHT_GDB / "freerun.gdb"
 STOP = FLIGHT_GDB / "stop.gdb"
 HALT = FLIGHT_GDB / "halt.gdb"
+PHOTO = FLIGHT_GDB / "photo.gdb"
 DEFAULT_TARGET = "arty200t"
 DEFAULT_CONFIG = "RocketArty200TDroneFullDDRConfig"
 RESULTS = ROOT / "results" / "fly"
@@ -485,7 +487,7 @@ def load_and_check(args, *, commit: bool) -> int:
         time.sleep(3.0)
         fpga_mark, esp_mark = taps["fpga"].mark(), taps["esp"].mark()
         rb_debug(args, bench, args.mode, FREERUN)
-        _remember_mode(args.mode)
+        _remember_mode(args.mode, elf_sha=loaded)
         if _sha(elf) != loaded:
             raise FlyError("the ELF was rebuilt during the load; rerun")
         banner = taps["fpga"].wait_for(BANNER_COMMIT_CAPABLE, 15, fpga_mark) or \
@@ -542,17 +544,31 @@ def status(args) -> int:
 LAST_MODE = RESULTS / "last-mode"
 
 
-def _remember_mode(mode: str, workload: str = "flight_controller") -> None:
+def _remember_mode(mode: str, workload: str = "flight_controller", elf_sha: str = "") -> None:
+    """What `rb fly load/commit` put on the board, and (when known) the hash of the ELF it
+    loaded -- so a later step that reads symbols can tell whether the ELF it has is that one."""
     RESULTS.mkdir(parents=True, exist_ok=True)
-    LAST_MODE.write_text(f"{workload} {mode}\n")
+    LAST_MODE.write_text(f"{workload} {mode}" + (f" {elf_sha}" if elf_sha else "") + "\n")
+
+
+def _last_mode_fields() -> list[str]:
+    try:
+        fields = LAST_MODE.read_text().split()
+    except OSError:
+        return []
+    return fields if len(fields) in (2, 3) else []
 
 
 def _last_mode() -> tuple[str, str]:
-    try:
-        workload, mode = LAST_MODE.read_text().split()
-        return workload, mode
-    except (OSError, ValueError):
+    fields = _last_mode_fields()
+    if not fields:
         return "flight_controller", ""
+    return fields[0], fields[1]
+
+
+def _last_elf_sha() -> str:
+    fields = _last_mode_fields()
+    return fields[2] if len(fields) == 3 else ""
 
 
 def gdb_step(args, script: Path) -> int:
@@ -570,6 +586,89 @@ def gdb_step(args, script: Path) -> int:
         script = HALT
     rb_debug(args, bench, mode, script, workload=workload, no_load=True)
     return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# Camera photo at the top of a flight (hardware/flight/photo.gdb)
+# ---------------------------------------------------------------------------------------------
+
+_PHOTO_RE = re.compile(r"PHOTO-GDB state=(-?\d+) count=(\d+) width=(\d+) height=(\d+)")
+PHOTO_STATES = {
+    0: "off / not built", 1: "preparing", 2: "ready (sensor streaming, not armed)", 3: "armed",
+    4: "captured in the core, not drained", 5: "drained OK",
+    -1: "prepare failed", -2: "capture incomplete / timeout", -3: "drain failed",
+}
+
+
+def is_photo_mode(workload: str, mode: str) -> bool:
+    """A build that has the rose_photo_* symbols photo.gdb reads (ROSE_CAMERA=1)."""
+    from . import boards
+
+    wl = boards.WORKLOADS.get(workload)
+    return wl is not None and mode in wl.modes and dict(wl.defines_for(mode)).get("ROSE_CAMERA") == "1"
+
+
+def parse_photo_log(text: str) -> dict | None:
+    m = _PHOTO_RE.search(text)
+    if m is None:
+        return None
+    state, count, width, height = (int(v) for v in m.groups())
+    return {"state": state, "count": count, "width": width, "height": height,
+            "meaning": PHOTO_STATES.get(state, "unknown")}
+
+
+def _gdb_quote(path: Path) -> str:
+    return str(path).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def photo(args) -> int:
+    """Halt the running photo image and read its frame out over JTAG, like `where`: the mode
+    is the last one `rb fly load/commit` put on the board, and nothing is reloaded. The core
+    is LEFT HALTED (the ESP cuts the motors by failsafe) -- run this after landing."""
+    from . import artifacts, boards, cli
+
+    bench = discover(args)
+    _require(bench, debug=True)
+    workload, remembered = _last_mode()
+    mode = args.mode or remembered
+    if not mode:
+        raise FlyError("which image is running? pass --mode (no rb fly load/commit recorded one)")
+    if not is_photo_mode(workload, mode):
+        raise FlyError(f"{workload} --mode {mode} is not a photo build (no -DROSE_CAMERA=1), so it has no "
+                       "rose_photo_* symbols to read. Load t21-hover-1.0m-photo or photo-bench first, "
+                       "or pass --mode if that is what is running.")
+    session = _session_dir()
+    wrapper = session / "photo-session.gdb"
+    wrapper.write_text(f'set $photo_outdir = "{_gdb_quote(session)}"\nsource {PHOTO}\n')
+    print(f"rb fly photo: {workload} --mode {mode}; halting the core (it stays halted) -> {session}")
+    rb_debug(args, bench, mode, wrapper, workload=workload, no_load=True)
+
+    # `rb debug` rebuilds before it attaches. If the sources moved since the load, GDB read the
+    # symbols of a different image than the one running, and the addresses may not match.
+    elf_dir = artifacts.zephyr_build_dir(cli.get_target(args.target), boards.WORKLOADS[workload], mode)
+    elf = elf_dir / "zephyr" / "zephyr.elf"
+    loaded_sha = _last_elf_sha() if mode == remembered else ""
+    if loaded_sha and elf.is_file() and _sha(elf) != loaded_sha:
+        print(f"rb fly photo: WARNING: the ELF was rebuilt since rb fly load ({loaded_sha} -> {_sha(elf)}); "
+              "GDB used the new image's symbol addresses, so these values and pixels may be garbage.",
+              file=sys.stderr)
+    record = elf_dir / "rb-build.txt"
+    if record.is_file():
+        (session / "rb-build.txt").write_text(record.read_text())
+
+    log = session / "photo-gdb.log"
+    result = parse_photo_log(log.read_text()) if log.is_file() else None
+    if result is None:
+        raise FlyError(f"photo.gdb did not report a state (see the GDB output above; logs {session})")
+    print(f"rb fly photo: state {result['state']} ({result['meaning']}), {result['count']} pixels, "
+          f"{result['width']} x {result['height']}")
+    pngs = [p for p in (session / "photo.png", session / "photo-colour.png") if p.is_file()]
+    for png in pngs:
+        print(f"rb fly photo: {png}")
+    if result["state"] == 5 and not pngs:
+        print(f"rb fly photo: raw frame {session / 'photo.raw'} but no PNG (see the converter output above)")
+    print(f"rb fly photo: session {session}. The core is HALTED; reload (rb fly load/commit) to run again.")
+    return 0 if pngs else 2
 
 
 # ---------------------------------------------------------------------------------------------

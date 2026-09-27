@@ -203,7 +203,8 @@ static int cam_reg_write(uint16_t reg, uint8_t val)
 #define CAM_ADS7128_GPO_VALUE 0x0BU
 #define CAM_STATUS_LED_CH     7U
 
-static int cam_status_led_on(void)
+/* unused when RB_CAMERA_STATUS_LED=0 (the flight photo modes: D8 is the flight LED) */
+__attribute__((unused)) static int cam_status_led_on(void)
 {
 	uint8_t tx[3];
 	int rc;
@@ -388,13 +389,10 @@ static void cam_dump_exposure(void)
 	}
 }
 
-int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
-			    struct rb_camera_capture *out,
-			    const char **stage, const char **detail)
+int rb_camera_prepare(uint32_t want, struct rb_camera_capture *out,
+		      const char **stage, const char **detail)
 {
 	uint8_t id_h, id_l;
-	uint32_t captured, n = 0, word;
-	int64_t deadline;
 
 	*stage = "none";
 	*detail = "";
@@ -409,6 +407,10 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 	out->x_odd_inc = out->y_odd_inc = 0xffU;
 	out->binning_mode = out->qvga_win_en = 0xffU;
 	out->program_ok = RB_CAMERA_PROGRAM_OFF;
+	/* A caller that retries reuses `out`: never report the last try's clock. */
+	out->mode_select = 0xffU;
+	out->pclk_before = out->pclk_after = 0U;
+	out->fvld_count = out->lvld_count = 0U;
 
 	if (sys_read32(CAM_CAPACITY) < want + 1U) {
 		return stop(stage, detail, "capacity",
@@ -697,6 +699,40 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 		return stop(stage, detail, "stream",
 			    "MODE_SELECT write was not acknowledged");
 	}
+	/* An ACK is not a latch: read it back, so a later "pclk" failure can tell
+	 * "never left standby" from "streams, but no clock reaches the core". */
+	if (cam_reg_read(HM01B0_REG_MODE_SELECT, &out->mode_select) != 0) {
+		out->mode_select = 0xffU;
+	}
+	printk("         MODE_SELECT <- 0x%02x, reads 0x%02x%s\n",
+	       (unsigned)HM01B0_MODE_STREAMING, out->mode_select,
+	       out->mode_select == HM01B0_MODE_STREAMING ? "" : "  <- DID NOT STICK");
+
+	/*
+	 * OPTIONAL EARLY CLOCK CHECK, off by default (the flight controller turns
+	 * it on). camera_photo proves PCLK is running 100 ms after MODE_SELECT, so
+	 * a sensor that shows none by then will not show any after the settle
+	 * either -- and failing here costs ~150 ms instead of the whole 6 s settle,
+	 * which is what makes a reset-and-retry affordable at boot.
+	 */
+#ifndef RB_CAMERA_EARLY_PCLK_MS
+#define RB_CAMERA_EARLY_PCLK_MS 0
+#endif
+#if RB_CAMERA_EARLY_PCLK_MS > 0
+	k_msleep(RB_CAMERA_EARLY_PCLK_MS);
+	out->pclk_before = sys_read32(CAM_PCLKCNT);
+	k_msleep(50);
+	out->pclk_after = sys_read32(CAM_PCLKCNT);
+	out->fvld_count = sys_read32(CAM_FVLDCNT);
+	out->lvld_count = sys_read32(CAM_LVLDCNT);
+	printk("         early PCLK %u -> %u over 50 ms, FVLD %u LVLD %u (%d ms after streaming)\n",
+	       (unsigned)out->pclk_before, (unsigned)out->pclk_after,
+	       (unsigned)out->fvld_count, (unsigned)out->lvld_count, RB_CAMERA_EARLY_PCLK_MS);
+	if (out->pclk_after == out->pclk_before) {
+		return stop(stage, detail, "pclk",
+			    "no pixel clock 100 ms after MODE_SELECT=streaming (early check)");
+	}
+#endif
 	/*
 	 * AE settle. 100 ms was enough when the target was never changed --
 	 * the sensor simply streamed at whatever it powered up with. Having
@@ -723,27 +759,98 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 	out->pclk_before = sys_read32(CAM_PCLKCNT);
 	k_msleep(50);
 	out->pclk_after = sys_read32(CAM_PCLKCNT);
+	out->fvld_count = sys_read32(CAM_FVLDCNT);
+	out->lvld_count = sys_read32(CAM_LVLDCNT);
+	printk("         PCLK %u -> %u over 50 ms, FVLD %u LVLD %u (after the AE settle)\n",
+	       (unsigned)out->pclk_before, (unsigned)out->pclk_after,
+	       (unsigned)out->fvld_count, (unsigned)out->lvld_count);
 	if (out->pclk_after == out->pclk_before) {
 		return stop(stage, detail, "pclk",
 			    "no pixel clock after MODE_SELECT=streaming");
 	}
-	if (sys_read32(CAM_FVLDCNT) == 0U || sys_read32(CAM_LVLDCNT) == 0U) {
+	if (out->fvld_count == 0U || out->lvld_count == 0U) {
 		return stop(stage, detail, "sync",
 			    "sensor is clocked but FVLD/LVLD never asserted");
 	}
 
-	/* Arm on a frame boundary so the capture is one picture, not a slice of two. */
+	/* Streaming, clocked and in sync: the next thing is to arm, and a caller that
+	 * cannot block (the flight controller) arms later, from its own loop. */
+	return 0;
+}
+
+/*
+ * Back to the power-up state, whatever a previous image left behind. Nothing on
+ * this board power-cycles the sensor between loads (USB keeps it up with the pack
+ * out), a failed prepare returns with the sensor still streaming, and `rb fly load`
+ * reprograms the FPGA -- stopping MCLK -- underneath a sensor in that state. The
+ * proven single-shot paths (camera_photo, bootup_check) only ever start from a
+ * sensor a previous run put back in standby.
+ *
+ * SW_RESET 0x0103 is the first write of Himax's reference init; the value is
+ * ignored. The part may NAK the write it resets on, so that is not an error; the
+ * model id answering again is the test.
+ */
+#ifndef RB_CAMERA_RESET_WAIT_MS
+#define RB_CAMERA_RESET_WAIT_MS 20
+#endif
+int rb_camera_sensor_reset(void)
+{
+	uint8_t id_h = 0, id_l = 0;
+
+	sys_write32(CAM_MCLK_DIV, CAM_MCLKDIV);
+	sys_write32(CTRL_ENABLE, CAM_CTRL);
+	k_msleep(10);
+	i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
+	if (!device_is_ready(i2c_dev)) {
+		return -1;
+	}
+	(void)cam_reg_write(HM01B0_REG_MODE_SELECT, HM01B0_MODE_STANDBY);
+	(void)cam_reg_write(HM01B0_REG_SW_RESET, HM01B0_SW_RESET_VALUE);
+	for (int i = 0; i < 10; i++) {
+		k_msleep(RB_CAMERA_RESET_WAIT_MS);
+		if (cam_reg_read(HM01B0_REG_MODEL_ID_H, &id_h) == 0 &&
+		    cam_reg_read(HM01B0_REG_MODEL_ID_L, &id_l) == 0 &&
+		    (uint16_t)((id_h << 8) | id_l) == HM01B0_MODEL_ID) {
+			return 0;
+		}
+	}
+	return -2;
+}
+
+void rb_camera_standby(void)
+{
+	if (i2c_dev != NULL) {
+		(void)cam_reg_write(HM01B0_REG_MODE_SELECT, HM01B0_MODE_STANDBY);
+	}
+}
+
+void rb_camera_arm(uint32_t want)
+{
+	/* Four register writes, no I2C, no printk, no sleep -- safe inside a control loop.
+	 * Arming mid-frame is fine: the capture starts at the next boundary the core sees
+	 * and the PNG tools re-align on the line markers. */
 	sys_write32(CTRL_ENABLE | CTRL_CLEAR, CAM_CTRL);
 	sys_write32(CTRL_ENABLE | CTRL_FLUSH, CAM_CTRL);
 	sys_write32(want, CAM_PIXTARGET);
 	sys_write32(CTRL_ENABLE | CTRL_ARM, CAM_CTRL);
+}
 
-	deadline = k_uptime_get() + CAPTURE_TIMEOUT_MS;
-	do {
-		captured = sys_read32(CAM_CAPCOUNT);
-	} while (captured < want &&
-		 (sys_read32(CAM_CAPSTAT) & CAPSTAT_DONE) == 0U &&
-		 k_uptime_get() < deadline);
+bool rb_camera_done(uint32_t want)
+{
+	return sys_read32(CAM_CAPCOUNT) >= want ||
+	       (sys_read32(CAM_CAPSTAT) & CAPSTAT_DONE) != 0U;
+}
+
+uint32_t rb_camera_frames(void)
+{
+	return sys_read32(CAM_FVLDCNT);
+}
+
+int rb_camera_finish(uint8_t *dst, uint32_t want, struct rb_camera_capture *out,
+		     const char **stage, const char **detail)
+{
+	uint32_t captured, n = 0, word;
+
 	/*
 	 * Read the count again now that the loop has stopped. The core sets
 	 * CAPCOUNT to the target and CAPSTAT.DONE in the same cycle
@@ -807,4 +914,20 @@ int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
 			    "every pixel identical: the data bus is stuck");
 	}
 	return 0;
+}
+
+int rb_camera_capture_frame(uint8_t *dst, uint32_t want,
+			    struct rb_camera_capture *out,
+			    const char **stage, const char **detail)
+{
+	int64_t deadline;
+
+	if (rb_camera_prepare(want, out, stage, detail) != 0) {
+		return -1;
+	}
+	rb_camera_arm(want);
+	deadline = k_uptime_get() + CAPTURE_TIMEOUT_MS;
+	while (!rb_camera_done(want) && k_uptime_get() < deadline) {
+	}
+	return rb_camera_finish(dst, want, out, stage, detail);
 }

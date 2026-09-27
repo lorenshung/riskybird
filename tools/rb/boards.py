@@ -1324,6 +1324,70 @@ def flight_presets() -> dict[str, tuple[tuple[tuple[str, str], ...], tuple[tuple
     return {path.stem: _parse_preset(path) for path in sorted(FLIGHT_PRESETS_DIR.glob("*.env"))}
 
 
+# ---- camera photo at the top of a flight ----------------------------------------------------
+#
+# A preset plus the camera, as a mode of its own, so the photo build is asked for by name and
+# its knobs are recorded in rb-build.txt like every other flight's. Built on a flown preset
+# through mode_bases rather than as a copied .env: the flight knobs stay exactly t21's, and a
+# change to t21-hover-1.0m.env reaches the photo build instead of silently forking from it.
+# The firmware side is integration/zephyr/camera (ROSE_CAMERA; the sample's CMakeLists points
+# ROSE_CAMERA_DIR there by default). `rb fly photo` reads the frame back over JTAG after landing
+# (hardware/flight/photo.gdb).
+PHOTO_CPPFLAGS = (
+    ("RB_CAMERA_STATUS_LED", "0"),     # the LED pin belongs to the flight image
+    ("RB_CAMERA_FRAME_LEN", "1000"),
+    ("RB_CAMERA_MAX_INTG", "900"),
+)
+# How long after boot a bench image captures on its own while disarmed (then drains at once).
+PHOTO_BENCH_AFTER_MS = 15000
+# (mode, base mode, CMake -D, preprocessor -D, note). The note is what rb-build.txt records on
+# its `flew:` line, so it says plainly that these have NOT flown.
+PHOTO_MODES = (
+    (
+        "t21-hover-1.0m-photo", "t21-hover-1.0m",
+        (("ROSE_CAMERA", "1"),),
+        PHOTO_CPPFLAGS,
+        "NOT FLOWN as a photo build -- t21-hover-1.0m (which flew T20 T21 T22) plus one camera "
+        "frame captured mid-hover and read back after landing (rb fly photo); "
+        "the photo variant itself has never flown",
+    ),
+    (
+        "t33-hover-1.5m-photo", "t33-hover-1.5m",
+        (("ROSE_CAMERA", "1"),),
+        PHOTO_CPPFLAGS,
+        "NOT FLOWN as a photo build -- t33-hover-1.5m (T21's control at 1.5 m; T122 flew the full "
+        "profile to 1.53 m and landed itself) plus one camera frame captured mid-hover and read "
+        "back after landing (rb fly photo); the photo variant itself has never flown",
+    ),
+    (
+        "photo-bench", "t21-hover-1.0m-photo",
+        (),
+        (("ROSE_PHOTO_BENCH_AFTER_MS", str(PHOTO_BENCH_AFTER_MS)),),
+        "NOT A FLIGHT BUILD -- bench test of prepare->arm->drain->dump, pack OUT: "
+        f"t21-hover-1.0m-photo that captures {PHOTO_BENCH_AFTER_MS // 1000} s after boot while "
+        "disarmed and drains at once; then rb fly photo",
+    ),
+)
+
+
+def _with_photo_modes(workload: Workload) -> Workload:
+    known = set(workload.modes) | {m for m, *_ in PHOTO_MODES}
+    if any(base not in known for _m, base, *_ in PHOTO_MODES):
+        # A photo mode on a preset that is gone would build as esp-motors plus the camera --
+        # a flight image with none of the flown values. Leave them out rather than that.
+        return workload
+    return replace(
+        workload,
+        modes=tuple(workload.modes) + tuple(m for m, *_ in PHOTO_MODES),
+        cmake_defines_by_mode=tuple(workload.cmake_defines_by_mode)
+        + tuple((m, cmake) for m, _b, cmake, _c, _n in PHOTO_MODES if cmake),
+        cppflags_by_mode=tuple(workload.cppflags_by_mode)
+        + tuple((m, cpp) for m, _b, _cm, cpp, _n in PHOTO_MODES),
+        mode_bases=tuple(workload.mode_bases) + tuple((m, b) for m, b, *_ in PHOTO_MODES),
+        mode_notes=tuple(workload.mode_notes) + tuple((m, n) for m, _b, _cm, _c, n in PHOTO_MODES),
+    )
+
+
 def _with_flight_presets(workload: Workload) -> Workload:
     presets = flight_presets()
     imu = (
@@ -1354,7 +1418,7 @@ def _with_flight_presets(workload: Workload) -> Workload:
     )
 
 
-WORKLOADS["flight_controller"] = _with_flight_presets(WORKLOADS["flight_controller"])
+WORKLOADS["flight_controller"] = _with_photo_modes(_with_flight_presets(WORKLOADS["flight_controller"]))
 
 
 def get_board(name: str) -> Board:

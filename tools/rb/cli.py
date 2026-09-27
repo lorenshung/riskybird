@@ -3005,7 +3005,7 @@ def cmd_flightlog(args: argparse.Namespace) -> int:
 
 
 def cmd_fly(args: argparse.Namespace) -> int:
-    """The flight bench: program, load, commit, status, stop (see tools/rb/fly.py)."""
+    """The flight bench: program, load, commit, status, stop, photo (see tools/rb/fly.py)."""
     try:
         action = args.fly_action
         if action in ("load", "commit"):
@@ -3020,6 +3020,8 @@ def cmd_fly(args: argparse.Namespace) -> int:
             return fly.gdb_step(args, fly.FLIGHT_GDB / "stop.gdb")
         if action == "where":
             return fly.gdb_step(args, fly.FLIGHT_GDB / "where.gdb")
+        if action == "photo":
+            return fly.photo(args)
         if action == "imu":
             return fly.imu(args)
         if action == "motors":
@@ -4152,6 +4154,9 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--yes", action="store_true", help="skip the 'nothing is flying?' prompt")
     _fly_common(fly_sub.add_parser("stop", help="halt the core; the ESP cuts all motors within 120 ms"))
     _fly_common(fly_sub.add_parser("where", help="halt, backtrace, resume"))
+    _fly_common(fly_sub.add_parser(
+        "photo", help="halt the photo image and read its camera frame out over JTAG -> PNG "
+        "(the core is LEFT HALTED; run after landing)"))
     im = _fly_common(fly_sub.add_parser("imu", help="guided IMU sign test on a motor-incapable image"),
                      mode_required=None, program=True)
     mo = _fly_common(fly_sub.add_parser("motors", help="spin each motor alone (motor identification)"),
