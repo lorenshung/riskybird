@@ -1,11 +1,11 @@
 # Repository layout and flow boundaries
 
-What is on the `setup` branch, directory by directory, read from `git ls-tree`
-on 2026-09-25. For what lives only on `main`, see
+This branch retains the curated `setup` layout at `8478502`, with the backend
+selections recorded in [integration.md](integration.md). For branch policy, see
 [`merging-into-main.md`](merging-into-main.md).
 
 ```text
-riskybird-dev/  (setup)
+riskybird-dev/  (integration, based on setup)
 ├── rb, rb-env.sh              the entry point; rb-env.sh puts it on PATH for scripts and CI
 ├── tools/
 │   ├── rb/                    every rb flow: build, program, debug, fly, ground, flightlog, ...
@@ -32,7 +32,7 @@ riskybird-dev/  (setup)
 │   ├── pwm/                   FPGA PWM simulation and bench scripts (the legacy motor path)
 │   ├── padtest/               bare-metal Verilog motor-pad test and the F13 input probe
 │   ├── spioverjtag/           KU040 flash bridge and openFPGALoader setup
-│   └── pcb/                   submodule: the board's KiCad files (riskybirdv3-layout branch)
+│   └── pcb/                   submodule: ucb-bar/riskybird, PCB-only riskybirdv3 branch
 ├── artifacts/modelblaster/    committed DroNet kernels for the accelerator shells
 ├── tests/                     unittest suite for the tooling; see setup.md, "Checking the tooling itself"
 ├── docs/                      these pages; docs/history/ holds handoffs and one-off records

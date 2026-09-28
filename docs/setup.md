@@ -36,7 +36,7 @@ verification at the end of each step exercises.
 | `dse`, `area` | design-space exploration and FPGA resource characterisation |
 
 Their backends and data -- `backends/RoSE`, `backends/XPU-RT`, `dse/`, `experiments/` -- live
-on the `main` branch and are not carried here, so on `setup` they cannot run (`rb area` only in
+on the `main` branch and are not carried here, so on this branch they cannot run (`rb area` only in
 part). On `main` they are in progress: their setup is not documented, and their interfaces are
 expected to change. Note that step 2b
 *does* pull several gigabytes of their dependencies -- `gymnasium`, `torch`, CUDA runtime
@@ -66,13 +66,14 @@ library.
 ### Get it
 
 ```console
-git clone --branch setup git@github.com:lorenshung/riskybird-dev.git
+git clone --branch integration git@github.com:lorenshung/riskybird-dev.git
 cd riskybird-dev
 ```
 
-`--branch setup` matters: `main` carries an older, shorter version of this same
-file, so cloning without it gives you a different page from the one you are
-reading.
+`--branch integration` selects the setup-derived integration candidate described
+here. The original `setup` branch retains the recorded bench/flight baseline;
+its quoted hardware results do not automatically qualify the new backend pins.
+See [the integration record](integration.md) for the exact changes and checks.
 
 > **These are private repositories.** This one, and the two side repositories in
 > steps 2d and 3c, are cloned over SSH and are not publicly readable. You need a

@@ -6,6 +6,11 @@ camera and motors, and one command — `rb` — that builds and runs all of it.
 
 ## Start here
 
+This `integration` branch is based on the curated `setup` history. Its merged
+backend pins are integration candidates: the flight and bench results below
+describe the original setup versions until repeated with these pins. See the
+[integration record](docs/integration.md) for the baseline, changes and checks.
+
 **To fly the drone: [`docs/tutorial-flight.md`](docs/tutorial-flight.md).** One
 machine, no Chipyard or Vivado: `rb fly` programs the shell, builds and loads a
 flight preset, checks the ESP motor link and prints `READY`.
@@ -65,8 +70,8 @@ side needs the other's toolchain.
 | [`dronet-on-accel-socs.md`](docs/dronet-on-accel-socs.md) | DroNet on those shells from committed sources: 14.57 fps on IntAt35, the recipe that regenerates it, and the Q31 spike model its gate needs |
 | [`modelblaster-dronet-on-fpga.md`](docs/modelblaster-dronet-on-fpga.md) | the earlier single-shell DroNet write-up: the Gemmini/Saturn configs, the per-op timeline, and the two clock/FPU traps |
 | [`upstream-pr/`](docs/upstream-pr/README.md) | the patch series proposed to `ucb-bar/zephyr-chipyard-sw` |
-| [`repository-layout.md`](docs/repository-layout.md) | orientation, and what is on `setup` versus `main` |
-| [`merging-into-main.md`](docs/merging-into-main.md) | how this branch relates to `main` |
+| [`repository-layout.md`](docs/repository-layout.md) | orientation and the curated integration scope |
+| [`merging-into-main.md`](docs/merging-into-main.md) | integration policy and branch histories |
 | [`history/`](docs/history/) | handoffs, plans and one-off records, kept for provenance; each opens with what it got wrong |
 
 Docs distinguish **verified** (run here, output quoted) from **recorded**,

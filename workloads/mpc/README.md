@@ -24,7 +24,8 @@ output.
 RoSE mode replaces the UART framing with request `0x12` for the target-relative
 12-state vector and action `0x20` for the four controls. The top-level HIL
 command supervises Spike and PyBullet and writes a trace, summary, logs, and an
-SVG plot. See [the RoSE MPC flow](../../docs/rose-mpc-flow.md).
+SVG plot. That research path requires backends omitted from this curated branch;
+see [the experimental RoSE MPC flow on main](https://github.com/lorenshung/riskybird-dev/blob/main/docs/rose-mpc-flow.md).
 
 `rb` links against each target's actual RAM and uses a three-step horizon on
 KU040 against Arty100T's ten-step — a holdover from the 32 KiB scratchpad era

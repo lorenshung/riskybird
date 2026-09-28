@@ -1,4 +1,12 @@
-# Upstream patch series — ready to apply, nothing executed
+# Historical upstream patch proposal
+
+This proposal predates the merged backend selected by `integration`. Its source
+commits are already in that backend's history; do not reapply or squash this
+series onto it. The patches and original proposal below are retained as a
+historical record. Current pins and validation are in
+[the integration record](../integration.md).
+
+## Original proposal
 
 Seven patches generated with `git format-patch` from commits that **already
 exist** on our `dev`. No branch was created, no commit made, nothing pushed, no

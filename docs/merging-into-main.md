@@ -1,54 +1,38 @@
-# How `setup` relates to `main`
+# Integration policy and branch histories
 
-`setup` is a **separate, curated history**, not a branch of `main`: it was
-rebuilt from scratch, one verified piece at a time, starting at `6c6887f`
-("setup: rb, the entry point"). The two share **no common ancestor**
-(`git merge-base main setup` finds nothing), so `git log main..setup` and a
-plain `git merge` do not mean anything here. Compare them path by path:
+`integration` starts from the curated `setup` commit `8478502`. The earlier
+integration branch incorrectly started from `main`; that version is retained
+as `archive/integration-main-base` at `ca253e3` for reference. Neither `main`
+nor `setup` is changed by this correction.
 
-```console
-git diff main setup -- <path>
-git log --oneline setup -- <path>        # and the same on main
-```
+The parent repository's setup and main histories are unrelated. Do not merge
+main wholesale to obtain a feature: it brings research backends, experiments,
+workloads and documentation outside setup's supported scope. Compare a proposed
+change against setup, retain its provenance and validate the affected workflow.
+The original backend merge histories remain intact in their own repositories.
 
-## What is where, by directory (2026-09-25)
+## Admission of changes
 
-| Only on `setup` | |
-| --- | --- |
-| `rb-env.sh` | the shell setup `rb` scripts use |
-| `tools/flight/`, `tools/modelblaster/`, `tools/flow-cal.py` | flight presets and `rb fly`'s predecessors; DroNet prep; flow calibration |
-| `workloads/esp_bridge`, `esp_motors`, `motor_safe`, `motor_duty` | the ESP images (Wi-Fi bridge and motor gates) and the motor commander |
-| `hardware/padtest/`, `hardware/modelblaster/` | the bare-metal motor-pad test; DroNet GDB scripts |
-| `backends/modelblaster`, `artifacts/modelblaster/` | the models tier and its committed kernels |
-| most of `docs/` | the flight tutorial, ESP offload, telemetry, remote bench, camera colour, accelerator shells, `docs/history/` |
+- Start from the existing supported workflow and compare its checks before and
+  after a change. Add only the pieces needed for that change.
+- Record exactly what ran. Unit tests, firmware builds and RTL generation are
+  distinct from an end-to-end board test or flight.
+- A new backend pin does not inherit an older pin's flight qualification. Record
+  the firmware, model, hardware configuration and bitstream used when repeating
+  that workflow before describing the new combination as verified.
+- Keep research workflows and unverified extensions outside the supported
+  surface until their dependencies and end-to-end evidence are available.
 
-| Only on `main` | |
-| --- | --- |
-| `backends/RoSE`, `backends/XPU-RT` | the co-simulation and scheduling backends behind `rb rose`, `hil`, `xpurt`, `schedule` |
-| `dse/`, `experiments/`, `benchmarks/`, `demos.md` | design-space exploration, area studies and the research record behind `rb dse` and most of `rb area` |
-| `hardware/diag/`, `tools/collect-elfs.py` | older diagnostics and ELF publishing |
-| docs on RoSE, XPU-RT, FireSim, the KU040 and FPGA optimisation | |
+The current approved pin changes and remaining validation are listed in
+[integration.md](integration.md). Removing the duplicate top-level ModelBlaster
+checkout will be a separate caller-path change with its own checks.
 
-Both carry `rb`, `tools/rb/`, `tools/bench/`, `workloads/`, `integration/`,
-`hardware/{zephyr,openocd,ospi,pwm,flight,bench,spioverjtag,pcb}`, `tests/` and
-`backends/{chipyard,zephyr-chipyard-sw}`, but with different contents in about
-fifty shared files -- most of `tools/rb/`, several overlays, the shared docs --
-and different submodule pins.
+## Preserved scope
 
-## Folding it back
+This branch retains setup's entry point, flight presets, workloads, overlays,
+committed model artifacts, bench tools and historical evidence. Experimental
+CLI entries already present in setup remain labeled experimental; their omitted
+RoSE/XPU-RT backends and research datasets are not added here.
 
-Not a branch swap: replacing `main` with `setup` would drop the research
-surface above. The workable route is a port onto `main`:
-
-1. Add the setup-only directories.
-2. For each shared path, read `git diff main setup -- <path>` and take
-   `setup`'s version where `main` has not moved, or merge by hand where it has.
-   `tools/rb/` is the part that needs care: `setup`'s `rb` has flows `main`
-   lacks (`fly`, `ground`, `flightlog`, ESP modes, presets) and `main`'s has
-   research flows `setup` does not carry.
-3. Reconcile the submodule pins. `setup`'s Chipyard pin is on the
-   `arty200t-dual-uart` branch of the fork, and its zephyr-chipyard-sw pin
-   carries the flight firmware that flew.
-4. Run the suite on the result (`python3 -m unittest discover -s tests`); on
-   `main` the RoSE, XPU-RT and area tests have their data and should run rather
-   than skip.
+The old directory-by-directory porting proposal in this file is superseded.
+Its original contents remain available in the `setup` history.
