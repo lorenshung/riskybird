@@ -84,6 +84,10 @@ Earlier backend-specific checks remain scoped to their recorded inputs:
 
 ## Next qualified changes
 
+- See [additional software pin validation](software-pin-validation.md) for the
+  fresh-generation header/simulator mismatch, missing FC+DroNet include path,
+  expanded host suite and numerical execution checks. These findings were
+  recorded without changing the selected backend pins.
 - Repeat setup's relevant end-to-end board/flight checks with exact selected
   firmware and matching bitstream/model pins before promoting their claims to
   verified on this branch.
