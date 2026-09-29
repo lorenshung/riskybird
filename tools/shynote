@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Repository-local ShyNote install; keep dependencies out of the FPGA runtimes.
+set -euo pipefail
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+runtime="$repo_root/.rb/shynote"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$repo_root/.rb/uv-cache}"
+
+if [[ "${1:-}" == "--install" ]]; then
+    if ! command -v uv >/dev/null 2>&1; then
+        echo 'Install uv and Python 3.11+ first; see .github/README.md.' >&2
+        exit 1
+    fi
+    if [[ ! -x "$runtime/bin/python" ]]; then
+        uv venv --python '>=3.11' "$runtime"
+    fi
+    uv pip install --python "$runtime/bin/python" \
+        'shynote[s3,notion] @ git+https://github.com/inferablejump/ShyNote.git@13ab94d144aa3ab004419bcc61b7a76de0cfe165' \
+        'markdown-it-py==4.2.0'
+    exit 0
+fi
+
+if [[ ! -x "$runtime/bin/shynote" ]]; then
+    echo 'Run tools/shynote --install first; see .github/README.md.' >&2
+    exit 1
+fi
+
+# An explicitly exported token takes precedence over the ignored local file.
+if [[ -z "${NOTION_TOKEN:-}" && -f "$repo_root/.rb/notion-token" ]]; then
+    export NOTION_TOKEN="$(< "$repo_root/.rb/notion-token")"
+fi
+
+cd -- "$repo_root"
+# Upstream --all walks the filesystem, including backend submodules and caches.
+# This notebook covers repository-relative paths; require explicit upload paths.
+command_name=""
+skip_repo_value=false
+for arg in "$@"; do
+    if $skip_repo_value; then
+        skip_repo_value=false
+        continue
+    fi
+    case "$arg" in
+        --repo) skip_repo_value=true ;;
+        --repo=*) ;;
+        *) command_name="$arg"; break ;;
+    esac
+done
+if [[ "$command_name" == "push" ]]; then
+    for arg in "$@"; do
+        if [[ "$arg" == "--all" ]]; then
+            echo 'Use explicit repository-relative document paths; push --all would include submodule docs.' >&2
+            exit 2
+        fi
+    done
+fi
+exec "$runtime/bin/python" "$repo_root/tools/shynote_hierarchy.py" "$@"

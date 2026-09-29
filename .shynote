@@ -1,0 +1,8 @@
+version = 1
+notebook = "riskybird-dev-integration"
+backend = "notion"
+notes_dir = "."
+
+[storage]
+parent_page_id = "3ea06b97-ede4-817f-b997-d1c5f607c577"
+token_env = "NOTION_TOKEN"

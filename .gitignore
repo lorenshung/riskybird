@@ -47,3 +47,25 @@ riskybird-logs/
 # Local run output: bench logs, captures, per-session results. Flight logs are
 # published to the separate flight-logs repo (rb flightlog push), not committed here.
 results/
+
+# Repository-owned documentation is maintained in the branch Notion notebook.
+/.rb/
+/.shynote-local/
+/docs/
+/README.md
+/artifacts/modelblaster/README.md
+/hardware/ospi/docs/CHIPYARD_INTEGRATION.md
+/hardware/ospi/docs/OSPI_I2C_INTEGRATION.md
+/hardware/ospi/docs/README.md
+/hardware/zephyr/targets/README.md
+/integration/README.md
+/integration/zephyr/tof/README.md
+/tools/flight/legacy/README.md
+/workloads/README.md
+/workloads/ads7128_test/README.rst
+/workloads/bmi088_test/README.rst
+/workloads/i2c_scanner/README.rst
+/workloads/mpc/README.md
+/workloads/pmw3901_test/README.rst
+/workloads/state/README.md
+/workloads/vl35l5cx_test/README.rst

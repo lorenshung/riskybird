@@ -1,0 +1,3 @@
+# RiskyBird
+
+@AGENTS.md
