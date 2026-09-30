@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 echo "ENV_SENTINEL: stack3_build $(date)"
-M=/scratch2/dima/misc_sw/xpurt_repro_wt/modelblaster
-ZCS=/scratch2/dima/misc_sw/XPU-RT/zephyr-chipyard-sw; SDK=$ZCS/tools-manual/zephyr-sdk-1.0.0-beta1
-source /scratch2/dima/miniforge3/etc/profile.d/conda.sh; conda activate zephyr
+# Machine paths are env-overridable; the defaults are the garden boxes this was
+# developed on. Everything repo-relative (checkpoint, board conf/overlay) now
+# resolves out of the checkouts themselves, so a clone + these four vars builds:
+#   MB_REPO   modelblaster checkout (branch riskybird-fps-repro, >= 94481a4)
+#   ZCS       zephyr-chipyard-sw checkout      ZEPHYR_SDK  SDK dir
+#   CONDA_SH / CONDA_ENV   conda init script and env name
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+M=${MB_REPO:-/scratch2/dima/misc_sw/xpurt_repro_wt/modelblaster}
+ZCS=${ZCS:-/scratch2/dima/misc_sw/XPU-RT/zephyr-chipyard-sw}; SDK=${ZEPHYR_SDK:-$ZCS/tools-manual/zephyr-sdk-1.0.0-beta1}
+source ${CONDA_SH:-/scratch2/dima/miniforge3/etc/profile.d/conda.sh}; conda activate ${CONDA_ENV:-zephyr}
 export ZEPHYR_BASE=$ZCS/zephyr_ws/zephyr ZEPHYR_SDK_INSTALL_DIR=$SDK ZEPHYR_TOOLCHAIN_VARIANT=zephyr
 export PATH=/usr/bin:$SDK/gnu/riscv64-zephyr-elf/bin:$PATH ; export PYTHONPATH="$(dirname "$M")"
 export MODELBLASTER_GEMMINI_CONFIG=q31ws_32x32_acc MODELBLASTER_CURATED_VERIFY=0
 export MODELBLASTER_DRONET_CHANNELS=3 MB_ENABLE_FUSION=1
-export MODELBLASTER_DRONET_CKPT=/scratch2/dima/misc_sw/XPU-RT/logs/dronet_himax_stack3/best.pt
-export MODELBLASTER_GEMMINI_SPIKE=/scratch2/dima/chipyard-fsim/.conda-env/riscv-tools/bin/spike
-export MODELBLASTER_GEMMINI_LIB=/scratch2/dima/chipyard-fsim/.conda-env/riscv-tools/lib/libgemmini.so
+# the trained 3-frame checkpoint is tracked in modelblaster as of aaf0d44
+export MODELBLASTER_DRONET_CKPT=${MODELBLASTER_DRONET_CKPT:-$M/models/checkpoints/dronet_stack3/best.pt}
+export MODELBLASTER_GEMMINI_SPIKE=${MODELBLASTER_GEMMINI_SPIKE:-/scratch2/dima/chipyard-fsim/.conda-env/riscv-tools/bin/spike}
+export MODELBLASTER_GEMMINI_LIB=${MODELBLASTER_GEMMINI_LIB:-/scratch2/dima/chipyard-fsim/.conda-env/riscv-tools/lib/libgemmini.so}
 cd "$M"; GEN=examples/dronet/int8/generated_stack3; SO=examples/xpurt_demo/int8/generated
 echo "== extract grayscale+fused =="
 python -m modelblaster.pipeline.extract_graph --model dronet --out-dir $GEN --quant int8 --num-calibration 1 --fusion-target gemmini_q31_rvv 2>&1 | tail -2
@@ -75,8 +83,8 @@ west build -p always -b chipyard_riscv64 harness_xpurt --build-dir examples/xpur
   -DMODEL_NAMES=dronet -DMODEL_DIRS_BASE=$M/$GEN -DMODEL_BACKENDS=gemmini_q31_rvv,rvv \
   -DXPURT_SCHEDULE_C=$M/$D/ku040_dronet_stack3_dev.c -DXPURT_MAIN_C=$M/$D/ku040_dronet_stack3_dev_main.c -DXPURT_INCLUDE_DIR=$M/$D \
   -DMODELBLASTER_KERNEL_CFLAGS_GEMMINI_Q31_RVV="$GCF" -DMODELBLASTER_KERNEL_CFLAGS_RVV="$RCF" \
-  -DEXTRA_CONF_FILE="$M/harness_xpurt/backends/rvv.conf;$M/harness/backends/firesim_chipyard_dual_gemmini.conf;/scratch2/dima/misc_sw/ku040_dronedual_console.conf;/tmp/sf.conf" \
-  -DEXTRA_DTC_OVERLAY_FILE=/scratch2/dima/misc_sw/ku040_dronedual_console.overlay > /tmp/ninja_stack3.log 2>&1
+  -DEXTRA_CONF_FILE="$M/harness_xpurt/backends/rvv.conf;$M/harness/backends/firesim_chipyard_dual_gemmini.conf;$HERE/ku040_dronedual_console.conf;/tmp/sf.conf" \
+  -DEXTRA_DTC_OVERLAY_FILE=$HERE/ku040_dronedual_console.overlay > /tmp/ninja_stack3.log 2>&1
 echo "BUILD_RC=$?"
 grep -nE "error:|FAILED:|undefined reference" /tmp/ninja_stack3.log | head -12
 E=examples/xpurt_demo/int8/build/ku040_dronet_stack3/zephyr/zephyr.elf

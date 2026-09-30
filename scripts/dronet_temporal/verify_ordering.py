@@ -4,7 +4,9 @@ HM01B0 dataset. Reports: are frames sequential by int(filename)? What is the
 inter-frame spacing distribution? Are there partition changes within acquisitions?
 """
 import os, csv, glob, numpy as np
-ROOT="/scratch2/dima/misc_sw/XPU-RT/datasets/pulp_dronet_himax/raw/Dataset_PULP_Dronet_v3"
+ROOT=os.environ.get("DRONET_DATASET_ROOT",
+     os.environ.get("XPURT_ROOT","/scratch2/dima/misc_sw/XPU-RT")
+     + "/datasets/pulp_dronet_himax/raw/Dataset_PULP_Dronet_v3")
 csvs=sorted(glob.glob(os.path.join(ROOT,"**","labels_partitioned.csv"),recursive=True))
 print(f"[csvs] {len(csvs)} acquisitions")
 

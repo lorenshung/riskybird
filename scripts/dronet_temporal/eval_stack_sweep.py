@@ -8,7 +8,7 @@ import os, sys, json, csv, glob, time
 N=int(os.environ["N"]); NORM=90.0
 N_CALIB=int(os.environ.get("N_CALIB","64")); N_SUB=int(os.environ.get("N_SUB","6000"))
 OUT=os.environ.get("OUT_DIR",f"/tmp/stack{N}_sweep")
-X="/scratch2/dima/misc_sw/XPU-RT"; M="/scratch2/dima/misc_sw/xpurt_repro_wt"; SP="/scratch2/dima/misc_sw/dronet_int8_eval"
+X=os.environ.get("XPURT_ROOT","/scratch2/dima/misc_sw/XPU-RT")  # XPURT_ROOT: XPU-RT checkout (qnn_models + datasets); M="/scratch2/dima/misc_sw/xpurt_repro_wt"; SP="/scratch2/dima/misc_sw/dronet_int8_eval"
 for p in (X,M,SP): sys.path.insert(0,p)
 import numpy as np, torch
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True

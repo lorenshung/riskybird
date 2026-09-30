@@ -54,6 +54,33 @@ for N in 1 3 5; do N=$N EPOCHS=45 $PY scripts/dronet_temporal/train_stack.py --N
 # N=1 val EVA 0.090 (reproduces single-frame baseline), N=3 0.433 (BEST), N=5 0.322
 ```
 
+## 2b. Reproducing the build from a clone
+
+Everything the temporal build needs is now in the repos; only machine paths are env vars.
+
+| what | where |
+|---|---|
+| trained 3-frame checkpoint | **tracked**: modelblaster `models/checkpoints/dronet_stack3/best.pt` (aaf0d44) |
+| ckpt-loading hook + harness CMake | modelblaster `riskybird-fps-repro` @ 94481a4 |
+| KU040 dual schedule + dispatch C | modelblaster `examples/dronet/int8/ku040_dual_stack3/` |
+| board conf + DT overlay | **here**: `scripts/dronet_temporal/ku040_dronedual_console.{conf,overlay}` |
+| build driver | `scripts/dronet_temporal/stack3_build.sh` |
+
+```bash
+MB_REPO=/path/to/modelblaster ZCS=/path/to/zephyr-chipyard-sw \
+CONDA_SH=/path/to/conda.sh CONDA_ENV=zephyr \
+  scripts/dronet_temporal/stack3_build.sh
+```
+
+`MODELBLASTER_DRONET_CKPT` defaults to the tracked checkpoint inside `$MB_REPO`, and the conf/overlay
+resolve next to the script, so neither has to be supplied. The trainers take `XPURT_ROOT` (XPU-RT
+checkout, for `qnn_models` + the dataset) and `DRONET_DATASET_ROOT`.
+
+**The one thing that is not committed** is the 2.8 MB `examples/dronet/int8/generated_stack3/` tree —
+it regenerates from the checkpoint plus 94481a4, which is what the script does. Before that commit,
+the `_SCALED` path ignored `MODELBLASTER_DRONET_CKPT` entirely and quantized *random init*, so any
+generated tree from before 2026-09-30 is suspect.
+
 ## 3. int8 / fp16 characterization (host sim) — `hybrid_sim.py`, `fp16_char.py`
 Faithful int8 = `modelblaster.pipeline.extract_graph.extract_int8(model, sample, name, out,
 calibration_samples=, fold_conv_bn=False, fp16_op_names={...})` + the golden `int8_sim`/`hybrid_sim`

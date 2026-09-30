@@ -5,7 +5,7 @@ Grayscale 112x112 (deploy input). Official partition split. Steering head only.
 label_yaw_rate is raw deg/s (+-90) -> normalize /90 to [-1,+1] (+CCW=turn left, our convention).
 BALANCE=1 -> WeightedRandomSampler by |yaw| bins to counter the ~83% straight-flight zeros."""
 import os, sys, time, csv, glob, argparse
-X="/scratch2/dima/misc_sw/XPU-RT"; sys.path.insert(0, X)
+X=os.environ.get("XPURT_ROOT","/scratch2/dima/misc_sw/XPU-RT")  # XPURT_ROOT: XPU-RT checkout (qnn_models + datasets); sys.path.insert(0, X)
 import numpy as np, torch, torch.nn as nn, torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True

@@ -13,7 +13,7 @@ Adapted from himax/train_himax.py. Correctness rules:
   - drop anomalous huge-int filenames (>1e12; the ~31 tii uint64-overflow frames)
 """
 import os, sys, time, csv, glob, argparse
-X="/scratch2/dima/misc_sw/XPU-RT"; sys.path.insert(0, X)
+X=os.environ.get("XPURT_ROOT","/scratch2/dima/misc_sw/XPU-RT")  # XPURT_ROOT: XPU-RT checkout (qnn_models + datasets); sys.path.insert(0, X)
 import numpy as np, torch, torch.nn as nn, torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True

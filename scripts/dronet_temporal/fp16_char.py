@@ -9,7 +9,7 @@ os.environ["MODELBLASTER_DRONET_CHANNELS"]="1"
 DATASET=os.environ.get("DATASET","simforest")
 N_SUB=int(os.environ.get("N_SUB","40")); N_CALIB=int(os.environ.get("N_CALIB","64"))
 OUT=os.environ.get("OUT_DIR",f"/tmp/fp16char_{DATASET}")
-X="/scratch2/dima/misc_sw/XPU-RT"; M="/scratch2/dima/misc_sw/xpurt_repro_wt"; SP="/scratch2/dima/misc_sw/dronet_int8_eval"
+X=os.environ.get("XPURT_ROOT","/scratch2/dima/misc_sw/XPU-RT")  # XPURT_ROOT: XPU-RT checkout (qnn_models + datasets); M="/scratch2/dima/misc_sw/xpurt_repro_wt"; SP="/scratch2/dima/misc_sw/dronet_int8_eval"
 for p in (X,M,SP,os.path.dirname(os.path.abspath(__file__))): sys.path.insert(0,p)
 import numpy as np, torch
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True
