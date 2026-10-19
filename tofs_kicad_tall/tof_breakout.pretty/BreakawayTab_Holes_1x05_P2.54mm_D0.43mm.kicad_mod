@@ -1,0 +1,91 @@
+(footprint "BreakawayTab_Holes_1x05_P2.54mm_D0.43mm"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "Five 0.43mm NPTH perforation holes on 2.54mm pitch, one per breakaway tab")
+	(tags "mouse bite breakaway tab panel")
+	(property "Reference" "REF**"
+		(at 0 -1 0)
+		(layer "F.Fab")
+		(uuid "c12c2066-5aeb-481c-9322-9c70015126f4")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(property "Value" "BreakawayTab_Holes"
+		(at 0 11.16 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "b57d7214-aff8-4c6a-a878-f2a7f57167c1")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "893eee48-f2ca-43de-a6f0-30d7ce5323cd")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "a55fe489-92e8-4447-86fd-a3ce4b3e6b27")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr board_only exclude_from_pos_files exclude_from_bom)
+	(duplicate_pad_numbers_are_jumpers no)
+	(pad "" np_thru_hole circle
+		(at 0 0)
+		(size 0.43 0.43)
+		(drill 0.43)
+		(layers "*.Cu" "*.Mask")
+		(uuid "ea7cd78c-4327-4b49-877a-3c328d1162b6")
+	)
+	(pad "" np_thru_hole circle
+		(at 0 2.54)
+		(size 0.43 0.43)
+		(drill 0.43)
+		(layers "*.Cu" "*.Mask")
+		(uuid "e80f5d96-36d7-4226-9360-a44637fdaaba")
+	)
+	(pad "" np_thru_hole circle
+		(at 0 5.08)
+		(size 0.43 0.43)
+		(drill 0.43)
+		(layers "*.Cu" "*.Mask")
+		(uuid "21754866-4946-4414-bfeb-9b46cc4b9b47")
+	)
+	(pad "" np_thru_hole circle
+		(at 0 7.62)
+		(size 0.43 0.43)
+		(drill 0.43)
+		(layers "*.Cu" "*.Mask")
+		(uuid "5974f8ed-1ff2-4811-a139-1e7350cd7dee")
+	)
+	(pad "" np_thru_hole circle
+		(at 0 10.16)
+		(size 0.43 0.43)
+		(drill 0.43)
+		(layers "*.Cu" "*.Mask")
+		(uuid "6ab74b4a-11dd-40bb-959a-3ac234fa4c34")
+	)
+	(embedded_fonts no)
+)

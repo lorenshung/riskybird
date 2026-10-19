@@ -1,0 +1,4 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "tof_breakout") (type "KiCad") (uri "${KIPRJMOD}/tof_breakout.pretty") (options "") (descr "VL53L5CX ToF breakout project footprints"))
+)
