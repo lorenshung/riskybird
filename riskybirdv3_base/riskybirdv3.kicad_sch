@@ -36663,7 +36663,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF2001TEE"
+		(property "MPN" "RC0201FR-072KL"
 			(at 183.642 222.25 90)
 			(hide yes)
 			(show_name no)
@@ -36674,7 +36674,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270358"
+		(property "LCSC Part" "C327392"
 			(at 183.642 222.25 90)
 			(hide yes)
 			(show_name no)
@@ -51288,7 +51288,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC-01W5762FT"
+		(property "MPN" "RC0201FR-0757K6L"
 			(at 403.352 372.11 90)
 			(hide yes)
 			(show_name no)
@@ -51299,7 +51299,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C320974"
+		(property "LCSC Part" "C474774"
 			(at 403.352 372.11 90)
 			(hide yes)
 			(show_name no)
@@ -59026,7 +59026,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF2001TEE"
+		(property "MPN" "RC0201FR-072KL"
 			(at 149.352 255.27 90)
 			(hide yes)
 			(show_name no)
@@ -59037,7 +59037,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270358"
+		(property "LCSC Part" "C327392"
 			(at 149.352 255.27 90)
 			(hide yes)
 			(show_name no)

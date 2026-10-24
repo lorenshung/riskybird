@@ -12192,7 +12192,7 @@
 				)
 			)
 		)
-		(property "MPN" "0201WMF2001TEE"
+		(property "MPN" "RC0201FR-072KL"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -12205,7 +12205,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C270358"
+		(property "LCSC Part" "C327392"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -34725,7 +34725,7 @@
 				(justify mirror)
 			)
 		)
-		(property "MPN" "RC-01W5762FT"
+		(property "MPN" "RC0201FR-0757K6L"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -34739,7 +34739,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC Part" "C320974"
+		(property "LCSC Part" "C474774"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -44374,7 +44374,7 @@
 				(justify mirror)
 			)
 		)
-		(property "MPN" "0201WMF2001TEE"
+		(property "MPN" "RC0201FR-072KL"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -44388,7 +44388,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC Part" "C270358"
+		(property "LCSC Part" "C327392"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "B.Fab")
