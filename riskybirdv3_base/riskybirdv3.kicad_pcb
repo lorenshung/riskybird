@@ -36282,7 +36282,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "TPS259824ONRGER"
+		(property "Value" "TPS259824LNRGER"
 			(at 0 -5.913 0)
 			(layer "B.Fab")
 			(uuid "853d9f6a-ea39-480f-9f05-12eafca5bb58")
@@ -36294,7 +36294,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C2155766.pdf"
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C2155879.pdf"
 			(at 0 0 0)
 			(layer "B.Fab")
 			(hide yes)
@@ -36318,7 +36318,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC Part" "C2155766"
+		(property "LCSC Part" "C2155879"
 			(at 0 0 0)
 			(layer "B.Fab")
 			(hide yes)
@@ -36345,7 +36345,7 @@
 				(justify mirror)
 			)
 		)
-		(property "MPN" "TPS259824ONRGER"
+		(property "MPN" "TPS259824LNRGER"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "B.Fab")

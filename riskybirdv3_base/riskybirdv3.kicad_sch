@@ -21837,7 +21837,7 @@
 					)
 				)
 			)
-			(property "Value" "TPS259824ONRGER"
+			(property "Value" "TPS259824LNRGER"
 				(at 0 -26.67 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -21858,7 +21858,7 @@
 					)
 				)
 			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C2155766.pdf"
+			(property "Datasheet" "https://www.lcsc.com/datasheet/C2155879.pdf"
 				(at 0 -31.75 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -21891,7 +21891,7 @@
 					)
 				)
 			)
-			(property "MPN" "TPS259824ONRGER"
+			(property "MPN" "TPS259824LNRGER"
 				(at 0 -36.83 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -21902,7 +21902,7 @@
 					)
 				)
 			)
-			(property "LCSC Part" "C2155766"
+			(property "LCSC Part" "C2155879"
 				(at 0 -39.37 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -55903,7 +55903,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS259824ONRGER"
+		(property "Value" "TPS259824LNRGER"
 			(at 240.03 335.28 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -55924,7 +55924,7 @@
 				)
 			)
 		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C2155766.pdf"
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C2155879.pdf"
 			(at 240.03 393.7 0)
 			(hide yes)
 			(show_name no)
@@ -55957,7 +55957,7 @@
 				)
 			)
 		)
-		(property "MPN" "TPS259824ONRGER"
+		(property "MPN" "TPS259824LNRGER"
 			(at 240.03 398.78 0)
 			(hide yes)
 			(show_name no)
@@ -55968,7 +55968,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C2155766"
+		(property "LCSC Part" "C2155879"
 			(at 240.03 401.32 0)
 			(hide yes)
 			(show_name no)
