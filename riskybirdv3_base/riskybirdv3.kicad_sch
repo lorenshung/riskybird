@@ -51288,7 +51288,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-0757K6L"
+		(property "MPN" "WR02X5762FAL"
 			(at 403.352 372.11 90)
 			(hide yes)
 			(show_name no)
@@ -51299,7 +51299,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C474774"
+		(property "LCSC Part" "C367666"
 			(at 403.352 372.11 90)
 			(hide yes)
 			(show_name no)
