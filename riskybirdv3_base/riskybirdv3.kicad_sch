@@ -23304,6 +23304,16 @@
 		)
 		(uuid "63c732fe-8b4b-4045-989e-7725f4cdde46")
 	)
+	(text "Note: Different on TE7012 and TE0841, keep disconnected"
+		(exclude_from_sim no)
+		(at 739.394 47.752 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "77f6d571-b34f-4a6e-878f-b539be5aefdf")
+	)
 	(text "TODO: 1V5"
 		(exclude_from_sim no)
 		(at 417.576 235.712 0)
@@ -24915,6 +24925,10 @@
 		(uuid "6daab8fc-56b4-4c0d-9069-03eff27af6d9")
 	)
 	(no_connect
+		(at 715.01 50.8)
+		(uuid "73a21304-fded-4c56-b714-cc823c744ec2")
+	)
+	(no_connect
 		(at 708.66 111.76)
 		(uuid "752a56ff-aceb-442d-9e92-f36737b7f7f4")
 	)
@@ -25531,16 +25545,6 @@
 			(type default)
 		)
 		(uuid "0922398a-e066-4ca1-9ddb-975511db6d52")
-	)
-	(wire
-		(pts
-			(xy 718.82 50.8) (xy 718.82 49.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0931fcb0-c3e2-44ae-a81f-888d7c694dcf")
 	)
 	(wire
 		(pts
@@ -27804,6 +27808,16 @@
 	)
 	(wire
 		(pts
+			(xy 708.66 50.8) (xy 715.01 50.8)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "440572de-8d94-4dcd-b968-60d9b8808245")
+	)
+	(wire
+		(pts
 			(xy 387.35 247.65) (xy 387.35 242.57)
 		)
 		(stroke
@@ -28041,16 +28055,6 @@
 			(type default)
 		)
 		(uuid "4860797b-ddc7-4fcd-a395-23f5b1e8da39")
-	)
-	(wire
-		(pts
-			(xy 708.66 50.8) (xy 718.82 50.8)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "493c0495-ed44-4f0a-8397-ba5c85e6bdce")
 	)
 	(wire
 		(pts
@@ -36616,7 +36620,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "2k"
 			(at 187.198 223.393 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36659,7 +36663,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" "0201WMF2001TEE"
 			(at 183.642 222.25 90)
 			(hide yes)
 			(show_name no)
@@ -36670,7 +36674,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C270358"
 			(at 183.642 222.25 90)
 			(hide yes)
 			(show_name no)
@@ -39209,7 +39213,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "604"
 			(at 29.21 29.2099 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39253,7 +39257,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" ""
 			(at 24.892 27.94 90)
 			(hide yes)
 			(show_name no)
@@ -39264,7 +39268,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C423470"
 			(at 24.892 27.94 90)
 			(hide yes)
 			(show_name no)
@@ -44501,7 +44505,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "604"
 			(at 52.07 25.3999 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44545,7 +44549,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" ""
 			(at 47.752 24.13 90)
 			(hide yes)
 			(show_name no)
@@ -44556,7 +44560,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C423470"
 			(at 47.752 24.13 90)
 			(hide yes)
 			(show_name no)
@@ -49905,7 +49909,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_BLUE"
 			(at 17.78 159.0675 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49937,7 +49941,7 @@
 				)
 			)
 		)
-		(property "Description" "Light emitting diode"
+		(property "Description" "Blue LED 0402 - Wurth 150040BS73240"
 			(at 21.59 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -49948,7 +49952,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C965793"
+		(property "LCSC Part" "C5354417"
 			(at 0 0 0)
 			(hide yes)
 			(show_name no)
@@ -61749,84 +61753,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3V3")
-		(at 718.82 49.53 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "a895f373-060c-45ac-8e12-053c78cbd25a")
-		(property "Reference" "#PWR0105"
-			(at 718.82 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 718.82 44.45 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 718.82 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 718.82 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 718.82 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "74eeb009-eb1d-4fe1-9d01-072e9a47b7af")
-		)
-		(instances
-			(project "riskybirdv3"
-				(path "/b045bc91-b5c2-4b45-9ee6-c32404600013"
-					(reference "#PWR0105")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R_Small")
 		(at 22.86 102.87 0)
 		(unit 1)
@@ -73174,7 +73100,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "100"
 			(at 24.13 151.1299 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -73218,7 +73144,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" "RC0201FR-07100RL"
 			(at 19.812 149.86 90)
 			(hide yes)
 			(show_name no)
@@ -73229,7 +73155,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C77623"
 			(at 19.812 149.86 90)
 			(hide yes)
 			(show_name no)

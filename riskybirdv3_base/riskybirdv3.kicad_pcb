@@ -3290,7 +3290,7 @@
 				)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "604"
 			(at 0 1.05 90)
 			(layer "F.Fab")
 			(uuid "51c2dc95-21ad-4aa7-970a-c5a2140638ae")
@@ -3325,7 +3325,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" ""
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -3338,7 +3338,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C423470"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -5852,7 +5852,7 @@
 				)
 			)
 		)
-		(property "Value" "LED"
+		(property "Value" "LED_BLUE"
 			(at 0 1.17 0)
 			(layer "F.Fab")
 			(uuid "3e5cce71-c379-47b5-a390-371cb8ab5b7f")
@@ -5874,7 +5874,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Blue LED 0402 - Wurth 150040BS73240"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -5885,7 +5885,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C965793"
+		(property "LCSC Part" "C5354417"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -7779,9 +7779,9 @@
 			(at -9.25 -1.85 180)
 			(size 0.3 1.5)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "+3V3")
+			(net "unconnected-(JB1-Pin_13-Pad13)")
 			(pinfunction "Pin_13_13")
-			(pintype "passive")
+			(pintype "passive+no_connect")
 			(uuid "eccef09e-5543-4758-875a-08dd546cbe68")
 		)
 		(pad "14" smd rect
@@ -12157,7 +12157,7 @@
 				)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "2k"
 			(at 0 1.05 0)
 			(layer "F.Fab")
 			(uuid "d1708aae-da25-4e07-820f-f72744b03b93")
@@ -12192,7 +12192,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" "0201WMF2001TEE"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -12205,7 +12205,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C270358"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -12384,7 +12384,7 @@
 				)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "604"
 			(at 0 1.05 90)
 			(layer "F.Fab")
 			(uuid "7ae81c13-9fcd-4b16-9216-438034a9cfcb")
@@ -12419,7 +12419,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0201FR-07150RL"
+		(property "MPN" ""
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -12432,7 +12432,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C423470"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -21479,7 +21479,7 @@
 				)
 			)
 		)
-		(property "Value" "150"
+		(property "Value" "100"
 			(at 0 1.05 0)
 			(layer "F.Fab")
 			(uuid "ffc8afdb-abe2-4ebb-a80b-2094dd282155")
@@ -21512,7 +21512,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C295773"
+		(property "LCSC Part" "C77623"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -25107,7 +25107,7 @@
 				)
 			)
 		)
-		(attr smd)
+		(attr smd dnp)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 3 3)
@@ -62770,14 +62770,6 @@
 		(uuid "daea915b-0476-4873-bfe9-ee0f03c71701")
 	)
 	(segment
-		(start 109.25 86.9)
-		(end 109.341508 86.991508)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "+3V3")
-		(uuid "00883dd1-8579-4346-88a6-9ed13ac7dd79")
-	)
-	(segment
 		(start 130.3855 93.68)
 		(end 130.331191 93.68)
 		(width 0.3)
@@ -63042,14 +63034,6 @@
 		(uuid "53ae7d7c-5cfd-4ff5-b859-37cc9aa97197")
 	)
 	(segment
-		(start 109.25 85.85)
-		(end 109.25 86.9)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "+3V3")
-		(uuid "5524264f-d77f-4906-85b4-f177fea26941")
-	)
-	(segment
 		(start 73.45 105.05)
 		(end 74 104.5)
 		(width 0.3)
@@ -63272,14 +63256,6 @@
 		(layer "F.Cu")
 		(net "+3V3")
 		(uuid "a5ca4c0f-c1c8-4893-9c9b-520d1e1decb4")
-	)
-	(segment
-		(start 109.341508 86.991508)
-		(end 109.873621 86.991508)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "+3V3")
-		(uuid "a6736bb6-661a-42eb-b4ae-68de3484bbd4")
 	)
 	(segment
 		(start 131.68175 94.45)
