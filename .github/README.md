@@ -57,11 +57,11 @@ session after receiving these instructions, or have an existing agent read
 `AGENTS.md`. In Claude Code, `/context` shows loaded memory files. Other agent
 tools may need to be told to read `AGENTS.md`.
 
-The four existing worktrees on this machine share the installed ShyNote runtime
-and token. A fresh clone or worktree needs `./tools/shynote --install` and access
-to `NOTION_TOKEN` or its own ignored `.rb/notion-token`. No per-agent installation
-is needed when agents share a configured checkout. Separate machines or isolated
-agent environments need their own setup and network access to Notion.
+Each checkout has its own branch config and ignored `.rb/` runtime/token. A fresh
+clone or worktree needs `./tools/shynote --install` and access to `NOTION_TOKEN`
+or its own ignored `.rb/notion-token`. Agents that share one checkout can use its
+installation; a separate checkout or isolated agent environment needs its own
+runtime and token file. ShyNote requires network access to Notion.
 
 The config travels with each branch once its commit is available in that checkout.
 ShyNote does not automatically synchronize edits between branches. A new branch

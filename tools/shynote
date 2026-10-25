@@ -29,7 +29,6 @@ fi
 if [[ -z "${NOTION_TOKEN:-}" && -f "$repo_root/.rb/notion-token" ]]; then
     export NOTION_TOKEN="$(< "$repo_root/.rb/notion-token")"
 fi
-
 cd -- "$repo_root"
 # Upstream --all walks the filesystem, including backend submodules and caches.
 # This notebook covers repository-relative paths; require explicit upload paths.
@@ -46,6 +45,10 @@ for arg in "$@"; do
         *) command_name="$arg"; break ;;
     esac
 done
+if [[ "$command_name" != "info" && -z "${NOTION_TOKEN:-}" ]]; then
+    echo 'No Notion token available. Export NOTION_TOKEN or save the token in .rb/notion-token (mode 0600); never paste it into chat.' >&2
+    exit 2
+fi
 if [[ "$command_name" == "push" ]]; then
     for arg in "$@"; do
         if [[ "$arg" == "--all" ]]; then
