@@ -1,7 +1,8 @@
-"""Keep ShyNote scoped to one branch while allowing nested Notion subpages.
+"""Keep ShyNote scoped to one branch and preserve repository asset links.
 
-Upstream 13ab94d supports only direct child pages. This adapter follows the
-published folder index and checks ancestry before reading or updating a note.
+Upstream stores paths in page metadata and supports nested Notion directories.
+This adapter normalizes indexed figure links and excludes the separate asset
+gallery from the repository note tree.
 """
 import json
 from dataclasses import replace
@@ -177,26 +178,31 @@ class HierarchicalNotionStore(NotionStore):
             seen.add(cursor)
 
     def list_notes(self):
-        folders = set(self.index.get("folders", {}).values())
         excluded = set(self.index.get("asset_pages", []))
         notes = []
         visited = set()
+        paths = set()
 
-        def visit(parent, prefix=""):
+        def visit(parent, parent_path=""):
             if parent in visited:
-                raise ProviderError("Repeated Notion folder.")
+                raise ProviderError("Repeated Notion page in notebook hierarchy.")
             visited.add(parent)
             for block in self._children(parent):
                 if block["type"] != "child_page" or self._archived(block):
                     continue
                 note_id = self._id(block["id"])
-                title = prefix + block["child_page"]["title"]
                 if note_id in excluded:
                     continue
-                if note_id in folders:
-                    visit(note_id, title + "/")
+                title = block["child_page"]["title"]
+                metadata = self._metadata(note_id)
+                self._check_location(note_id, title, metadata, parent_path)
+                if metadata["kind"] == "directory":
+                    visit(note_id, metadata["path"])
                 else:
-                    notes.append(NoteSummary(note_id, title))
+                    if metadata["path"] in paths:
+                        raise ProviderError(f"Duplicate Notion note path {metadata['path']!r}.")
+                    paths.add(metadata["path"])
+                    notes.append(NoteSummary(note_id, title, metadata["path"]))
 
         visit(self.settings.parent_page_id)
         return notes

@@ -15,7 +15,7 @@ if [[ "${1:-}" == "--install" ]]; then
         uv venv --python '>=3.11' "$runtime"
     fi
     uv pip install --python "$runtime/bin/python" \
-        'shynote[s3,notion] @ git+https://github.com/inferablejump/ShyNote.git@13ab94d144aa3ab004419bcc61b7a76de0cfe165' \
+        'shynote[s3,notion] @ git+https://github.com/inferablejump/ShyNote.git@a2803c3e329b56e484985911968c1586985e151f' \
         'markdown-it-py==4.2.0'
     exit 0
 fi

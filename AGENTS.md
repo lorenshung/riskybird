@@ -8,6 +8,8 @@ remain in their upstream repositories.
 - Use `./tools/shynote` from this checkout. `.shynote` selects the notebook and
   `.shynote-index.json` maps repository paths to pages, folders, and figures.
   Keep those files together; never copy another branch's notebook IDs over them.
+  Note and folder pages start with a `shynote-metadata` code block; leave it first
+  and intact so paths can be restored reliably.
 - If the runtime is missing, run `./tools/shynote --install` (requires `uv` and
   Python 3.11+). Authentication uses `NOTION_TOKEN` or `.rb/notion-token`.
   Never print or commit the token. Report missing credentials without claiming

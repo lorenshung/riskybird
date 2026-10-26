@@ -26,6 +26,8 @@ Supply `NOTION_TOKEN` in the environment, or save its raw value in the ignored
 `.rb/notion-token` file with permissions `0600`. The Notion connection must have
 access to the notebook's parent page. `.shynote` selects this branch's notebook;
 `.shynote-index.json` records its document, folder, and asset mappings.
+ShyNote saves each note's repository path in a `shynote-metadata` code block at
+the top of the Notion page; leave that block first and intact.
 
 File arguments are relative to the repository root, for example
 `./tools/shynote pull docs/setup.md --diff`. New checkouts should use `read`, or
