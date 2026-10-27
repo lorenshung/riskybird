@@ -2808,7 +2808,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 177.8 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -2819,7 +2819,7 @@
 				)
 			)
 		)
-		(property "MPN" "CC0402KRX7R7BB104"
+		(property "MPN" "CL05B104KO5NNNC"
 			(at 177.8 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -2830,7 +2830,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C1525"
 			(at 177.8 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -2922,7 +2922,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 73.66 175.26 0)
 			(hide yes)
 			(show_name no)
@@ -2933,7 +2933,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 73.66 175.26 0)
 			(hide yes)
 			(show_name no)
@@ -2944,7 +2944,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 73.66 175.26 0)
 			(hide yes)
 			(show_name no)
@@ -3113,7 +3113,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 152.4 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3124,7 +3124,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 152.4 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3135,7 +3135,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 152.4 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3326,7 +3326,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C3178303"
 			(at 99.06 96.52 0)
 			(hide yes)
 			(show_name no)
@@ -3466,7 +3466,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 165.1 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -3477,7 +3477,7 @@
 				)
 			)
 		)
-		(property "MPN" "CC0402KRX5R6BB475"
+		(property "MPN" "CL05A475MP5NRNC"
 			(at 165.1 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -3488,7 +3488,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C23733"
 			(at 165.1 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -3657,7 +3657,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 167.64 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3668,7 +3668,7 @@
 				)
 			)
 		)
-		(property "MPN" "CC0402KRX5R6BB475"
+		(property "MPN" "CL05A475MP5NRNC"
 			(at 167.64 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3679,7 +3679,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C23733"
 			(at 167.64 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3771,7 +3771,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 81.28 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3782,7 +3782,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 81.28 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3793,7 +3793,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 81.28 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -3962,7 +3962,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 78.74 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -3973,7 +3973,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 78.74 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -3984,7 +3984,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 78.74 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -4076,7 +4076,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 86.36 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -4087,7 +4087,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 86.36 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -4098,7 +4098,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 86.36 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -4212,7 +4212,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C3178303"
 			(at 101.6 162.56 0)
 			(hide yes)
 			(show_name no)
@@ -4352,7 +4352,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 71.12 109.22 0)
 			(hide yes)
 			(show_name no)
@@ -4363,7 +4363,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 71.12 109.22 0)
 			(hide yes)
 			(show_name no)
@@ -4374,7 +4374,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 71.12 109.22 0)
 			(hide yes)
 			(show_name no)
@@ -4466,7 +4466,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 180.34 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -4477,7 +4477,7 @@
 				)
 			)
 		)
-		(property "MPN" "CC0402KRX7R7BB104"
+		(property "MPN" "CL05B104KO5NNNC"
 			(at 180.34 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -4488,7 +4488,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C1525"
 			(at 180.34 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -4888,7 +4888,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 88.9 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -4899,7 +4899,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 88.9 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -4910,7 +4910,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 88.9 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -5002,7 +5002,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" "YAGEO"
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 			(at 149.86 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -5013,7 +5013,7 @@
 				)
 			)
 		)
-		(property "MPN" "RC0402FR-0747KL"
+		(property "MPN" "0402WGF4702TCE"
 			(at 149.86 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -5024,7 +5024,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" ""
+		(property "LCSC Part" "C25792"
 			(at 149.86 88.9 0)
 			(hide yes)
 			(show_name no)
