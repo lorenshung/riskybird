@@ -141,6 +141,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "load_link.h"
+
 #define FPGA_UART_NODE DT_ALIAS(fpga_uart)
 #if !DT_NODE_EXISTS(FPGA_UART_NODE)
 #error "esp_bridge needs an fpga-uart alias (see esp_bridge.overlay)"
@@ -214,6 +216,12 @@ static void uart_isr(const struct device *dev, void *user_data)
 		if (n <= 0) {
 			break;
 		}
+		/* A program-load session owns the wire: these bytes are TSI
+		 * responses, not telemetry or duty frames. */
+		if (load_link_active()) {
+			load_link_rx_from_fpga(buf, (size_t)n);
+			continue;
+		}
 		/* Short write = ring full. Nothing useful to do in an ISR
 		 * except keep draining the FIFO, which is what this loop is. */
 		(void)ring_buf_put(&uart_rb, buf, (uint32_t)n);
@@ -225,11 +233,18 @@ static void uart_isr(const struct device *dev, void *user_data)
 	}
 }
 
-static void fpga_uart_write(const char *s, size_t len)
+/* Returns false, writing nothing, while a program-load session owns the wire:
+ * the FPGA end is a bus master then, not the flight controller's uart1. */
+static bool fpga_uart_write(const char *s, size_t len)
 {
+	if (!load_link_tx_trylock()) {
+		return false;
+	}
 	for (size_t i = 0; i < len; i++) {
 		uart_poll_out(fpga_uart, s[i]);
 	}
+	load_link_tx_unlock();
+	return true;
 }
 
 /* ==========================================================================
@@ -345,7 +360,9 @@ static void motors_apply(const uint16_t duty[MOTOR_LINK_NMOTORS])
 	const uint32_t ceiling = (MOTOR_LINK_DUTY_FULL * ESP_LINK_MAX_DUTY_PCT) / 100U;
 
 	for (unsigned i = 0; i < MOTOR_LINK_NMOTORS; i++) {
-		uint32_t d = g_kill ? 0u : duty[i];
+		/* A program load resets the SoC and starts new code on it: no
+		 * gate is driven from the moment it claims the wire. */
+		uint32_t d = (g_kill || load_link_active()) ? 0u : duty[i];
 		uint32_t pulse;
 		int rc;
 
@@ -496,6 +513,7 @@ static void link_thread(void *a, void *b, void *c)
 	/* Starts already expired: nothing drives a gate before the first frame. */
 	int64_t deadline = 0;
 	bool kill_applied = false;
+	bool load_applied = false;
 
 	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
 
@@ -543,6 +561,13 @@ static void link_thread(void *a, void *b, void *c)
 		if (g_kill != kill_applied) {
 			kill_applied = g_kill;
 			if (kill_applied) {
+				motors_off();
+			}
+		}
+		/* Same for a load session starting between frames. */
+		if (load_link_active() != load_applied) {
+			load_applied = load_link_active();
+			if (load_applied) {
 				motors_off();
 			}
 		}
@@ -773,7 +798,9 @@ static void status_thread(void *a, void *b, void *c)
 		if (sock >= 0) {
 			send_to_clients(sock, &cl, buf, (size_t)n);
 		}
-		printk("%s", buf);
+		if (!load_link_active()) {   /* the USB tunnel shares the console */
+			printk("%s", buf);
+		}
 	}
 }
 #endif /* HAVE_MOTORS */
@@ -839,10 +866,13 @@ static void uplink_thread(void *a, void *b, void *c)
 		}
 #endif
 		cmd[n] = '\n';
-		fpga_uart_write(cmd, (size_t)n + 1);
+		bool delivered = fpga_uart_write(cmd, (size_t)n + 1);
 
 		char ack[192];
-		int alen = snprintf(ack, sizeof(ack), "ACK %.*s%s\n", n, cmd, local);
+		int alen = delivered ?
+			snprintf(ack, sizeof(ack), "ACK %.*s%s\n", n, cmd, local) :
+			snprintf(ack, sizeof(ack), "BUSY %.*s -- program load in progress, "
+				 "NOT delivered to the FPGA%s\n", n, cmd, local);
 
 		if (alen > 0) {
 			if (alen > (int)sizeof(ack)) {
@@ -852,7 +882,9 @@ static void uplink_thread(void *a, void *b, void *c)
 					   (struct sockaddr *)&src, srclen);
 		}
 		cmd[n] = '\0';
-		printk("esp_bridge: cmd -> FPGA: %s%s\n", cmd, local);
+		if (delivered) {
+			printk("esp_bridge: cmd -> FPGA: %s%s\n", cmd, local);
+		}
 	}
 }
 
@@ -1099,6 +1131,10 @@ int main(void)
 	if (softap_start() != 0) {
 		printk("esp_bridge: radio down -- UART still logged below\n");
 	}
+
+	/* Program loading into the FPGA SoC: TCP for WiFi, plus the USB console
+	 * as a tunnel for bench tests without joining the drone's network. */
+	(void)load_link_start(fpga_uart, DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_console)));
 
 #if HAVE_MOTORS
 	/* Highest priority in the application, and created BEFORE the radio

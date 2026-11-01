@@ -1581,6 +1581,32 @@ def load_elf(
             f"Zephyr ELF is missing: {elf}\n"
             f"Run: rb build {workload.name} --target {target.name} --mode {mode}"
         )
+    port_arg = port_arg or os.environ.get("RB_TSI_PORT")
+    if port_arg and "://" in port_arg:
+        # Through the ESP32 (WiFi, or its USB console as socket:// via a
+        # proxy): the FPGA end is EspLinkMux, which needs the esp_bridge
+        # load-service handshake that plain pyuartsi does not speak. Only
+        # shells built with the ESP loader answer it (e.g.
+        # RocketArty200TDroneFullDDRLoaderConfig).
+        # esp-usb:///dev/ttyACM0 is the same service through the ESP's USB
+        # console -- the bench test that needs no WiFi association.
+        link = (
+            ["--usb", port_arg[len("esp-usb://"):]]
+            if port_arg.startswith("esp-usb://")
+            else ["--url", port_arg]
+        )
+        run(
+            [
+                ZEPHYR_PREFIX / "bin" / "python",
+                ROOT / "tools" / "rb" / "esp_tsi_load.py",
+                *link,
+                "--elf",
+                elf,
+            ],
+            environment="zephyr",
+            cwd=ROOT,
+        )
+        return
     try:
         port = select_serial_port("tsi", port_arg)
     except (FileNotFoundError, RuntimeError) as exc:
@@ -3955,7 +3981,12 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workload(load)
     _add_board(load)
     load.add_argument("--mode")
-    load.add_argument("--port", help="UARTTSI device (or RB_TSI_PORT)")
+    load.add_argument(
+        "--port",
+        help="UARTTSI device (or RB_TSI_PORT); socket://HOST:14552 loads through the "
+        "ESP over WiFi, esp-usb:///dev/ttyACM0 through its USB console (shells "
+        "built with the ESP loader only)",
+    )
     load.add_argument("--baudrate", type=int, default=921600)
     load.set_defaults(func=cmd_load)
 
