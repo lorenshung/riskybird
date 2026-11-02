@@ -32,6 +32,17 @@ void load_link_rx_from_fpga(const uint8_t *buf, size_t n);
 bool load_link_tx_trylock(void);
 void load_link_tx_unlock(void);
 
+/* Provided by main.c: true while, or within 1 s after, any motor gate carried
+ * a nonzero duty. Every session is refused then. */
+bool esp_bridge_motors_recently_on(void);
+
+/* Provided by main.c: the current RBLINK health line, newline-terminated
+ * (what the motor frames last said, e.g. fl=0x20 COMMITTED). */
+int esp_bridge_status(char *buf, size_t len);
+
+/* Provided by main.c: uart1 bytes received outside sessions since boot. */
+uint32_t esp_bridge_uart1_rx_bytes(void);
+
 /* Starts the session thread: TCP :LOAD_LINK_TCP_PORT and the USB tunnel.
  * `usb` may be NULL (no tunnel). */
 int load_link_start(const struct device *fpga_uart, const struct device *usb);

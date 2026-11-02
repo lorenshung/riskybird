@@ -519,6 +519,57 @@ def load_and_check(args, *, commit: bool) -> int:
             tap.stop()
 
 
+def _esp_link(url: str) -> list[str]:
+    return ["--usb", url[len("esp-usb://"):]] if url.startswith("esp-usb://") else ["--url", url]
+
+
+def _esp_tool(url: str, *extra, capture: bool = False) -> subprocess.CompletedProcess:
+    from . import cli
+    cmd = [str(cli.ZEPHYR_PREFIX / "bin" / "python"), str(ROOT / "tools" / "rb" / "esp_tsi_load.py"),
+           *_esp_link(url), *[str(e) for e in extra]]
+    return subprocess.run(cmd, cwd=ROOT, text=True, capture_output=capture)
+
+
+def remote_load_and_check(args, *, commit: bool) -> int:
+    """`rb fly load/commit --remote URL`: the same steps with no cable to the drone. The ELF goes
+    in through the ESP (WiFi or its USB console) instead of JTAG, the link is judged from the
+    ESP's own RBLINK lines (RBSTAT1), and the commit key is written by a no-reset POKE session
+    instead of commit.gdb. There is no FPGA console, so the boot banners are not checked; the
+    COMMITTED flag in the flight controller's own motor frames is."""
+    elf, record = build(args, args.mode)
+    url = args.remote
+    print(f"rb fly: loading {elf} through the ESP ({url})")
+    if _esp_tool(url, "--elf", elf).returncode != 0:
+        raise FlyError("the remote load failed (see above); nothing was started")
+    _remember_mode(args.mode, elf_sha=_sha(elf))
+    lines: list[str] = []
+    deadline = time.time() + 20
+    link: dict = {"ok": False, "why": "no RBLINK lines"}
+    time.sleep(1.0)
+    while time.time() < deadline:
+        r = _esp_tool(url, "--stat", capture=True)
+        line = r.stdout.strip()
+        parsed = parse_rblink(line)
+        lines = lines + [line] if parsed and parsed.get("ml") == "up" else []
+        if len(lines) >= 8:
+            link = link_summary(lines[-8:])
+            if link.get("ok"):
+                break
+        time.sleep(0.25)
+    if not link.get("ok") or link.get("ml") != "up":
+        raise FlyError(f"NO-GO: the ESP never saw a steady motor link after the load: {link}")
+    print(f"rb fly: ESP link up: {link['frames_per_s']:.0f} frames/s, worst gap "
+          f"{link['gap_max_ms']} ms (failsafe 120), kill={link['kill']}, flags [{link['flags']}]")
+    if commit:
+        if _esp_tool(url, "--elf", elf, "--commit").returncode != 0:
+            raise FlyError("the remote commit did not complete (see above)")
+    print(f"rb fly: build record {record}")
+    if commit:
+        print("READY: COMMITTED remotely. Level floor, open space, then RESET on the panel. "
+              "ESTOP (E) stops it.")
+    return 0
+
+
 def status(args) -> int:
     bench = discover(args)
     _require(bench, esp=True)

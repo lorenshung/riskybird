@@ -11,13 +11,31 @@
  * "RBLK", holds the SoC in reset for 10 ms (parking hart 0 in the boot ROM),
  * then routes the wires to TSI until 2 s pass with no traffic either way.
  *
- * SESSION PROTOCOL (identical on both transports)
+ * SESSION PROTOCOL (identical on both transports). The host sends one line:
  *
- *   host  -> "RBLOAD1\n"
- *   ESP   -> "RBLOAD OK\n"                  handshake with the FPGA done
- *         or "RBLOAD ERR <reason>\n"        and the session is over
- *   host  -> TSI commands, FPGA -> host TSI responses, raw
- *   host  -> END command (below), or closes the TCP connection
+ *   "RBLOAD1"            reset the SoC, then TSI (program loading)
+ *   "RBPOKE1"            TSI with NO reset: read/write memory under the running
+ *                        program (the remote commit). Allowed only while this
+ *                        ESP knows TSI's word assembly is at a command boundary.
+ *   "RBPING1"            which bitstream is answering; touches nothing
+ *   "RBFLASH1 [FAST]"    configuration-flash bridge (EspLinkFlash framing),
+ *                        FAST = 921600 baud on the wire after the ack
+ *   "RBBOOT1 <hex addr>" reconfigure the FPGA from that flash address (IPROG).
+ *                        Never run a FLASH session in the same breath first:
+ *                        on 2026-11-01 an IPROG issued ~0.3 s after one was
+ *                        ignored (the running program survived), while the
+ *                        same IPROG seconds after a FLASH session worked.
+ *   "RBSTAT1"            the ESP's RBLINK line (motor-frame flags, e.g.
+ *                        COMMITTED); never touches the FPGA link
+ *
+ *   ESP   -> "RB<KIND> OK id=<8 hex>\n"    the FPGA answered; id is its
+ *                                           USR_ACCESS build timestamp
+ *         or "RB<KIND> ERR <reason>\n"     and the session is over
+ *   then, for LOAD/POKE: TSI commands and responses (below); for FLASH: flash
+ *   frames and replies; PING and BOOT end after the reply.
+ *
+ * Every session is refused while, or for 1 s after, any motor gate carried a
+ * nonzero duty: a session takes the wire the motor frames use.
  *
  * THE ESP PARSES THE TSI COMMAND STREAM, and forwards only well-formed
  * commands. A TSI header is 20 bytes, little-endian: u32 cmd, u64 addr,
@@ -32,6 +50,20 @@
  *
  * Header boundaries are also what makes END possible at all on the USB tunnel,
  * which has no connection to close.
+ *
+ * FLASH frames are parsed the same way and forwarded only whole: 0x01 XFER
+ * (u16 wlen <= 512, u16 rlen, wlen bytes), 0x02 PROG (u32 addr, 256 bytes),
+ * 0x03 ERASE (u32 addr), and the local 0xE5 END. The FPGA refuses to program
+ * or erase below the golden-image guard whatever arrives here.
+ *
+ * TSI ALIGNMENT. TSI assembles 32-bit words with no timeout, and only a LOAD
+ * (SoC reset) restarts it. A POKE session does not reset, so it is allowed
+ * only when every byte this ESP has sent TSI since the last LOAD formed whole
+ * commands: tsi_synced. POKE commands are buffered whole (<= 1 KiB payload)
+ * before the first byte is forwarded, so even a host that vanishes mid-command
+ * leaves TSI aligned; a LOAD that ends mid-command clears tsi_synced. (On
+ * bitstreams before EspLinkRxFilter the closing break itself leaked into TSI;
+ * those do not answer the POKE key at all.)
  *
  * WHILE A SESSION IS ACTIVE (load_link_active()) the motors read zero, the
  * uplink refuses to write the FPGA UART, and every FPGA byte goes to the
@@ -51,6 +83,7 @@
  */
 
 #include "load_link.h"
+#include "load_link_internal.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/devicetree.h>
@@ -65,6 +98,8 @@
 #include <hal/uart_ll.h>
 #include <string.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 /* The break is made by inverting the UART0 TX signal, so the FPGA link must be
  * UART0. (GPIO16 is UART0's TX; see esp_bridge.overlay.) */
@@ -87,6 +122,7 @@ BUILD_ASSERT(DT_SAME_NODE(DT_ALIAS(fpga_uart), DT_NODELABEL(uart0)),
 #define FALLBACK_DRAIN_MS (FPGA_IDLE_EXIT_MS + 500)
 #define STALL_ABORT_MS    5000  /* no traffic either way: the host is gone */
 #define HELLO_TIMEOUT_MS  2000
+#define HELLO_LINE_MAX          32
 
 #define TSI_CMD_READ  0u
 #define TSI_CMD_WRITE 1u
@@ -96,16 +132,46 @@ BUILD_ASSERT(DT_SAME_NODE(DT_ALIAS(fpga_uart), DT_NODELABEL(uart0)),
  * anything near this is a corrupt header, and (len + 1) * 4 must not wrap. */
 #define TSI_MAX_LEN_WORDS (1u << 20)
 
-static const uint8_t KEY[8] = { 0x52, 0x42, 0x4c, 0x44, 0xa5, 0x5a, 0xc3, 0x3c };
-static const uint8_t ACK[4] = { 'R', 'B', 'L', 'K' };
-static const char HELLO[] = "RBLOAD1";
+static const uint8_t KEY_PREFIX[7] = { 0x52, 0x42, 0x4c, 0x44, 0xa5, 0x5a, 0xc3 };
+
+struct kind_info {
+	const char *hello;     /* line prefix */
+	const char *name;      /* reply prefix */
+	uint8_t sel;           /* last key byte */
+	char ack[4];
+};
+static const struct kind_info KINDS[] = {
+	[K_LOAD]  = { "RBLOAD1",  "RBLOAD",  0x3c, { 'R', 'B', 'L', 'K' } },
+	[K_POKE]  = { "RBPOKE1",  "RBPOKE",  0x3d, { 'R', 'B', 'P', 'K' } },
+	[K_PING]  = { "RBPING1",  "RBPING",  0x3d, { 'R', 'B', 'P', 'K' } },
+	[K_FLASH] = { "RBFLASH1", "RBFLASH", 0x3e, { 'R', 'B', 'F', 'L' } },
+	[K_BOOT]  = { "RBBOOT1",  "RBBOOT",  0x3f, { 'R', 'B', 'B', 'T' } },
+	[K_STAT]  = { "RBSTAT1",  "RBSTAT",  0x00, { 0 } },   /* ESP only: no FPGA */
+	[K_STASH] = { "RBSTASH1", "RBSTASH", 0x00, { 0 } },   /* persist.c */
+	[K_POLICY] = { "RBPOLICY1", "RBPOLICY", 0x00, { 0 } },
+	[K_AUTO]  = { "RBAUTO1",  "RBAUTO",  0x00, { 0 } },
+};
+#define SEL_FLASH_FAST 0x3b
+#define FLASH_FAST_BAUD 921600
+#define LINK_BAUD 115200
+
+
+#define FL_XFER  0x01
+#define FL_PROG  0x02
+#define FL_ERASE 0x03
+#define FL_END   0xE5
+#define FL_MAX_WLEN 512
+#define POKE_MAX_PAYLOAD 1024
+
+static bool tsi_synced;
 
 static const struct device *fpga;
 static const struct device *usb;
 static atomic_t active;
 static K_MUTEX_DEFINE(tx_lock);
 
-static uint8_t from_fpga_buf[4096];
+/* 16 KiB: a WiFi retransmit stall of ~1.4 s at the link rate before a byte drops. */
+static uint8_t from_fpga_buf[16384];
 static struct ring_buf from_fpga;
 static atomic_t from_fpga_dropped;
 
@@ -188,6 +254,8 @@ static int t_recv(struct transport *t, uint8_t *buf, size_t max)
 	return (errno == EAGAIN || errno == EWOULDBLOCK) ? 0 : -1;
 }
 
+static int last_send_errno;
+
 static int t_send(struct transport *t, const uint8_t *buf, size_t n)
 {
 	if (t->is_usb) {
@@ -209,6 +277,7 @@ static int t_send(struct transport *t, const uint8_t *buf, size_t n)
 			continue;
 		}
 		if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+			last_send_errno = errno;
 			return -1;
 		}
 		if (k_uptime_get() > give_up) {
@@ -254,6 +323,20 @@ static void logs_quiet(bool quiet)
 
 /* ---- FPGA handshake ------------------------------------------------------- */
 
+/* One byte to the FPGA, SLEEPING while the 128-byte TX FIFO is full. The
+ * driver's uart_poll_out() spins instead, and this thread outranks the WiFi
+ * task: a load spinning for minutes starved it until the SoftAP stopped
+ * beaconing, TCP stalled for more than the mux's 2 s idle exit, and the rest
+ * of the program went to uart1 instead of TSI. A full FIFO is 11 ms of
+ * transmission, so a 1 ms sleep never lets the line go idle. */
+static void fpga_putc(uint8_t c)
+{
+	while (uart_ll_get_txfifo_len(FPGA_UART_HW) == 0) {
+		k_msleep(1);
+	}
+	uart_poll_out(fpga, c);
+}
+
 static bool send_break(void)
 {
 	int64_t give_up = k_uptime_get() + 50;
@@ -272,11 +355,14 @@ static bool send_break(void)
 	return true;
 }
 
-static bool wait_ack(void)
+/* The ack, then (bitstreams with EspLinkRxFilter onwards) four id bytes MSB
+ * first. *id_valid is false for an older loader, which sends the ack alone. */
+static bool wait_ack(const char ack[4], uint32_t *id, bool *id_valid)
 {
 	int64_t deadline = k_uptime_get() + ACK_TIMEOUT_MS;
 	size_t matched = 0;
 
+	*id_valid = false;
 	while (k_uptime_get() < deadline) {
 		uint8_t c;
 
@@ -284,15 +370,47 @@ static bool wait_ack(void)
 			k_msleep(1);
 			continue;
 		}
-		matched = (c == ACK[matched]) ? matched + 1 : (c == ACK[0] ? 1 : 0);
-		if (matched == sizeof(ACK)) {
-			return true;
+		matched = (c == (uint8_t)ack[matched]) ? matched + 1 :
+			  (c == (uint8_t)ack[0] ? 1 : 0);
+		if (matched == 4) {
+			break;
 		}
 	}
-	return false;
+	if (matched != 4) {
+		return false;
+	}
+	/* Four more bytes take 350 us at 115200; allow 5 ms. */
+	uint8_t idb[4];
+	size_t n = 0;
+	int64_t id_deadline = k_uptime_get() + 5;
+
+	while (n < 4 && k_uptime_get() <= id_deadline) {
+		n += ring_buf_get(&from_fpga, &idb[n], 4 - n);
+		if (n < 4) {
+			k_busy_wait(200);
+		}
+	}
+	if (n == 4) {
+		*id = sys_get_be32(idb);
+		*id_valid = true;
+	}
+	return true;
+}
+
+static void set_link_baud(uint32_t baud)
+{
+	struct uart_config cfg;
+
+	if (uart_config_get(fpga, &cfg) == 0 && cfg.baudrate != baud) {
+		cfg.baudrate = baud;
+		(void)uart_configure(fpga, &cfg);
+	}
 }
 
 /* ---- the session ----------------------------------------------------------- */
+
+/* A LOAD pump that stops with a write's payload half sent leaves TSI misaligned. */
+static bool pump_tsi_mid_command;
 
 struct session_stats {
 	uint32_t cmds;
@@ -301,22 +419,198 @@ struct session_stats {
 	const char *end;
 };
 
+static void fpga_write(const uint8_t *b, size_t n)
+{
+	for (size_t i = 0; i < n; i++) {
+		fpga_putc(b[i]);
+	}
+}
+
+/* Reply accounting for a session. (A keepalive that injected its own
+ * commands while idle was tried and removed: replies came back shifted. The
+ * mux's 2 s idle exit therefore ends a session if the host goes quiet that
+ * long; with the WiFi heap sized properly, a load does not.) */
+struct wire {
+	uint32_t outstanding;   /* reply bytes the host is still owed */
+	uint32_t swallow;       /* keepalive reply bytes to drop */
+	int64_t last;           /* last byte either way */
+};
+
+/* Forward FPGA -> host; false if the host is gone. */
+static bool drain_to_host(struct transport *t, struct session_stats *st, bool *progress,
+			  struct wire *w)
+{
+	static uint8_t out[1024];   /* larger sends: fewer, fuller TCP segments */
+	uint32_t m = ring_buf_get(&from_fpga, out, sizeof(out));
+	uint32_t skip = 0;
+
+	if (m == 0u) {
+		return true;
+	}
+	*progress = true;
+	w->last = k_uptime_get();
+	if (w->swallow > 0u) {
+		skip = MIN(w->swallow, m);
+		w->swallow -= skip;
+	}
+	if (m > skip) {
+		st->to_host += m - skip;
+		w->outstanding -= MIN(w->outstanding, m - skip);
+		if (t_send(t, &out[skip], m - skip) < 0) {
+			static char why[48];
+
+			snprintk(why, sizeof(why), "host send failed (errno %d)", last_send_errno);
+			st->end = why;
+			return false;
+		}
+	}
+	return true;
+}
+
+/* POKE: each command is collected whole (header + payload) and only then
+ * forwarded, so nothing the host does can leave TSI mid-command. */
+static void pump_poke(struct transport *t, struct session_stats *st)
+{
+	static uint8_t cmdbuf[TSI_HDR_LEN + POKE_MAX_PAYLOAD];
+	size_t have = 0, need = TSI_HDR_LEN;
+	int64_t last_traffic = k_uptime_get();
+	struct wire w = { .last = k_uptime_get() };
+
+	for (;;) {
+		bool progress = false;
+		int n = t_recv(t, &cmdbuf[have], need - have);
+
+		if (n < 0) {
+			st->end = have == 0 ? "host closed" : "host closed mid-command (nothing of it sent)";
+			return;
+		}
+		if (n > 0) {
+			progress = true;
+			have += (size_t)n;
+		}
+		if (have == TSI_HDR_LEN && need == TSI_HDR_LEN) {
+			uint32_t cmd = sys_get_le32(&cmdbuf[0]);
+			uint64_t len = sys_get_le64(&cmdbuf[12]);
+
+			if (cmd == TSI_CMD_END) {
+				st->end = "END";
+				return;
+			}
+			if ((cmd != TSI_CMD_READ && cmd != TSI_CMD_WRITE) ||
+			    (cmd == TSI_CMD_WRITE && (len + 1u) * 4u > POKE_MAX_PAYLOAD) ||
+			    len >= TSI_MAX_LEN_WORDS) {
+				st->end = "REJECTED (poke takes reads, and writes <= 1 KiB)";
+				return;
+			}
+			need = TSI_HDR_LEN + (cmd == TSI_CMD_WRITE ? (size_t)(len + 1u) * 4u : 0u);
+		}
+		if (have == need && have >= TSI_HDR_LEN) {
+			fpga_write(cmdbuf, have);
+			if (sys_get_le32(&cmdbuf[0]) == TSI_CMD_READ) {
+				w.outstanding += (uint32_t)(sys_get_le64(&cmdbuf[12]) + 1u) * 4u;
+			}
+			w.last = k_uptime_get();
+			st->to_fpga += have;
+			st->cmds++;
+			have = 0;
+			need = TSI_HDR_LEN;
+		}
+		if (!drain_to_host(t, st, &progress, &w)) {
+			return;
+		}
+
+		if (progress) {
+			last_traffic = k_uptime_get();
+		} else if (k_uptime_get() - last_traffic > STALL_ABORT_MS) {
+			st->end = "stalled (no traffic for 5 s)";
+			return;
+		} else {
+			k_msleep(1);
+		}
+	}
+}
+
+/* FLASH: whole frames only, as for POKE. */
+static void pump_flash(struct transport *t, struct session_stats *st)
+{
+	static uint8_t fr[5 + FL_MAX_WLEN + 256];
+	size_t have = 0, need = 1;
+	int64_t last_traffic = k_uptime_get();
+	struct wire w = { .last = k_uptime_get() };
+
+	for (;;) {
+		bool progress = false;
+		int n = t_recv(t, &fr[have], need - have);
+
+		if (n < 0) {
+			st->end = have == 0 ? "host closed" : "host closed mid-frame (nothing of it sent)";
+			return;
+		}
+		if (n > 0) {
+			progress = true;
+			have += (size_t)n;
+		}
+		if (have == 1 && need == 1) {
+			switch (fr[0]) {
+			case FL_END:   st->end = "END"; return;
+			case FL_XFER:  need = 5; break;
+			case FL_PROG:  need = 5 + 256; break;
+			case FL_ERASE: need = 5; break;
+			default:       st->end = "REJECTED an unknown flash frame"; return;
+			}
+		}
+		if (have == 5 && need == 5 && fr[0] == FL_XFER) {
+			uint16_t wlen = sys_get_le16(&fr[1]);
+
+			if (wlen == 0 || wlen > FL_MAX_WLEN) {
+				st->end = "REJECTED an XFER length";
+				return;
+			}
+			need = 5 + wlen;
+		}
+		if (have == need && have >= 5) {
+			fpga_write(fr, have);
+			w.outstanding += fr[0] == FL_XFER ? (uint32_t)sys_get_le16(&fr[3]) + 1u : 1u;
+			w.last = k_uptime_get();
+			st->to_fpga += have;
+			st->cmds++;
+			have = 0;
+			need = 1;
+		}
+		if (!drain_to_host(t, st, &progress, &w)) {
+			return;
+		}
+
+		if (progress) {
+			last_traffic = k_uptime_get();
+		} else if (k_uptime_get() - last_traffic > STALL_ABORT_MS) {
+			st->end = "stalled (no traffic for 5 s)";
+			return;
+		} else {
+			k_msleep(1);
+		}
+	}
+}
+
 static void pump(struct transport *t, struct session_stats *st)
 {
 	uint8_t hdr[TSI_HDR_LEN];
 	size_t hn = 0;
 	uint64_t payload_left = 0;
 	int64_t last_traffic = k_uptime_get();
+	struct wire w = { .last = k_uptime_get() };
+
+	pump_tsi_mid_command = false;
 
 	for (;;) {
 		uint8_t in[128];
-		uint8_t out[128];
 		bool progress = false;
 		int n = t_recv(t, in, sizeof(in));
 
 		if (n < 0) {
 			st->end = (hn == 0 && payload_left == 0) ? "host closed" :
 				  "host closed MID-COMMAND";
+			pump_tsi_mid_command = payload_left > 0;
 			return;
 		}
 		for (int i = 0; i < n; i++) {
@@ -324,9 +618,10 @@ static void pump(struct transport *t, struct session_stats *st)
 
 			progress = true;
 			if (payload_left > 0) {
-				uart_poll_out(fpga, b);
+				fpga_putc(b);
 				payload_left--;
 				st->to_fpga++;
+				w.last = k_uptime_get();
 				continue;
 			}
 			hdr[hn++] = b;
@@ -351,27 +646,27 @@ static void pump(struct transport *t, struct session_stats *st)
 				return;
 			}
 			for (size_t k = 0; k < TSI_HDR_LEN; k++) {
-				uart_poll_out(fpga, hdr[k]);
+				fpga_putc(hdr[k]);
 			}
 			st->to_fpga += TSI_HDR_LEN;
 			st->cmds++;
 			payload_left = (cmd == TSI_CMD_WRITE) ? (len + 1u) * 4u : 0u;
-		}
-
-		uint32_t m = ring_buf_get(&from_fpga, out, sizeof(out));
-
-		if (m > 0u) {
-			progress = true;
-			st->to_host += m;
-			if (t_send(t, out, m) < 0) {
-				st->end = "host send failed";
-				return;
+			if (cmd == TSI_CMD_READ) {
+				w.outstanding += (uint32_t)(len + 1u) * 4u;
 			}
+			w.last = k_uptime_get();
 		}
+
+		if (!drain_to_host(t, st, &progress, &w)) {
+			pump_tsi_mid_command = payload_left > 0;
+			return;
+		}
+
 		if (progress) {
 			last_traffic = k_uptime_get();
 		} else if (k_uptime_get() - last_traffic > STALL_ABORT_MS) {
 			st->end = "stalled (no traffic for 5 s)";
+			pump_tsi_mid_command = payload_left > 0;
 			return;
 		} else {
 			k_msleep(1);
@@ -379,11 +674,49 @@ static void pump(struct transport *t, struct session_stats *st)
 	}
 }
 
-static void session(struct transport *t)
+static void say_kind(struct transport *t, const struct request *rq, const char *fmt, ...)
+{
+	char buf[200];
+	int n = snprintk(buf, sizeof(buf), "%s ", KINDS[rq->kind].name);
+	va_list ap;
+
+	va_start(ap, fmt);
+	n += vsnprintk(&buf[n], sizeof(buf) - n, fmt, ap);
+	va_end(ap);
+	t_say(t, buf);
+}
+
+static void session(struct transport *t, const struct request *rq)
 {
 	struct session_stats st = { .end = "?" };
+	const struct kind_info *k = &KINDS[rq->kind];
 	const char *err = NULL;
 	int64_t t0 = k_uptime_get();
+	uint32_t id = 0;
+	bool id_valid = false;
+
+	if (rq->kind == K_STASH || rq->kind == K_POLICY || rq->kind == K_AUTO) {
+		persist_session(t->is_usb ? NULL : &t->sock, t->is_usb, rq);
+		return;
+	}
+	if (rq->kind == K_STAT) {
+		char line[256];
+
+		(void)esp_bridge_status(line, sizeof(line));
+		say_kind(t, rq, "OK %s", line);
+		return;
+	}
+	if (esp_bridge_motors_recently_on()) {
+		say_kind(t, rq, "ERR motors-running: a gate carried a nonzero duty in the last "
+			 "second; a session would cut the motor link. Land and disarm first.\n");
+		printk("load_link: %s %s refused: motors running\n", t->name, k->name);
+		return;
+	}
+	if (rq->kind == K_POKE && !tsi_synced) {
+		say_kind(t, rq, "ERR tsi-unsynced: TSI may be mid-command since the last load "
+			 "(or this ESP restarted); poke needs a fresh load first\n");
+		return;
+	}
 
 	k_mutex_lock(&tx_lock, K_FOREVER);   /* waits out an in-flight uplink line */
 	from_fpga_reset();
@@ -394,37 +727,103 @@ static void session(struct transport *t)
 	}
 	k_msleep(10);               /* > one motor-link tick: gates are at 0 */
 
+
 	if (!send_break()) {
-		err = "RBLOAD ERR esp-uart-busy\n";
+		err = "ERR esp-uart-busy\n";
 	} else {
 		from_fpga_reset();
-		for (size_t i = 0; i < sizeof(KEY); i++) {
-			uart_poll_out(fpga, KEY[i]);
+		fpga_write(KEY_PREFIX, sizeof(KEY_PREFIX));
+		uint8_t sel = (rq->kind == K_FLASH && rq->fast) ? SEL_FLASH_FAST : k->sel;
+
+		fpga_putc(sel);
+		if (rq->kind == K_BOOT) {
+			uint8_t arg[8];
+
+			sys_put_le32(rq->addr, &arg[0]);
+			sys_put_le32(~rq->addr, &arg[4]);
+			fpga_write(arg, sizeof(arg));
 		}
-		if (!wait_ack()) {
-			err = "RBLOAD ERR no-ack: the FPGA did not answer the loader key "
-			      "(bitstream without the ESP loader, or link down)\n";
+		if (!wait_ack(k->ack, &id, &id_valid)) {
+			err = rq->kind == K_LOAD ?
+				"ERR no-ack: the FPGA did not answer the loader key "
+				"(bitstream without the ESP loader, or link down)\n" :
+				"ERR no-ack: no answer to this session's key (a bitstream "
+				"without the ESP loader, or a loader older than ping/poke/flash/boot)\n";
 		}
 	}
 
+	char idtxt[16];
+
+	if (id_valid) {
+		snprintk(idtxt, sizeof(idtxt), "%08x", id);
+	} else {
+		strcpy(idtxt, "unknown");
+	}
+
 	if (err != NULL) {
-		t_say(t, err);
+		say_kind(t, rq, "%s", err);
 		st.end = "handshake failed";
-		/* A non-loader bitstream's uart1 just saw a break and 8 junk bytes;
-		 * a loader bitstream that missed the key is back on uart1 already. */
+		/* A non-loader bitstream's uart1 just saw a break and junk bytes; a
+		 * loader bitstream that missed the key is back on uart1 already. */
 		k_msleep(300);
 	} else {
-		k_msleep(RESET_SETTLE_MS);
-		from_fpga_reset();
-		t_say(t, "RBLOAD OK\n");
-		pump(t, &st);
-		/* Hand the pins back to uart1: bare break, then wait out the key
-		 * window. If the break cannot be sent, fall back to the idle exit. */
-		if (send_break()) {
-			k_msleep(DRAIN_MS);
-		} else {
-			k_msleep(FALLBACK_DRAIN_MS);
+		switch (rq->kind) {
+		case K_LOAD:
+			k_msleep(RESET_SETTLE_MS);
+			from_fpga_reset();
+			tsi_synced = true;            /* the SoC reset restarted TSI */
+			say_kind(t, rq, "OK id=%s\n", idtxt);
+			pump(t, &st);
+			if (pump_tsi_mid_command) {
+				tsi_synced = false;
+			}
+			break;
+		case K_POKE:
+			k_msleep(2);
+			from_fpga_reset();
+			say_kind(t, rq, "OK id=%s\n", idtxt);
+			pump_poke(t, &st);
+			break;
+		case K_PING:
+			say_kind(t, rq, "OK id=%s\n", idtxt);
+			st.end = "ping";
+			break;
+		case K_FLASH:
+			if (rq->fast) {
+				set_link_baud(FLASH_FAST_BAUD);
+			}
+			k_msleep(2);
+			from_fpga_reset();
+			say_kind(t, rq, "OK id=%s%s\n", idtxt, rq->fast ? " baud=921600" : "");
+			pump_flash(t, &st);
+			break;
+		case K_BOOT:
+			say_kind(t, rq, "OK id=%s; reconfiguring from 0x%08x\n", idtxt, rq->addr);
+			st.end = "IPROG";
+			/* The FPGA reconfigures now: its pins float, then a new image
+			 * starts on uart1. Anything heard meanwhile is noise. A load or
+			 * poke after this needs a fresh LOAD first. */
+			tsi_synced = false;
+			k_msleep(500);
+			break;
+		default:
+			break;   /* answered before the handshake */
 		}
+		if (rq->kind == K_LOAD || rq->kind == K_POKE || rq->kind == K_FLASH) {
+			/* Why it ended, for a host that is still reading (after the
+			 * binary stream; tools print it on failure). */
+			say_kind(t, rq, "END %s\n", st.end);
+		}
+		if (rq->kind != K_BOOT) {
+			/* Hand the pins back to uart1: bare break, then wait out the
+			 * key window. Without the break, fall back to the idle exit. */
+			if (send_break()) {
+				k_msleep(DRAIN_MS);
+			} else {
+				k_msleep(FALLBACK_DRAIN_MS);
+			}
+		}
+		set_link_baud(LINK_BAUD);
 	}
 
 	from_fpga_reset();
@@ -435,18 +834,70 @@ static void session(struct transport *t)
 	k_mutex_unlock(&tx_lock);
 	usb_flush();   /* a hello typed or retried during this session is stale */
 
-	printk("load_link: %s session: %s; %u cmds, %u B to FPGA, %u B to host, "
-	       "%d dropped, %lld ms\n", t->name, err ? "NO ACK" : st.end,
+	printk("load_link: %s %s session: %s; id=%s; %u cmds, %u B to FPGA, %u B to host, "
+	       "%d dropped, %lld ms\n", t->name, k->name, err ? "NO ACK" : st.end, idtxt,
 	       st.cmds, st.to_fpga, st.to_host, (int)atomic_get(&from_fpga_dropped),
 	       k_uptime_get() - t0);
+}
+
+/* Parse a hello line into a request. */
+static bool parse_hello(const char *line, struct request *rq)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(KINDS); i++) {
+		size_t n = strlen(KINDS[i].hello);
+
+		if (strncmp(line, KINDS[i].hello, n) != 0) {
+			continue;
+		}
+		const char *rest = &line[n];
+
+		rq->kind = (enum kind)i;
+		rq->fast = false;
+		rq->addr = 0;
+		rq->args[0] = '\0';
+		if (rq->kind == K_FLASH) {
+			if (*rest == '\0') {
+				return true;
+			}
+			if (strcmp(rest, " FAST") == 0) {
+				rq->fast = true;
+				return true;
+			}
+			return false;
+		}
+		if (rq->kind == K_STASH || rq->kind == K_POLICY) {
+			strncpy(rq->args, rest, sizeof(rq->args) - 1);
+			rq->args[sizeof(rq->args) - 1] = '\0';
+			return true;
+		}
+		if (rq->kind == K_BOOT) {
+			char *endp;
+
+			if (*rest != ' ') {
+				return false;
+			}
+			unsigned long a = strtoul(rest + 1, &endp, 16);
+
+			if (endp == rest + 1) {
+				return false;
+			}
+			if (*endp != '\0') {
+				return false;
+			}
+			rq->addr = (uint32_t)a;
+			return true;
+		}
+		return *rest == '\0';
+	}
+	return false;
 }
 
 /* ---- listeners --------------------------------------------------------------- */
 
 /* Read one hello line on a fresh TCP connection. */
-static bool tcp_hello(int sock)
+static bool tcp_hello(int sock, struct request *rq)
 {
-	char line[16];
+	char line[HELLO_LINE_MAX];
 	size_t n = 0;
 	int64_t deadline = k_uptime_get() + HELLO_TIMEOUT_MS;
 
@@ -462,7 +913,7 @@ static bool tcp_hello(int sock)
 		}
 		if (c == '\n') {
 			line[n] = '\0';
-			return strcmp(line, HELLO) == 0;
+			return parse_hello(line, rq);
 		}
 		if (c != '\r' && n < sizeof(line) - 1) {
 			line[n++] = c;
@@ -471,11 +922,11 @@ static bool tcp_hello(int sock)
 	return false;
 }
 
-static char usb_line[16];
+static char usb_line[HELLO_LINE_MAX];
 static size_t usb_line_n;
 
 /* Feed USB console input; true when a hello line has arrived. */
-static bool usb_hello(void)
+static bool usb_hello(struct request *rq)
 {
 	char *line = usb_line;
 	size_t n = usb_line_n;
@@ -484,13 +935,16 @@ static bool usb_hello(void)
 
 	while (!hit && usb != NULL && uart_poll_in(usb, &c) == 0) {
 		if (c == '\n') {
-			hit = (n == strlen(HELLO)) && memcmp(line, HELLO, n) == 0;
+			if (n < sizeof(usb_line)) {
+				line[n] = '\0';
+				hit = parse_hello(line, rq);
+			}
 			n = 0;
 		} else if (c != '\r') {
-			if (n < sizeof(usb_line)) {
+			if (n < sizeof(usb_line) - 1) {
 				line[n++] = (char)c;
 			} else {
-				n = sizeof(usb_line) + 1;   /* overlong: never matches */
+				n = sizeof(usb_line);   /* overlong: never matches */
 			}
 		}
 	}
@@ -522,19 +976,32 @@ static void open_listener(void)
 		return;
 	}
 	if (zsock_bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0 ||
-	    zsock_listen(s, 1) < 0) {
+	    zsock_listen(s, 4) < 0) {
 		zsock_close(s);
 		return;
 	}
 	listen_sock = s;
-	printk("load_link: program loading on TCP :%d%s\n", LOAD_LINK_TCP_PORT,
-	       usb ? " and the USB console (\"RBLOAD1\")" : "");
+	printk("load_link: program loading on TCP :%d%s (RBLOAD1/RBPOKE1/RBPING1/"
+	       "RBFLASH1/RBBOOT1)\n", LOAD_LINK_TCP_PORT, usb ? " and the USB console" : "");
 }
 
 static void load_thread(void *a, void *b, void *c)
 {
 	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
 	int64_t next_listen_try = 0;
+
+	/* If this ESP restarted in the middle of a session, the mux may still be
+	 * in TSI or FLASH (or, for FLASH, waiting out its idle timer): a bare
+	 * break returns it to uart1 within the key window. */
+	k_mutex_lock(&tx_lock, K_FOREVER);
+	atomic_set(&active, 1);
+	(void)send_break();
+	k_msleep(DRAIN_MS);
+	from_fpga_reset();
+	atomic_set(&active, 0);
+	k_mutex_unlock(&tx_lock);
+
+	persist_start();   /* power-on only: boot policy and the stashed program */
 
 	for (;;) {
 		if (listen_sock < 0 && k_uptime_get() >= next_listen_try) {
@@ -555,8 +1022,9 @@ static void load_thread(void *a, void *b, void *c)
 					(void)zsock_setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
 							       &one, sizeof(one));
 					char peek;
+					struct request rq;
 
-					if (tcp_hello(s) &&
+					if (tcp_hello(s, &rq) &&
 					    /* A request that gave up while another session ran
 					     * still has its hello buffered: do not reset the SoC
 					     * for a peer that has already closed. */
@@ -564,9 +1032,10 @@ static void load_thread(void *a, void *b, void *c)
 						struct transport t = {
 							.name = "WiFi", .sock = s, .is_usb = false,
 						};
-						session(&t);
+						session(&t, &rq);
 					} else {
-						static const char bad[] = "RBLOAD ERR expected RBLOAD1\n";
+						static const char bad[] = "RB ERR expected RBLOAD1, RBPOKE1, "
+							"RBPING1, RBFLASH1 [FAST], RBBOOT1 <hex> or RBSTAT1\n";
 
 						(void)zsock_send(s, bad, sizeof(bad) - 1, 0);
 					}
@@ -576,10 +1045,12 @@ static void load_thread(void *a, void *b, void *c)
 		} else {
 			k_msleep(20);
 		}
-		if (usb_hello()) {
+		struct request urq;
+
+		if (usb_hello(&urq)) {
 			struct transport t = { .name = "USB", .sock = -1, .is_usb = true };
 
-			session(&t);
+			session(&t, &urq);
 		}
 	}
 }
@@ -596,4 +1067,96 @@ int load_link_start(const struct device *fpga_uart, const struct device *usb_dev
 			load_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(4), 0, K_NO_WAIT);
 	k_thread_name_set(&load_thread_data, "loadlink");
 	return 0;
+}
+
+/* ---- internal sessions (persist.c: power-on boot policy, stashed program) ---- */
+
+void ll_claim(void)
+{
+	k_mutex_lock(&tx_lock, K_FOREVER);
+	from_fpga_reset();
+	atomic_set(&active, 1);
+	k_msleep(10);
+}
+
+void ll_release(bool end_break)
+{
+	if (end_break) {
+		if (send_break()) {
+			k_msleep(DRAIN_MS);
+		} else {
+			k_msleep(FALLBACK_DRAIN_MS);
+		}
+	}
+	set_link_baud(LINK_BAUD);
+	from_fpga_reset();
+	atomic_set(&active, 0);
+	k_mutex_unlock(&tx_lock);
+}
+
+bool ll_handshake(enum kind kind, uint32_t addr, uint32_t *id, bool *id_valid)
+{
+	const struct kind_info *k = &KINDS[kind];
+
+	if (!send_break()) {
+		return false;
+	}
+	from_fpga_reset();
+	fpga_write(KEY_PREFIX, sizeof(KEY_PREFIX));
+	fpga_putc(k->sel);
+	if (kind == K_BOOT) {
+		uint8_t arg[8];
+
+		sys_put_le32(addr, &arg[0]);
+		sys_put_le32(~addr, &arg[4]);
+		fpga_write(arg, sizeof(arg));
+	}
+	if (!wait_ack(k->ack, id, id_valid)) {
+		return false;
+	}
+	if (kind == K_LOAD) {
+		k_msleep(RESET_SETTLE_MS);
+		tsi_synced = true;
+	} else if (kind == K_BOOT) {
+		tsi_synced = false;
+	} else {
+		k_msleep(2);
+	}
+	from_fpga_reset();
+	return true;
+}
+
+void ll_write(const uint8_t *b, size_t n)
+{
+	fpga_write(b, n);
+}
+
+size_t ll_read(uint8_t *b, size_t n, int timeout_ms)
+{
+	size_t got = 0;
+	int64_t deadline = k_uptime_get() + timeout_ms;
+
+	while (got < n && k_uptime_get() < deadline) {
+		uint32_t m = ring_buf_get(&from_fpga, &b[got], n - got);
+
+		got += m;
+		if (m == 0) {
+			k_msleep(1);
+		}
+	}
+	return got;
+}
+
+int ll_send(int *sock, bool is_usb, const char *s)
+{
+	struct transport t = { .name = "", .sock = sock ? *sock : -1, .is_usb = is_usb };
+
+	return t_send(&t, (const uint8_t *)s, strlen(s));
+}
+
+int ll_recv(int *sock, bool is_usb, uint8_t *buf, size_t max)
+{
+	struct transport t = { .name = "", .sock = sock ? *sock : -1, .is_usb = is_usb };
+
+	return t_recv(&t, buf, max);
 }

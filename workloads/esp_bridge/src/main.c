@@ -202,6 +202,15 @@ static struct ring_buf line_rb;
  * Interrupt-driven, because polling a 115200 link from a thread either burns a
  * core or drops bytes, and this is the only copy of the flight data. The ISR
  * does nothing but move bytes into the ring. */
+/* Bytes uart1 delivered outside load sessions since boot: persist.c reads it
+ * to tell "a program is already running" from "the FPGA just powered up". */
+static atomic_t g_uart1_rx_total = ATOMIC_INIT(0);
+
+uint32_t esp_bridge_uart1_rx_bytes(void)
+{
+	return (uint32_t)atomic_get(&g_uart1_rx_total);
+}
+
 static void uart_isr(const struct device *dev, void *user_data)
 {
 	ARG_UNUSED(user_data);
@@ -222,6 +231,7 @@ static void uart_isr(const struct device *dev, void *user_data)
 			load_link_rx_from_fpga(buf, (size_t)n);
 			continue;
 		}
+		atomic_add(&g_uart1_rx_total, n);
 		/* Short write = ring full. Nothing useful to do in an ISR
 		 * except keep draining the FIFO, which is what this loop is. */
 		(void)ring_buf_put(&uart_rb, buf, (uint32_t)n);
@@ -355,6 +365,21 @@ static volatile bool g_kill;
  * the sole caller also means that semaphore is never contended, so the
  * cooperative link thread can never block on another thread's PWM write.
  */
+/* When a gate last carried a nonzero duty: load_link refuses every session
+ * for a second after that, because a session takes the wire the motor frames
+ * travel on (and resets the SoC, for a load). Mid-flight, either drops the
+ * drone. */
+static atomic_t g_last_spin_ms = ATOMIC_INIT(0);
+static atomic_t g_ever_spun = ATOMIC_INIT(0);
+
+bool esp_bridge_motors_recently_on(void)
+{
+	if (!atomic_get(&g_ever_spun)) {
+		return false;
+	}
+	return (uint32_t)(k_uptime_get_32() - (uint32_t)atomic_get(&g_last_spin_ms)) < 1000u;
+}
+
 static void motors_apply(const uint16_t duty[MOTOR_LINK_NMOTORS])
 {
 	const uint32_t ceiling = (MOTOR_LINK_DUTY_FULL * ESP_LINK_MAX_DUTY_PCT) / 100U;
@@ -376,6 +401,10 @@ static void motors_apply(const uint16_t duty[MOTOR_LINK_NMOTORS])
 			g_pwm_errs++;
 		}
 		g_duty[i] = (uint16_t)d;
+		if (d != 0u) {
+			atomic_set(&g_last_spin_ms, (atomic_val_t)k_uptime_get_32());
+			atomic_set(&g_ever_spun, 1);
+		}
 	}
 }
 
@@ -637,6 +666,21 @@ static int status_line(char *buf, size_t len, int clients)
 			g_kill ? 1u : 0u, (unsigned)g_text_bytes, clients);
 }
 
+int esp_bridge_status(char *buf, size_t len)
+{
+	return status_line(buf, len, -1);
+}
+
+#else
+bool esp_bridge_motors_recently_on(void)
+{
+	return false;   /* no gate in this image */
+}
+
+int esp_bridge_status(char *buf, size_t len)
+{
+	return snprintk(buf, len, "RBLINK none (no motor path in this image)\n");
+}
 #endif /* HAVE_MOTORS */
 
 /* ---- client list ----------------------------------------------------------

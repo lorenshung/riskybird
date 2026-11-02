@@ -3035,6 +3035,8 @@ def cmd_fly(args: argparse.Namespace) -> int:
     try:
         action = args.fly_action
         if action in ("load", "commit"):
+            if getattr(args, "remote", None):
+                return fly.remote_load_and_check(args, commit=(action == "commit"))
             return fly.load_and_check(args, commit=(action == "commit"))
         if action == "program":
             fly._confirm_pack_out(args)
@@ -4169,6 +4171,10 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--no-program", action="store_true",
                            help="skip re-programming the FullDDR shell (it is already fresh)")
             p.add_argument("--pristine", choices=("auto", "always", "never"), default="auto")
+            p.add_argument("--remote", metavar="URL",
+                           help="no cable to the drone: load (and commit) through the ESP, e.g. "
+                                "socket://192.168.4.1:14552 or esp-usb:///dev/ttyACM0. Needs a loader "
+                                "shell (RocketArty200TDroneFullDDRLoaderConfig) already running")
         p.set_defaults(func=cmd_fly)
         return p
 
