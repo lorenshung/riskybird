@@ -1,0 +1,11 @@
+{
+  "source": "/scratch/dima/riskybird_chipyard",
+  "head": "041d19eaa3333c342c17f3171d5c45f3cd03fd6a",
+  "files": {
+    "fpga/src/main/scala/ku040/HarnessBinders.scala": "cfa68fe42613aa6b348713a4d369d410b8c1a3d7315ab6cc2deb1cf7c8661740",
+    "generators/chipyard/src/main/scala/fc/FcRoCC.scala": "37de5932d6bdb165df9dd11264e215c65193344db6e16a68efe7031b93be5649",
+    "generators/chipyard/src/main/resources/vsrc/fc_rocc_core.sv": "73098c4ae1a2dd0288e64fa75ac3d154bb4a8245147e8c7acb39b5a2cce0195e",
+    "generators/chipyard/src/main/resources/vsrc/fc_rocc_rom.hex": "114063f55bfa01dbc65de9e0b8c28d8695b9b000c74abef42267f74dc6c3507a",
+    "generators/chipyard/src/main/resources/vsrc/fc_rocc_init.hex": "3cf8f8f023ae64af622513cb1388c926bc26ef0b8a77f96b2c4bbd846400a086"
+  }
+}

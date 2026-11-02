@@ -1,0 +1,136 @@
+diff --git a/deploy/runtools/workload.py b/deploy/runtools/workload.py
+index 954e16b0c..dde6a54db 100644
+--- a/deploy/runtools/workload.py
++++ b/deploy/runtools/workload.py
+@@ -8,6 +8,13 @@ import os
+ from typing import List, Optional, Dict, Any, Tuple
+ 
+ 
++def resolve_under_workload_input_base(workload_input_base_dir: str, path: str) -> str:
++    """Prepend workload_input_base_dir unless path is already absolute."""
++    if os.path.isabs(path):
++        return path
++    return workload_input_base_dir + path
++
++
+ class JobConfig:
+     """A single job that runs on a simulation.
+     E.g. one spec benchmark, one of the risc-v tests, etc.
+@@ -57,9 +64,9 @@ class JobConfig:
+                 self.rootfs = None
+             else:
+                 # Explicit per-job rootfs
+-                self.rootfs = (
+-                    self.parent_workload.workload_input_base_dir
+-                    + singlejob_dict["rootfs"]
++                self.rootfs = resolve_under_workload_input_base(
++                    self.parent_workload.workload_input_base_dir,
++                    singlejob_dict["rootfs"],
+                 )
+         else:
+             # No explicit per-job rootfs, inherit from workload
+@@ -75,25 +82,30 @@ class JobConfig:
+                 self.rootfs = None
+             else:
+                 # Explicit rootfs path from workload
+-                self.rootfs = (
+-                    self.parent_workload.workload_input_base_dir
+-                    + self.parent_workload.common_rootfs
++                self.rootfs = resolve_under_workload_input_base(
++                    self.parent_workload.workload_input_base_dir,
++                    self.parent_workload.common_rootfs,
+                 )
+ 
+     def bootbinary_path(self) -> str:
+-        return self.parent_workload.workload_input_base_dir + self.bootbinary
++        return resolve_under_workload_input_base(
++            self.parent_workload.workload_input_base_dir, self.bootbinary
++        )
+ 
+     def get_siminputs(self) -> List[Tuple[str, str]]:
+         # remote filename for a siminput gets prefixed with the job's name
+-        return list(
+-            map(
+-                lambda x: (
+-                    self.parent_workload.workload_input_base_dir + "/" + x,
+-                    self.jobname + "-" + x,
+-                ),
+-                self.siminputs,
+-            )
+-        )
++        out: List[Tuple[str, str]] = []
++        for x in self.siminputs:
++            if os.path.isabs(x):
++                out.append((x, self.jobname + "-" + os.path.basename(x)))
++            else:
++                out.append(
++                    (
++                        self.parent_workload.workload_input_base_dir + "/" + x,
++                        self.jobname + "-" + x,
++                    )
++                )
++        return out
+ 
+     def rootfs_path(self) -> Optional[str]:
+         return self.rootfs
+diff --git a/deploy/sudo-scripts/firesim-change-pcie-perms b/deploy/sudo-scripts/firesim-change-pcie-perms
+index 1cb65aec0..63d84c3dc 100755
+--- a/deploy/sudo-scripts/firesim-change-pcie-perms
++++ b/deploy/sudo-scripts/firesim-change-pcie-perms
+@@ -1,9 +1,11 @@
+ #!/bin/bash
++set -euo pipefail
+ 
+-set -ex
+-
+-BDF_ESC=$(echo "$1" | sed -r 's/\:/*/g')
+-
+-chmod a+rwX /sys/bus/pci/devices/$BDF_ESC/vendor
+-chmod a+rwX /sys/bus/pci/devices/$BDF_ESC/device
+-chmod a+rwX /sys/bus/pci/devices/$BDF_ESC/xdma/*_h2c_0
++BDF_ESC=$(printf '%s' "$1" | sed -r 's/\:/*/g')
++paths=(
++  /sys/bus/pci/devices/$BDF_ESC/vendor
++  /sys/bus/pci/devices/$BDF_ESC/device
++  /sys/bus/pci/devices/$BDF_ESC/xdma/*_h2c_0
++)
++chgrp firesim-runner "${paths[@]}"
++chmod 0660 "${paths[@]}"
+diff --git a/deploy/sudo-scripts/firesim-chmod-xdma-perm b/deploy/sudo-scripts/firesim-chmod-xdma-perm
+index dc8e8881a..0a95b8d0c 100755
+--- a/deploy/sudo-scripts/firesim-chmod-xdma-perm
++++ b/deploy/sudo-scripts/firesim-chmod-xdma-perm
+@@ -1,5 +1,5 @@
+ #!/bin/bash
++set -euo pipefail
+ 
+-set -ex
+-
+-chmod a+rw /dev/xdma*
++chgrp firesim-runner /dev/xdma*
++chmod 0660 /dev/xdma*
+diff --git a/platforms/xilinx_alveo_u250/build-bitstream.sh b/platforms/xilinx_alveo_u250/build-bitstream.sh
+index 46ec8f1b6..6fafd5740 100755
+--- a/platforms/xilinx_alveo_u250/build-bitstream.sh
++++ b/platforms/xilinx_alveo_u250/build-bitstream.sh
+@@ -70,6 +70,17 @@ if [ -z "$BOARD" ] ; then
+     usage 1
+ fi
+ 
++# FireSim runs this via Fabric over SSH using a non-interactive shell, which does not source ~/.bashrc.
++
++if [ "$(uname -n)" = garden ]; then
++  [ -f /ecad/tools/vlsi.bashrc ] && . /ecad/tools/vlsi.bashrc
++  [ -f /ecad/tools/xilinx/Vitis/2023.1/settings64.sh ] && . /ecad/tools/xilinx/Vitis/2023.1/settings64.sh
++fi
++if ! command -v vivado >/dev/null 2>&1; then
++    echo "vivado not found on PATH" >&2
++    exit 127
++fi
++
+ # run build
+ cd $CL_DIR
+ vivado -mode batch -source $CL_DIR/scripts/main.tcl -tclargs $FREQUENCY $STRATEGY $BOARD
+diff --git a/sourceme-manager.sh b/sourceme-manager.sh
+old mode 100644
+new mode 100755

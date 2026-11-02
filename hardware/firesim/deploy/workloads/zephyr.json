@@ -1,0 +1,7 @@
+{
+    "_comment": "Drives the modelblaster harness. benchmark_name must stay `zephyr`: firesim_runner.py hardcodes zephyr0-zephyr.elf, which is <jobname>-<basename>, and jobname is zephyr0 only for benchmark_name zephyr with no_net_num_nodes=1. bootbinary is whichever example was last built with RUNNER=firesim; the runner cp's its --elf over the staged copy each run.",
+    "benchmark_name": "zephyr",
+    "common_simulation_outputs": ["uartlog"],
+    "common_bootbinary": "/scratch2/loren/riskybird-dev/backends/zephyr-chipyard-sw/modelblaster/examples/mlp_control/fp32/build/scalar_firesim/zephyr/zephyr.elf",
+    "common_rootfs": "/scratch2/loren/riskybird-dev/backends/chipyard/software/firemarshal/boards/default/installers/firesim/dummy.rootfs"
+}

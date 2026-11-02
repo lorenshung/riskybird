@@ -1,0 +1,419 @@
+diff --git a/fpga/fpga-shells b/fpga/fpga-shells
+--- a/fpga/fpga-shells
++++ b/fpga/fpga-shells
+@@ -1 +1 @@
+-Subproject commit 3876a0980f3a3e1740483957f27069bbe031586a
++Subproject commit 3876a0980f3a3e1740483957f27069bbe031586a-dirty
+diff --git a/fpga/src/main/scala/arty200t/RbAreaExperimentsTacit.scala b/fpga/src/main/scala/arty200t/RbAreaExperimentsTacit.scala
+index 2502dfac..d16e04c9 100644
+--- a/fpga/src/main/scala/arty200t/RbAreaExperimentsTacit.scala
++++ b/fpga/src/main/scala/arty200t/RbAreaExperimentsTacit.scala
+@@ -17,3 +17,38 @@ class RocketArty200TDroneGemminiSaturnFp16At35TacitFullNoLoopConvConfig extends
+   new chipyard.harness.WithHarnessBinderClockFreqMHz(35) ++
+   new chipyard.config.WithUniformBusFrequencies(35) ++
+   new RocketArty200TDroneGemminiSaturnFp16NoLoopConvConfig)
++
++// ==========================================================================
++// NON-FITTING NEGATIVE-RESULT EXPERIMENTS -- DO NOT COMMIT.
++// Both KEEP LoopConv and both FAIL Vivado placement (slice-packing overflow) on
++// the XC7A200T with TACIT + full periphery. Kept as working-tree reference only.
++// ==========================================================================
++
++// DO NOT COMMIT. TACIT + FULL periphery + FULL LoopConv (has_loop_conv=true).
++// MEASURED: DOES NOT FIT -- synth OK (DRC 0 err) but Placer [30-487] overflow:
++// unplaced instances require 25,768 slices, only 25,503 available (over ~265).
++class RocketArty200TDroneGemminiSaturnFp16At35TacitFullConfig extends Config(
++  new WithTacitDmaTrace128 ++
++  new chipyard.harness.WithHarnessBinderClockFreqMHz(35) ++
++  new chipyard.config.WithUniformBusFrequencies(35) ++
++  new RocketArty200TDroneGemminiSaturnFp16Config)
++
++// DO NOT COMMIT. TACIT + FULL periphery + LITE LoopConv (keep LoopConv, prune its
++// maxpool + depthwise-conv loop flags: has_max_pool=false, has_dw_convs=false).
++// MEASURED: DOES NOT FIT -- Placer [30-487] overflow: unplaced require 25,716
++// slices, 25,551 available (over ~165). Lite prune shaves ~100 slices vs full
++// LoopConv (fewer control sets) but still ~0.6% too big. Slice-packing is the
++// binding constraint (not LUT% or DSP). Only no-LoopConv fits with full periphery.
++class RocketArty200TDroneGemminiSaturnFp16At35TacitLiteLoopConvConfig extends Config(
++  new WithTacitDmaTrace128 ++
++  new chipyard.harness.WithHarnessBinderClockFreqMHz(35) ++
++  new chipyard.config.WithUniformBusFrequencies(35) ++
++  new WithArty200TDroneFullDmaUartBase ++
++  new saturn.rocket.WithRocketVectorUnit(128, 64,
++    saturn.common.VectorParams.robotMpcParams.copy(useElementwiseFP64 = true)) ++
++  new freechips.rocketchip.rocket.WithRocketFPU16 ++
++  new gemmini.Q31GemminiConfig(RbArty200TGemmini.mesh16.copy(
++    has_max_pool = false, has_dw_convs = false)) ++
++  new chipyard.config.WithSystemBusWidth(128) ++
++  new freechips.rocketchip.rocket.WithNHugeCores(1) ++
++  new chipyard.config.AbstractConfig)
+diff --git a/fpga/src/main/scala/arty200t/TacitAccelConfigs.scala b/fpga/src/main/scala/arty200t/TacitAccelConfigs.scala
+index 6fea2d8f..7ecb3d49 100644
+--- a/fpga/src/main/scala/arty200t/TacitAccelConfigs.scala
++++ b/fpga/src/main/scala/arty200t/TacitAccelConfigs.scala
+@@ -59,9 +59,12 @@ class WithTacitEncoderBP(nEntries: Int = 1024, bufferDepth: Int = 16) extends Co
+ })
+ 
+ // Full-strength TACIT (1024-entry BP): DMA sink (target id 1) + encoder.
++// useBP = true is explicit because chipyard.WithTacitEncoder now defaults the DSC
++// branch predictor OFF -- it is dead logic in BrTarget mode, which is the only mode
++// the PYNQ-Z1 tutorial uses. This config keeps the predictor, so it is unchanged.
+ class WithTacitDmaTrace extends Config(
+   new tacit.WithTraceSinkDMA(1) ++
+-  new chipyard.WithTacitEncoder)
++  new chipyard.WithTacitEncoder(useBP = true))
+ 
+ // Reduced-BP TACIT (256-entry BP): for the LUT-critical combined config.
+ class WithTacitDmaTrace256 extends Config(
+diff --git a/fpga/src/main/scala/ku040/Configs.scala b/fpga/src/main/scala/ku040/Configs.scala
+index da8d8d47..dbfcfc79 100644
+--- a/fpga/src/main/scala/ku040/Configs.scala
++++ b/fpga/src/main/scala/ku040/Configs.scala
+@@ -1219,3 +1219,47 @@ class RocketKU040DroneDualFp16D64Config extends Config(
+   new chipyard.config.WithSystemBusWidth(128) ++
+   new freechips.rocketchip.rocket.WithNHugeCores(2) ++
+   new chipyard.config.AbstractConfig)
++
++
++// L2 variant of RocketKU040DroneDualFp16D64Config: the no-L2 broadcast coherence hub
++// (WithBroadcastManager) has no LLC buffering, so sustained TACIT trace-DMA writes deadlock
++// the shared fabric (harts unhaltable). Swap in a small SiFive InclusiveCache LLC
++// (PynqZ2-style 64KB/4-way/1-bank) as the coherence root -- the Zynq-like arch where TACIT
++// tracing runs at ~2% overhead. TACIT + everything else unchanged (useBP=false).
++class RocketKU040DroneDualFp16D64L2Config extends Config(
++  new WithKU040UARTTiedOff(uartNo = 1) ++
++  new chipyard.config.WithUART(address = 0x10021000) ++
++  new WithKU040PWM ++
++  new chipyard.iobinders.WithPWMPunchthrough ++
++  new WithKU040SPI ++
++  new WithKU040GPIO ++
++  new chipyard.config.WithRiskyBirdDronePeriphery ++
++  new WithKU040Ospi(
++    dataPins = Seq("N7", "M5", "L5", "J1", "H1", "J4", "J5", "M7"),
++    pclkPin = "L8", fvldPin = "L1", lvldPin = "K2", intrPin = "K1", mclkPin = "N8", trigPin = "M1") ++
++  new chipyard.iobinders.WithOspiPunchthrough ++
++  new ospi.WithOspiCapture ++
++  new WithKU040I2C(sclPin = "AA12", sdaPin = "AB12", ioStandard = "LVCMOS33") ++
++  new chipyard.config.WithI2C ++
++  new WithKU040Tweaks(ddr = true, ddrControllers = 1,
++    uartRxdPin = "AH12", uartTxdPin = "AG12", ioStandard = "LVCMOS33",
++    jtagTckPin = "AA10", jtagTmsPin = "Y12", jtagTdiPin = "Y10", jtagTdoPin = "Y11") ++
++  new chipyard.WithL2MissHandlers(120) ++  // L2 miss handlers sized for soft-MIG latency (PYNQ root-cause fix)
++  new freechips.rocketchip.subsystem.WithInclusiveCache(nWays = 4, capacityKB = 64) ++ // L2 LLC: fixes broadcast-hub trace-DMA deadlock
++  new tacit.WithTraceSinkDMA(1) ++
++  new tacit.WithTraceSinkAlways(0) ++
++  new chipyard.config.WithTraceArbiterMonitor ++
++  new chipyard.WithTacitEncoder(useBP = true) ++
++  new WithFP32OnlyFPUOnTiles(1) ++
++  new freechips.rocketchip.rocket.WithRocketFPU16 ++
++  new chipyard.config.WithMultiRoCC ++
++  new chipyard.config.WithMultiRoCCFromBuildRoCC(0) ++
++  new chipyard.fc.WithFcRoCC ++
++  new chipyard.config.WithMultiRoCCFromBuildRoCC(1) ++
++  new gemmini.Q31Ws32x32AccGemminiConfig ++
++  new saturn.rocket.WithRocketVectorUnit(128, 64,
++    saturn.common.VectorParams.robotMpcParams.copy(useElementwiseFP64 = true),
++    cores = Some(Seq(0))) ++
++  new chipyard.config.WithSystemBusWidth(128) ++
++  new freechips.rocketchip.rocket.WithNHugeCores(2) ++
++  new chipyard.config.AbstractConfig)
+diff --git a/fpga/src/main/scala/ku040/HarnessBinders.scala b/fpga/src/main/scala/ku040/HarnessBinders.scala
+index bbf4fbe3..3448a8b9 100644
+--- a/fpga/src/main/scala/ku040/HarnessBinders.scala
++++ b/fpga/src/main/scala/ku040/HarnessBinders.scala
+@@ -1,6 +1,7 @@
+ package chipyard.fpga.ku040
+ 
+ import chisel3._
++import chisel3.experimental.{Analog}
+ 
+ import freechips.rocketchip.jtag.{JTAGIO}
+ import freechips.rocketchip.subsystem.{PeripheryBusKey}
+@@ -54,22 +55,39 @@ class WithKU040UARTTSI(rxdPin: String = "A4", txdPin: String = "B4") extends Har
+ // Maps the sifive UART device to the PMOD UART pins (PMOD2):
+ //   RX (FPGA in)  - D3
+ //   TX (FPGA out) - D4
+-class WithKU040UART(rxdPin: String = "D3", txdPin: String = "D4") extends HarnessBinder({
+-  case (th: HasHarnessInstantiators, port: UARTPort, chipId: Int) => {
++//
++// `uartNo` selects which UARTPort this binder answers for, so a second UART device (e.g. an
++// ESP telemetry link added as uart1) does not collide with this one on the same D3/D4 pins --
++// mirrors WithArty200TUART(uartNo) in fpga/src/main/scala/arty200t/HarnessBinders.scala.
++class WithKU040UART(rxdPin: String = "D3", txdPin: String = "D4", uartNo: Int = 0,
++                    ioStandard: String = "LVCMOS18") extends HarnessBinder({
++  case (th: HasHarnessInstantiators, port: UARTPort, chipId: Int) if port.uartNo == uartNo => {
+     val kth = th.asInstanceOf[LazyRawModuleImp].wrapper.asInstanceOf[KU040Harness]
+-    val harnessIO = IO(chiselTypeOf(port.io)).suggestName("uart")
++    val harnessIO = IO(chiselTypeOf(port.io)).suggestName(s"uart${port.uartNo}")
+     harnessIO <> port.io
+     val packagePinsWithPackageIOs = Seq(
+       (rxdPin, IOPin(harnessIO.rxd)),
+       (txdPin, IOPin(harnessIO.txd)))
+     packagePinsWithPackageIOs foreach { case (pin, io) => {
+       kth.xdc.addPackagePin(io, pin)
+-      kth.xdc.addIOStandard(io, "LVCMOS18")
++      kth.xdc.addIOStandard(io, ioStandard)
+       kth.xdc.addIOB(io)
+     } }
+   }
+ })
+ 
++// Ties off a UART device that has no package-pin mapping yet (e.g. a second UART added for
++// ESP telemetry, ahead of a verified carrier pinout). Without this, an unclaimed UARTPort falls
++// through to AbstractConfig's default `WithUARTAdapter` HarnessBinder, which instantiates a
++// simulation-only DPI UART model -- not synthesizable for a real FPGA build. `port.io <> DontCare`
++// mirrors WithI2CTiedOff's synthesizable tie-off pattern (harness/HarnessBinders.scala) rather
++// than reaching for the sim-only adapter.
++class WithKU040UARTTiedOff(uartNo: Int) extends HarnessBinder({
++  case (th: HasHarnessInstantiators, port: UARTPort, chipId: Int) if port.uartNo == uartNo => {
++    port.io <> DontCare
++  }
++})
++
+ // Pin assignments (PMOD1):
+ //   TCK - E5, TMS - C6, TDI - D5, TDO - D6
+ // `pullup` defaults to false because these four pins are LVCMOS18 in HP bank 68,
+@@ -81,7 +99,7 @@ class WithKU040UART(rxdPin: String = "D3", txdPin: String = "D4") extends Harnes
+ // bit-exact repeatable. Set it true only for a directly-wired 1.8 V probe.
+ class WithKU040JTAG(tckPin: String = "E5", tmsPin: String = "C6",
+                     tdiPin: String = "D5", tdoPin: String = "D6",
+-                    pullup: Boolean = false) extends HarnessBinder({
++                    pullup: Boolean = false, ioStandard: String = "LVCMOS18") extends HarnessBinder({
+   case (th: HasHarnessInstantiators, port: JTAGPort, chipId: Int) => {
+     val kth = th.asInstanceOf[LazyRawModuleImp].wrapper.asInstanceOf[KU040Harness]
+     val harnessIO = IO(new JTAGChipIO(false)).suggestName("jtag")
+@@ -105,7 +123,7 @@ class WithKU040JTAG(tckPin: String = "E5", tmsPin: String = "C6",
+ 
+     packagePinsWithPackageIOs foreach { case (pin, io) => {
+       kth.xdc.addPackagePin(io, pin)
+-      kth.xdc.addIOStandard(io, "LVCMOS18")
++      kth.xdc.addIOStandard(io, ioStandard)
+       if (pullup) kth.xdc.addPullup(io)
+     } }
+   }
+@@ -113,7 +131,11 @@ class WithKU040JTAG(tckPin: String = "E5", tmsPin: String = "C6",
+ 
+ // Open-drain I2C bus used to configure the HM01B0 (default sensor address 0x24). The weak internal
+ // pull-ups aid bring-up; use external pull-ups sized for the board capacitance in hardware.
+-class WithKU040I2C(sclPin: String = "A1", sdaPin: String = "A2") extends HarnessBinder({
++// `ioStandard` defaults to LVCMOS18 (Loren's bank-68 A1/A2 header); the riskybird v3 carrier wires
++// this bus (IMU/ToF/baro/ADS7128 + the HM01B0 SCCB via a PCA9306 level-shifter onto the same net)
++// to Bank 64 (HR) balls AA12/AB12, so pass "LVCMOS33" there.
++class WithKU040I2C(sclPin: String = "A1", sdaPin: String = "A2",
++                   ioStandard: String = "LVCMOS18") extends HarnessBinder({
+   case (th: HasHarnessInstantiators, port: I2CPort, chipId: Int) => {
+     val kth = th.asInstanceOf[LazyRawModuleImp].wrapper.asInstanceOf[KU040Harness]
+     val harnessIO = IO(new ShellI2CPortIO).suggestName("i2c")
+@@ -123,12 +145,96 @@ class WithKU040I2C(sclPin: String = "A1", sdaPin: String = "A2") extends Harness
+     port.io.sda.in := AnalogToUInt(harnessIO.sda).asBool
+     Seq((sclPin, IOPin(harnessIO.scl)), (sdaPin, IOPin(harnessIO.sda))).foreach { case (pin, io) =>
+       kth.xdc.addPackagePin(io, pin)
+-      kth.xdc.addIOStandard(io, "LVCMOS18")
++      kth.xdc.addIOStandard(io, ioStandard)
+       kth.xdc.addPullup(io)
+     }
+   }
+ })
+ 
++// PMW3901 optical-flow SPI, mirror of WithArty200TSPI. MOSI-only master (dq0 out, dq1 in = MISO);
++// a weak pulldown on MISO makes an absent sensor read 0x00 rather than a floating 0xFF. The
++// riskybird v3 carrier wires this to Bank 64 (HR) balls (SCK=AC9, MOSI=AD9, MISO=AH14, LVCMOS33).
++// The chip-select is a GPIO (software CS via WithKU040GPIO bit 0), matching flow.c.
++class WithKU040SPI(
++  sckPin: String = "AC9",
++  mosiPin: String = "AD9",
++  misoPin: String = "AH14",
++  ioStandard: String = "LVCMOS33",
++  misoPulldown: Boolean = true) extends HarnessBinder({
++  case (th: HasHarnessInstantiators, port: SPIPort, chipId: Int) => {
++    val kth = th.asInstanceOf[LazyRawModuleImp].wrapper.asInstanceOf[KU040Harness]
++    val sck  = IO(Output(Bool())).suggestName("spi_sck")
++    val mosi = IO(Output(Bool())).suggestName("spi_mosi")
++    val miso = IO(Input(Bool())).suggestName("spi_miso")
++
++    sck  := port.io.sck
++    mosi := port.io.dq(0).o
++    port.io.dq(0).i := false.B          // MOSI is output-only here
++    port.io.dq(1).i := miso
++    port.io.dq(2).i := false.B
++    port.io.dq(3).i := false.B
++
++    Seq((sckPin, IOPin(sck)), (mosiPin, IOPin(mosi)), (misoPin, IOPin(miso))) foreach {
++      case (pin, io) => {
++        kth.xdc.addPackagePin(io, pin)
++        kth.xdc.addIOStandard(io, ioStandard)
++      }
++    }
++    if (misoPulldown) kth.xdc.addPulldown(IOPin(miso))
++  }
++})
++
++// The DroneLogic GPIO block, mirror of WithArty200TGPIO: three bits ordered CS/reset/LED to match
++// the pmw3901 overlay. Bit 0 is the PMW3901 NCS (riskybird carrier ball AH13, Bank 64). Bits 1/2
++// (reset, LED_N) are carrier placeholders on nets this rev leaves unconnected (JB1.37/JB1.58) --
++// same as the TE0712 -- but the GPIO block is three bits wide so the pins must be assigned.
++class WithKU040GPIO(
++  pins: Seq[String] = Seq("AH13", "AB10", "AG10"),
++  ioStandard: String = "LVCMOS33") extends HarnessBinder({
++  case (th: HasHarnessInstantiators, port: GPIOPort, chipId: Int) => {
++    val kth = th.asInstanceOf[LazyRawModuleImp].wrapper.asInstanceOf[KU040Harness]
++    require(port.pinId < pins.size,
++      s"WithKU040GPIO has ${pins.size} pins but the shell elaborated GPIO bit ${port.pinId}")
++    val harnessIO = IO(Analog(1.W)).suggestName(s"gpio_${port.pinId}")
++    harnessIO <> port.io
++    kth.xdc.addPackagePin(IOPin(harnessIO), pins(port.pinId))
++    kth.xdc.addIOStandard(IOPin(harnessIO), ioStandard)
++  }
++})
++
++// The four ESC/motor PWM outputs, mirror of WithArty200TPWM. Four motors span the two sifive PWM
++// blocks (comparator 0 of each sets the period and can't drive an output), so the (block,comparator)
++// map is (0,1)(0,2)(0,3)(1,1) -- identical to the arty200t/Zephyr contract. Riskybird v3 carrier
++// balls: motor1=AH8, motor2=AB9 (Bank64), motor3=AF23 (Bank65, HR 3.3V), motor4=AB15 (Bank64).
++// The output is INVERTED (and pulled down) so pwmcmp=0 (reset/stop) => 0% duty, i.e. motors OFF at
++// power-on -- without the invert an unconfigured pin sits high = full throttle. Software must NOT
++// also set the RTL pwminvert bits (that double-inverts back to full throttle).
++class WithKU040PWM(
++  motors: Seq[(String, Int, Int, String)] = Seq(
++    ("motor1", 0, 1, "AH8"),    // JB1.32
++    ("motor2", 0, 2, "AB9"),    // JB1.35
++    ("motor3", 0, 3, "AF23"),   // JB1.100, Bank 65 (HR, fixed 3.3V)
++    ("motor4", 1, 1, "AB15")),  // JB1.99
++  ioStandard: String = "LVCMOS33",
++  invert: Boolean = true) extends HarnessBinder({
++  case (th: HasHarnessInstantiators, port: PWMPort, chipId: Int) => {
++    val kth = th.asInstanceOf[LazyRawModuleImp].wrapper.asInstanceOf[KU040Harness]
++    motors.filter(_._2 == port.pwmId).foreach { case (name, _, cmp, pin) =>
++      require(cmp > 0,
++        s"$name is mapped to comparator 0 of PWM block ${port.pwmId}, which sets the period " +
++        "and cannot drive an output")
++      require(cmp < port.io.gpio.size,
++        s"$name needs comparator $cmp but PWM block ${port.pwmId} elaborated only " +
++        s"${port.io.gpio.size}")
++      val harnessIO = IO(Output(Bool())).suggestName(name)
++      harnessIO := (if (invert) ~port.io.gpio(cmp) else port.io.gpio(cmp))
++      kth.xdc.addPackagePin(IOPin(harnessIO), pin)
++      kth.xdc.addIOStandard(IOPin(harnessIO), ioStandard)
++      kth.xdc.addPulldown(IOPin(harnessIO))
++    }
++  }
++})
++
+ // Default allocation uses otherwise-unused bank-68 pins; D3 is a P-side global-clock-capable input.
+ // All pins are valid for xcku040-sfva784 and use 1.8 V I/O, but the mapping must still be matched to
+ // the carrier/header schematic before connecting a camera.
+diff --git a/generators/chipyard/src/main/scala/DigitalTop.scala b/generators/chipyard/src/main/scala/DigitalTop.scala
+index 23eeb969..326c64e7 100644
+--- a/generators/chipyard/src/main/scala/DigitalTop.scala
++++ b/generators/chipyard/src/main/scala/DigitalTop.scala
+@@ -33,6 +33,7 @@ class DigitalTop(implicit p: Parameters) extends ChipyardSystem
+   with icenet.CanHavePeripheryIceNIC // Enables optionally adding the IceNIC for FireSim
+   with chipyard.example.CanHavePeripheryGCD // Enables optionally adding the GCD example widget
+   with ospi.CanHavePeripheryOspi // Enables optionally adding the HM01B0 camera capture peripheral
++  with pdmmic.CanHavePeripheryPdmMic // Enables optionally adding the PYNQ-Z1 PDM microphone front end
+   with uartdma.CanHavePeripheryUartTxDma // Enables optionally adding the memory->UART TX DMA engine
+   with chipyard.clocking.HasChipyardPRCI // Use Chipyard reset/clock distribution
+   with chipyard.clocking.CanHaveClockTap // Enables optionally adding a clock tap output port
+diff --git a/generators/chipyard/src/main/scala/iobinders/IOBinders.scala b/generators/chipyard/src/main/scala/iobinders/IOBinders.scala
+index 99906d91..f75b1abb 100644
+--- a/generators/chipyard/src/main/scala/iobinders/IOBinders.scala
++++ b/generators/chipyard/src/main/scala/iobinders/IOBinders.scala
+@@ -244,6 +244,21 @@ class WithOspiPunchthrough extends OverrideIOBinder({
+   }
+ })
+ 
++// Two pins, straight out to package balls F17 and G18 -- no IOCells, exactly as
++// WithOspiPunchthrough does it for the camera. The structural top in
++// fpga/pynq-z2/src/pynqz2_rocket_top.v is what gives them an IOSTANDARD.
++class WithPdmMicPunchthrough extends OverrideIOBinder({
++  (system: pdmmic.CanHavePeripheryPdmMic) => {
++    val ports = system.pdm_mic.map { micMV =>
++      val mic: pdmmic.PdmMicIO = micMV // unwrap the InModuleBody ModuleValue via the implicit
++      val io_mic = IO(chiselTypeOf(mic)).suggestName("mic")
++      io_mic <> mic
++      PdmMicPort(() => io_mic)
++    }.toSeq
++    (ports, Nil)
++  }
++})
++
+ // DOC include start: WithUARTIOCells
+ class WithUARTIOCells extends OverrideIOBinder({
+   (system: HasPeripheryUART) => {
+diff --git a/generators/chipyard/src/main/scala/iobinders/Ports.scala b/generators/chipyard/src/main/scala/iobinders/Ports.scala
+index 06f22606..a4f8804d 100644
+--- a/generators/chipyard/src/main/scala/iobinders/Ports.scala
++++ b/generators/chipyard/src/main/scala/iobinders/Ports.scala
+@@ -44,6 +44,9 @@ case class I2CPort         (val getIO: () => sifive.blocks.devices.i2c.I2CPort)
+ case class OspiPort        (val getIO: () => ospi.SensorIO)
+     extends Port[ospi.SensorIO]
+ 
++case class PdmMicPort      (val getIO: () => pdmmic.PdmMicIO)
++    extends Port[pdmmic.PdmMicIO]
++
+ case class UARTPort        (val getIO: () => UARTPortIO, val uartNo: Int, val freqMHz: Int)
+     extends Port[UARTPortIO]
+ 
+diff --git a/generators/gemmini b/generators/gemmini
+index 7b7a2ebc..7d91e9ec 160000
+--- a/generators/gemmini
++++ b/generators/gemmini
+@@ -1 +1 @@
+-Subproject commit 7b7a2ebc07cc0a6f6b4815904ff47e2b87175565
++Subproject commit 7d91e9ecec5d52e7f2cae659272606aec59e3af8-dirty
+diff --git a/generators/rocket-chip b/generators/rocket-chip
+index 15190c09..40235213 160000
+--- a/generators/rocket-chip
++++ b/generators/rocket-chip
+@@ -1 +1 @@
+-Subproject commit 15190c09a4a50bbea21d483c371f10beab1191c7
++Subproject commit 4023521326f14663069e9ed6ce57fbed6209b746
+diff --git a/generators/rocket-chip-inclusive-cache b/generators/rocket-chip-inclusive-cache
+--- a/generators/rocket-chip-inclusive-cache
++++ b/generators/rocket-chip-inclusive-cache
+@@ -1 +1 @@
+-Subproject commit 8e157c808c8ba019b6fdb42232c4e6ac6b11b439
++Subproject commit 8e157c808c8ba019b6fdb42232c4e6ac6b11b439-dirty
+diff --git a/generators/saturn b/generators/saturn
+index 780c7780..e73d9bcc 160000
+--- a/generators/saturn
++++ b/generators/saturn
+@@ -1 +1 @@
+-Subproject commit 780c7780c5e33e68cd4ef0d4adfee9ccc8d95fcd
++Subproject commit e73d9bcc479eec4064ced555956da766781e06ef
+diff --git a/generators/tacit b/generators/tacit
+index 8af13a74..dd7a19cd 160000
+--- a/generators/tacit
++++ b/generators/tacit
+@@ -1 +1 @@
+-Subproject commit 8af13a74e9b69cb97481dd9ec74d3c52f9549f1f
++Subproject commit dd7a19cd075d1b53085eaf0097165b517093a237
+diff --git a/riskybird/tcl/rb_attributes.tcl b/riskybird/tcl/rb_attributes.tcl
+index ce538073..9e8faa1c 100644
+--- a/riskybird/tcl/rb_attributes.tcl
++++ b/riskybird/tcl/rb_attributes.tcl
+@@ -50,6 +50,18 @@ set rb_injection_table {
+     {dsp MacUnit.sv           {use_dsp = "yes"} {wire \[15:0\] _io_out_d_T} {Gemmini PE 8x8 signed mul + 20b add -> one DSP48E2}}
+     {dsp OuterProductCell.sv  {use_dsp = "yes"} {wire \[15:0\]\s+prod =}    {Saturn OPU cell 8x8 signed mul + 32b acc add -> one DSP48E2}}
+     {dsp MulAddRecFNPipe_*.sv {use_dsp = "yes"} {} {hardfloat FMA mantissa mul; defensive, historically already inferred}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_unprot\s*=} {MEAS vrace_unprot SMOKING GUN}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_respfire\s*=} {MEAS vrace_respfire}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_inc\s*=} {MEAS vrace_inc}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_irq_while_pending\s*=} {MEAS vrace_irq_while_pending}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_sboard_a5\s*=} {MEAS vrace_sboard_a5}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_sboard_a0\s*=} {MEAS vrace_sboard_a0}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+vrace_sboard_a4\s*=} {MEAS vrace_sboard_a4}}
++    {dsp Rocket.sv {mark_debug = "true"} {reg\s+\[3:0\]\s+vrace_outstanding\s*;} {MEAS vrace_outstanding}}
++    {dsp Rocket.sv {mark_debug = "true"} {reg\s+\[4:0\]\s+vrace_last_rd\s*;} {MEAS vrace_last_rd}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+ll_wen\s*=} {MEAS ll_wen}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+\[4:0\]\s+ll_waddr\s*=} {MEAS ll_waddr}}
++    {dsp Rocket.sv {mark_debug = "true"} {wire\s+_csr_io_interrupt\s*;} {MEAS csr_io_interrupt}}
+ }
+ 
+ # Return 1 if $mode is enabled by the RB_ATTRS setting $setting.
+diff --git a/software/tacit_decoder b/software/tacit_decoder
+--- a/software/tacit_decoder
++++ b/software/tacit_decoder
+@@ -1 +1 @@
+-Subproject commit acbbd2e2e5344548a464460bff9ee9b9ff437209
++Subproject commit acbbd2e2e5344548a464460bff9ee9b9ff437209-dirty

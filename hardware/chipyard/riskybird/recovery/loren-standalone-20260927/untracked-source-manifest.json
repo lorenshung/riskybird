@@ -1,0 +1,107 @@
+{
+  "source": "/scratch2/loren/chipyard",
+  "head": "63c1506826fc70a8f24065237aa65130b4830ee1",
+  "files": {
+    "generators/nvfp4/chipyard/NVFP4Configs.scala": "af5fba161bb483856a018e781c91d5d9c32dd238e16c999402dbe04fd58bfaf6",
+    "generators/nvfp4/src/main/scala/nvfp4/BlockDot.scala": "2b66873b1c1dea09185b5c9c9890f71f74a2fcc69b01faa006c58094fa07a3dc",
+    "generators/nvfp4/src/main/scala/nvfp4/Codec.scala": "13653abff8bdcf73cfd10e10582279053938115217d86de426b786269c91c042",
+    "generators/nvfp4/src/main/scala/nvfp4/NVFP4Accel.scala": "29e77cf2a34e04ccabd0513c423854a6775593b368babe487e5a28c234f4fc3d",
+    "generators/nvfp4/src/main/scala/nvfp4/ScaleAlign.scala": "6c7fedc54b9a719905ee82cc5c32cf94ce3c39ffa609dfb2253b351a859d7a1c",
+    "generators/nvfp4/src/test/scala/nvfp4/CodecSpec.scala": "6d22ec3d86176b1d397e1115c3def421e1bd37805e8c4c8c244a6f8663e6eff0",
+    "generators/nvfp4/src/test/scala/nvfp4/PESpec.scala": "f34ddff2eec920a8cf35cd87202125d495b4c606c0a68bc26ab033b9e67fdd4f",
+    "tests/nvfp4.h": "ce6697a415bff943d755a824fb25e29b6a245c0528bae97418b20e4aa5d1562d",
+    "tests/nvfp4_gemm.c": "b6cc8643b6aa2734d39c281a519b8ff8c23b2cec151897e5ee81bbeedb716a6f",
+    "tests/nvfp4_layer.c": "c86ad8977f28a7b1d02fa112efaeb0c9da9ca692dd188fbe908c6e3029939711",
+    "tests/nvfp4_layer_data.h": "bdcfc55283f5f249ce92a634678c55bd4da81fa27939b69d193fe2f512234e01"
+  },
+  "remotes": [
+    "origin\thttps://github.com/ucb-bar/chipyard.git (fetch)",
+    "origin\thttps://github.com/ucb-bar/chipyard.git (push)"
+  ],
+  "gitlinks": [
+    "160000 17bd8d286297468a0256b15f908be08396cf804e 0\tfpga/fpga-shells",
+    "160000 96daf15d3c54ac4975ea2bdc869f95bccdf90a1e 0\tgenerators/ara",
+    "160000 bd02692fe6cb5197df90dc39051d31369ef61fcd 0\tgenerators/bar-fetchers",
+    "160000 5223e44cfeb26f41380057a2eb4d651197475f69 0\tgenerators/boom",
+    "160000 56eb80f9f2d062940890d9813099ec083189924a 0\tgenerators/caliptra-aes-acc",
+    "160000 f265568c9208b5893562be5048908410f7b186b4 0\tgenerators/compress-acc",
+    "160000 3750a9eb10f54ec3f85178e7ff11ed6182fd7c7d 0\tgenerators/constellation",
+    "160000 187ed3cd126c68659f446c963599525c2bf58420 0\tgenerators/cva6",
+    "160000 6590276fa4dac315ae7c7c01371b954c5687a473 0\tgenerators/diplomacy",
+    "160000 9146db738e8fe39afbaf3bbdcc6375725e255268 0\tgenerators/fft-generator",
+    "160000 6ad65b90b1eb270c20ce4f04109e3dde0180b36f 0\tgenerators/gemmini",
+    "160000 4225367ed282aadd70f4cbd131f6959f4d00c502 0\tgenerators/hardfloat",
+    "160000 5129576841529ee5581e038e0678de972baf1e76 0\tgenerators/ibex",
+    "160000 6fd35bf5a28310c61671fce7309526b56d91e35d 0\tgenerators/icenet",
+    "160000 7e7a4c02de36afa1f411ee6fd799a956ecb9e03a 0\tgenerators/mempress",
+    "160000 33d87f56004763b503c60931b8a37f7bff3a17ff 0\tgenerators/nvdla",
+    "160000 917c95cdb6d698c4fd267ccab2602e283d2ca6c3 0\tgenerators/radiance",
+    "160000 8b672f4e836c111d09e135e8981b611d120692de 0\tgenerators/rerocc",
+    "160000 910a2e83ce206e86372927ec3e0b8056953f7d95 0\tgenerators/riscv-sodor",
+    "160000 33ea77110ca9c28c5c7eb3c6b67ae74096ea8b37 0\tgenerators/rocc-acc-utils",
+    "160000 8f1e33b253e3bce741861c0a2e3ba8b7ff85b292 0\tgenerators/rocket-chip",
+    "160000 c8c14f7b47c3c790022c293bc7e4309f5c5ed523 0\tgenerators/rocket-chip-blocks",
+    "160000 8e157c808c8ba019b6fdb42232c4e6ac6b11b439 0\tgenerators/rocket-chip-inclusive-cache",
+    "160000 2dae15d16bebe10f413ea39bdd18aa402eb419dd 0\tgenerators/saturn",
+    "160000 cb9313d03637ca52d0ccf27ac8e986a0d454befb 0\tgenerators/shuttle",
+    "160000 fe61365292ef1fa60410a2a91c48a3e3d22b1a75 0\tgenerators/tacit",
+    "160000 bfe7aa36fc570ee17e3f461c1ed48525684b95ff 0\tgenerators/testchipip",
+    "160000 c82fcfcd5cad4a416987ed12aef75b45a7892b5c 0\tgenerators/vexiiriscv",
+    "160000 b084672c2f8cf32e55d78f73a001074c23f8a2b8 0\tsims/firesim",
+    "160000 6e01715bea3e4a4015138e9583e40caa08205408 0\tsoftware/baremetal-ide",
+    "160000 cf8b8f7d82e085b3ecb31865fa40fb3dd62554f2 0\tsoftware/coremark",
+    "160000 d9b30cdf805133bef9db5f7ecf84ae1ce8124291 0\tsoftware/embench/embench-iot",
+    "160000 21119e5ce922ff9302f0bc9d2d7349c77f7ac064 0\tsoftware/firemarshal",
+    "160000 172265a3c74fc6dcd492cb3753ee21a319cffdcc 0\tsoftware/firesim-paper-workloads",
+    "160000 30290c3ed8014577fa2ad234fa1b731a082299fb 0\tsoftware/nvdla-workload",
+    "160000 83e33110472c47aaa762257ed7c053ff1278834c 0\tsoftware/spec2017",
+    "160000 acbbd2e2e5344548a464460bff9ee9b9ff437209 0\tsoftware/tacit_decoder",
+    "160000 cd45a528d3bf81f9c7aa2a63f9fe512eee0881b0 0\tsoftware/zephyrproject/zephyr",
+    "160000 39234a16247ab1fa234821b251f1f1870c3de343 0\ttoolchains/libgloss",
+    "160000 9c190a07c6838f6392bafa4ad83acea462c7f759 0\ttoolchains/riscv-tools/riscv-isa-sim",
+    "160000 8f59570468edcf53854d2fd6dabf57b8db7d23c9 0\ttoolchains/riscv-tools/riscv-openocd",
+    "160000 abadfdc507d5a75b6272dc360e70a80a510c758a 0\ttoolchains/riscv-tools/riscv-pk",
+    "160000 887b868db313805c7163f7cc519a7b9e74d92c98 0\ttoolchains/riscv-tools/riscv-spike-devices",
+    "160000 0494f954a3d8d2ca9e4972da7a01e94b6a909bce 0\ttoolchains/riscv-tools/riscv-tests",
+    "160000 56c29e01ba3e705c563edd1271a387119bddb5a5 0\ttoolchains/riscv-tools/riscv-tools-feedstock",
+    "160000 44322e2f935d7dac83b7adf8dd270b41a54c6acb 0\ttools/DRAMSim2",
+    "160000 4a7cf86960425fbf0b6224865b745ff511dc5742 0\ttools/axe",
+    "160000 2bcaeae2b9914bd25497ce3c6fa62dc5ca80e09f 0\ttools/cde",
+    "160000 481cb60add7358934414a3c6b396f5d29ad934fe 0\ttools/circt",
+    "160000 a310a157cab6e569d30741eae4ca5592069cab7c 0\ttools/dsptools",
+    "160000 09156cae09cb37c530322c6005649d2380c3eb0e 0\ttools/firrtl2",
+    "160000 ef164009e40ce5a5abe61ebcc11c12ff82e34014 0\ttools/fixedpoint",
+    "160000 3f8dda6e1c1965537b5801a43c81c287bac4eae4 0\ttools/install-circt",
+    "160000 6ee2309f80a54b404795f227793d2a54e1dfadf8 0\ttools/rocket-dsp-utils",
+    "160000 b2b66a66d51b360e0ae95017774d03377c78c574 0\ttools/torture"
+  ],
+  "nested_snapshots": {
+    "generators/saturn": {
+      "head": "2dae15d16bebe10f413ea39bdd18aa402eb419dd",
+      "remotes": [
+        "origin\thttps://github.com/ucb-bar/saturn-vectors.git (fetch)",
+        "origin\thttps://github.com/ucb-bar/saturn-vectors.git (push)"
+      ],
+      "patch": "nested-generators_saturn.patch",
+      "sha256": "f906bebee23b5c25bc64e811f8ec376c837cfde18f0ccd83ebe567f24accef2a"
+    },
+    "generators/constellation": {
+      "head": "3750a9eb10f54ec3f85178e7ff11ed6182fd7c7d",
+      "remotes": [
+        "origin\thttps://github.com/ucb-bar/constellation.git (fetch)",
+        "origin\thttps://github.com/ucb-bar/constellation.git (push)"
+      ],
+      "patch": "nested-generators_constellation.patch",
+      "sha256": "254619aea1a60e13f15603159606d4d3bdb73c99b2e9888e76fbc3d445489f20"
+    },
+    "sims/firesim": {
+      "head": "b084672c2f8cf32e55d78f73a001074c23f8a2b8",
+      "remotes": [
+        "origin\thttps://github.com/firesim/firesim.git (fetch)",
+        "origin\thttps://github.com/firesim/firesim.git (push)"
+      ],
+      "patch": "nested-sims_firesim.patch",
+      "sha256": "2d6230aa783940fffc72b982d38854d8a0c9f7d9b856be3086cf914d56dfaf14"
+    }
+  }
+}
