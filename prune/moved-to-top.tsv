@@ -307,3 +307,11 @@ zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/src/pmw3901.c	workl
 zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/src/pmw3901.h	workloads/sensor_bringup/src/pmw3901.h	f4ef6e4b1f43a0a6117ffb82fb5d6d9a8739604a
 zephyr-chipyard-sw	40079130	samples/riskybird/PROGRAMMING.md	hardware/zephyr/targets/esp32c6/PROGRAMMING.md	5c6b4b4601461a4774d019f733ff2a578e94652d
 zephyr-chipyard-sw	40079130	samples/riskybird/usb_console.overlay	hardware/zephyr/targets/esp32c6/usb_console.overlay	9687e7e75a79a88ca0c9d088bc510a0863c4380c
+zephyr-chipyard-sw	40079130	gemmini_ubench/CMakeLists.txt	workloads/gemmini_ubench/CMakeLists.txt	81750f2ac89a9768230d070583992ca0434aecca
+zephyr-chipyard-sw	40079130	gemmini_ubench/boards/chipyard_riscv64.conf	workloads/gemmini_ubench/boards/chipyard_riscv64.conf	65b7ca0b7a636acedce3289b9ec56966e281e5ab
+zephyr-chipyard-sw	40079130	gemmini_ubench/boards/chipyard_riscv64.overlay	workloads/gemmini_ubench/boards/chipyard_riscv64.overlay	9e185d364d3fd95113ba1f400f4ff9a81389a69f
+zephyr-chipyard-sw	40079130	gemmini_ubench/build.sh	workloads/gemmini_ubench/build.sh	b998bd89884b3031ba34d703446b3baa952aecfe
+zephyr-chipyard-sw	40079130	gemmini_ubench/prj.conf	workloads/gemmini_ubench/prj.conf	9cbe95771a71328534798d9d1e123eca1fab0886
+zephyr-chipyard-sw	40079130	gemmini_ubench/run.sh	workloads/gemmini_ubench/run.sh	048d5ba84c835a693fe799404699c5acf4174bae
+zephyr-chipyard-sw	40079130	gemmini_ubench/src/bench.c	workloads/gemmini_ubench/src/bench.c	1347b8e1876089204552940fa34475ff03f42028
+zephyr-chipyard-sw	40079130	gemmini_ubench/src/main.c	workloads/gemmini_ubench/src/main.c	6c122bf1b993612e24c9de6f962c96f7d6583ca1
