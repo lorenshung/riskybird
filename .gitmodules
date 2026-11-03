@@ -5,17 +5,14 @@
 #   bench tier    git submodule update --init backends/zephyr-chipyard-sw
 #   silicon tier  ... plus backends/chipyard   (Linux only; needs Vivado)
 #   models        ... plus backends/modelblaster  (~143 MiB)
-#   board files   git submodule update --init hardware/pcb   (KiCad, ~18 MiB)
 #
 # backends/modelblaster remains the path used by `rb modelblaster`. The merged
 # Zephyr backend also uses a nested ModelBlaster checkout; both select the same
 # commit. Consolidating the caller paths is a separate tested change.
 #
-# hardware/pcb is the board itself rather than a backend, and nothing in the
-# build reads it, so no tier pulls it automatically. Initialise it when you
-# need the schematic to answer a wiring question -- which net a sensor's XSHUT
-# or interrupt pin actually reaches is the difference between a driver bug and
-# an unwired pin, and this repo has been wrong about that before.
+# hardware/pcb is the board itself (KiCad), checked in as a plain directory.
+# Its one nested submodule, gym-pybullet-drones under riskybird-academy, is
+# listed below and is not part of any tier.
 [submodule "backends/zephyr-chipyard-sw"]
 	path = backends/zephyr-chipyard-sw
 	url = https://github.com/lorenshung/zephyr-chipyard-sw.git
