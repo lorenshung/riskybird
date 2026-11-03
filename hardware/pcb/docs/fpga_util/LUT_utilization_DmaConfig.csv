@@ -1,0 +1,28 @@
+component,LUTs,LUT_pct_of_design,LUT_pct_of_XC7A200T,FFs,RAMB36,RAMB18,DSP48
+Rocket RV64GC core tile (core+FPU+caches+PTW),29169,57.79,21.8,13280,0,96,25
+DDR3 memory controller (Xilinx MIG + AXI adapters),10474,20.75,7.83,10378,0,0,0
+cbus - control/periphery TL bus + crossbar,2676,5.3,2.0,443,0,0,0
+pbus - peripheral TL bus + crossbar,1769,3.5,1.32,584,0,0,0
+OSPI camera-capture core + TileLink DMA (HM01B0),1275,2.53,0.95,1084,44,0,0
+tlDM - RISC-V debug module (DMI/abstract),1047,2.07,0.78,1199,0,0,0
+bootrom,667,1.32,0.5,0,0,0,0
+mbus - memory TL bus,469,0.93,0.35,45,0,0,0
+PLIC - external interrupt controller,422,0.84,0.32,200,0,0,0
+sbus - system TL bus,363,0.72,0.27,52,0,0,0
+fbus - front TL bus (DMA/serial/debug ingress),361,0.72,0.27,160,0,0,0
+coh_wrapper - coherence manager (broadcast),330,0.65,0.25,276,0,0,0
+"Scratchpad bank (TL RAM, 16x RAMB36)",245,0.49,0.18,123,16,0,0
+SPI controller,212,0.42,0.16,187,0,0,0
+DigitalTop glue / top interconnect,200,0.4,0.15,10,0,0,0
+I2C controller,115,0.23,0.09,119,0,0,0
+PWM0 controller,103,0.2,0.08,125,0,0,0
+PWM1 controller,100,0.2,0.07,125,0,0,0
+UART0 controller,93,0.18,0.07,108,0,0,0
+UART1 controller (ESP link),93,0.18,0.07,108,0,0,0
+PRCI / clock+reset control,91,0.18,0.07,62,0,0,0
+JTAG debug transport module (DTM),84,0.17,0.06,167,0,0,0
+serial-TL (TSI) domain,44,0.09,0.03,31,0,0,0
+CLINT - timer / soft interrupts,36,0.07,0.03,131,0,0,0
+GPIO controller,35,0.07,0.03,57,0,0,0
+ChipTop + harness glue (resets/POR/PLL/clk-wrangler),-2,-0.0,-0.0,84,0,0,0
+"TOTAL (Arty200THarness, post-route)",50471,100.0,37.72,29138,60,96,25
