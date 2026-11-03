@@ -28,7 +28,6 @@
 	path = backends/modelblaster
 	url = https://github.com/lorenshung/ModelBlaster.git
 	branch = integration/riskybird-20260928
-[submodule "hardware/pcb"]
-	path = hardware/pcb
-	url = https://github.com/ucb-bar/riskybird.git
-	branch = riskybirdv3
+[submodule "hardware/pcb/riskybird-academy/sim/gym-pybullet-drones"]
+	path = hardware/pcb/riskybird-academy/sim/gym-pybullet-drones
+	url = https://github.com/ucb-bar/gym-pybullet-drones.git
