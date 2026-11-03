@@ -62,6 +62,9 @@ results/
 /integration/zephyr/tof/README.md
 /tools/flight/legacy/README.md
 /workloads/README.md
+/hardware/zephyr/targets/esp32c6/PROGRAMMING.md
+/workloads/actuator_bringup/README.rst
+/workloads/sensor_bringup/README.rst
 /hardware/chipyard/OSPI_I2C_INTEGRATION.md
 /hardware/chipyard/fpga/scripts/floorplan/README.md
 /hardware/chipyard/riskybird/INTEGRATION.md

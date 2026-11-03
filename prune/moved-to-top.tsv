@@ -282,3 +282,28 @@ chipyard	7346121	generators/chipyard/src/main/scala/iobinders/IOBinders.scala#Wi
 chipyard	7346121	generators/chipyard/src/main/scala/iobinders/Ports.scala#OspiPort	hardware/chipyard/generators/chipyard/src/main/scala/iobinders/RbPorts.scala	extract
 gemmini	7d91e9ec	chipyard/GemminiConfigs.scala (appended configs)	hardware/gemmini/chipyard/RbGemminiConfigs.scala	extract
 chipyard	7346121	fpga/Makefile (arty200t/ku040 blocks + area.mk hook)	hardware/chipyard/fpga/rb-fpga.mk	extract
+zephyr-chipyard-sw	40079130	riskybird/i2c_expander/CMakeLists.txt	workloads/i2c_expander/CMakeLists.txt	ecb7d24bb8ff753778bed003c59db298da08d4b4
+zephyr-chipyard-sw	40079130	riskybird/i2c_expander/boards/esp32c6_devkitc_hpcore.overlay	workloads/i2c_expander/boards/esp32c6_devkitc_hpcore.overlay	3e093cc3988807a4d8effd077709fe27e8fe85d2
+zephyr-chipyard-sw	40079130	riskybird/i2c_expander/prj.conf	workloads/i2c_expander/prj.conf	7af00fb9ec505f410fdd6aed93c7988dd27aafc8
+zephyr-chipyard-sw	40079130	riskybird/i2c_expander/src/main.c	workloads/i2c_expander/src/main.c	04bfca68701bfc0c2af2d8470b75238bf8e0f703
+zephyr-chipyard-sw	40079130	riskybird/tof_sensor/CMakeLists.txt	workloads/tof_sensor/CMakeLists.txt	ecb7d24bb8ff753778bed003c59db298da08d4b4
+zephyr-chipyard-sw	40079130	riskybird/tof_sensor/boards/esp32c6_devkitc_hpcore.overlay	workloads/tof_sensor/boards/esp32c6_devkitc_hpcore.overlay	f1fb787b2e2c0461a1bc33e3642a61bf0ae29c8e
+zephyr-chipyard-sw	40079130	riskybird/tof_sensor/prj.conf	workloads/tof_sensor/prj.conf	fed2cb28e99edaf6feb83e6c119e0f14167f99ad
+zephyr-chipyard-sw	40079130	riskybird/tof_sensor/src/main.c	workloads/tof_sensor/src/main.c	35e690e0baaf0d2efaea3688b65a1b675033f864
+zephyr-chipyard-sw	40079130	samples/riskybird/actuator_bringup/CMakeLists.txt	workloads/actuator_bringup/CMakeLists.txt	80e8ef38faa9e634567b14165235436df0044452
+zephyr-chipyard-sw	40079130	samples/riskybird/actuator_bringup/README.rst	workloads/actuator_bringup/README.rst	627bdab767b82e6e8700632fd6a6b77e268b214f
+zephyr-chipyard-sw	40079130	samples/riskybird/actuator_bringup/boards/esp32c6_devkitc_hpcore.overlay	workloads/actuator_bringup/boards/esp32c6_devkitc_hpcore.overlay	8b9a856f1a9075509e3ee8e3af80c0c6bdd0d26b
+zephyr-chipyard-sw	40079130	samples/riskybird/actuator_bringup/prj.conf	workloads/actuator_bringup/prj.conf	eb3682f4a7c6b4564a5e125e9b4e08dc81b45cc9
+zephyr-chipyard-sw	40079130	samples/riskybird/actuator_bringup/sample.yaml	workloads/actuator_bringup/sample.yaml	732e61f68820ed399dbf9b3b29735f00026cfdaa
+zephyr-chipyard-sw	40079130	samples/riskybird/actuator_bringup/src/main.c	workloads/actuator_bringup/src/main.c	616606382cbf02d215a8590cc967f455696457d6
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/CMakeLists.txt	workloads/sensor_bringup/CMakeLists.txt	57a036605b230ed615a9ddaf987e0d8023df2bb1
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/README.rst	workloads/sensor_bringup/README.rst	23a7098f59b1b4356843c27061c6aed890a2e9e5
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/boards/esp32c6_devkitc_hpcore.overlay	workloads/sensor_bringup/boards/esp32c6_devkitc_hpcore.overlay	a05609c85fec9b0120b7641898d2b6badd4d6a0f
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/prj.conf	workloads/sensor_bringup/prj.conf	d307c757b3c463a0498da245b23feede7a193cef
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/sample.yaml	workloads/sensor_bringup/sample.yaml	e0e9a589892b16ef29f10a885e7365c22ebb79f9
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/src/ads7128.h	workloads/sensor_bringup/src/ads7128.h	ae32fbe3c839a277be6ac9bf6240f5e1007923bd
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/src/main.c	workloads/sensor_bringup/src/main.c	2ee11cc238e9a9c89476b42dac040abd821a489b
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/src/pmw3901.c	workloads/sensor_bringup/src/pmw3901.c	853ee624c63d51f35feac8ac811923c0309ef368
+zephyr-chipyard-sw	bb533b8b	samples/riskybird/sensor_bringup/src/pmw3901.h	workloads/sensor_bringup/src/pmw3901.h	f4ef6e4b1f43a0a6117ffb82fb5d6d9a8739604a
+zephyr-chipyard-sw	40079130	samples/riskybird/PROGRAMMING.md	hardware/zephyr/targets/esp32c6/PROGRAMMING.md	5c6b4b4601461a4774d019f733ff2a578e94652d
+zephyr-chipyard-sw	40079130	samples/riskybird/usb_console.overlay	hardware/zephyr/targets/esp32c6/usb_console.overlay	9687e7e75a79a88ca0c9d088bc510a0863c4380c
