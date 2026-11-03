@@ -20,7 +20,10 @@
  *   "RBPING1"            which bitstream is answering; touches nothing
  *   "RBFLASH1 [FAST]"    configuration-flash bridge (EspLinkFlash framing),
  *                        FAST = 921600 baud on the wire after the ack
- *   "RBBOOT1 <hex addr>" reconfigure the FPGA from that flash address (IPROG).
+ *   "RBBOOT1 <hex addr> [mode]" reconfigure the FPGA from that flash address
+ *                       (IPROG). mode 1-3 are ICAP diagnostics (EspLinkIprog):
+ *                       1 IPROG without writing WBSTAR, 2 write WBSTAR only
+ *                       (the FPGA keeps running), 3 Vivado's packed layout.
  *                        Never run a FLASH session in the same breath first:
  *                        on 2026-11-01 an IPROG issued ~0.3 s after one was
  *                        ignored (the running program survived), while the
@@ -159,6 +162,7 @@ static const struct kind_info KINDS[] = {
 #define FL_XFER  0x01
 #define FL_PROG  0x02
 #define FL_ERASE 0x03
+#define FL_CRC   0x04
 #define FL_END   0xE5
 #define FL_MAX_WLEN 512
 #define POKE_MAX_PAYLOAD 1024
@@ -556,6 +560,7 @@ static void pump_flash(struct transport *t, struct session_stats *st)
 			case FL_XFER:  need = 5; break;
 			case FL_PROG:  need = 5 + 256; break;
 			case FL_ERASE: need = 5; break;
+			case FL_CRC:   need = 9; break;
 			default:       st->end = "REJECTED an unknown flash frame"; return;
 			}
 		}
@@ -570,7 +575,8 @@ static void pump_flash(struct transport *t, struct session_stats *st)
 		}
 		if (have == need && have >= 5) {
 			fpga_write(fr, have);
-			w.outstanding += fr[0] == FL_XFER ? (uint32_t)sys_get_le16(&fr[3]) + 1u : 1u;
+			w.outstanding += fr[0] == FL_XFER ? (uint32_t)sys_get_le16(&fr[3]) + 1u :
+					 fr[0] == FL_CRC ? 5u : 1u;
 			w.last = k_uptime_get();
 			st->to_fpga += have;
 			st->cmds++;
@@ -740,7 +746,7 @@ static void session(struct transport *t, const struct request *rq)
 			uint8_t arg[8];
 
 			sys_put_le32(rq->addr, &arg[0]);
-			sys_put_le32(~rq->addr, &arg[4]);
+			sys_put_le32(~rq->addr ^ (0x01010101u * rq->mode), &arg[4]);
 			fpga_write(arg, sizeof(arg));
 		}
 		if (!wait_ack(k->ack, &id, &id_valid)) {
@@ -798,7 +804,13 @@ static void session(struct transport *t, const struct request *rq)
 			pump_flash(t, &st);
 			break;
 		case K_BOOT:
-			say_kind(t, rq, "OK id=%s; reconfiguring from 0x%08x\n", idtxt, rq->addr);
+			if (rq->mode == 2) {
+				say_kind(t, rq, "OK id=%s; WBSTAR <- 0x%08x (mode 2, no IPROG)\n",
+					 idtxt, rq->addr);
+			} else {
+				say_kind(t, rq, "OK id=%s; reconfiguring from 0x%08x (mode %u)\n",
+					 idtxt, rq->addr, rq->mode);
+			}
 			st.end = "IPROG";
 			/* The FPGA reconfigures now: its pins float, then a new image
 			 * starts on uart1. Anything heard meanwhile is noise. A load or
@@ -854,6 +866,7 @@ static bool parse_hello(const char *line, struct request *rq)
 		rq->kind = (enum kind)i;
 		rq->fast = false;
 		rq->addr = 0;
+		rq->mode = 0;
 		rq->args[0] = '\0';
 		if (rq->kind == K_FLASH) {
 			if (*rest == '\0') {
@@ -881,7 +894,10 @@ static bool parse_hello(const char *line, struct request *rq)
 			if (endp == rest + 1) {
 				return false;
 			}
-			if (*endp != '\0') {
+			/* Optional " <mode>" 0..3: the ICAP sequence (EspLinkIprog). */
+			if (endp[0] == ' ' && endp[1] >= '0' && endp[1] <= '3' && endp[2] == '\0') {
+				rq->mode = (uint8_t)(endp[1] - '0');
+			} else if (*endp != '\0') {
 				return false;
 			}
 			rq->addr = (uint32_t)a;
@@ -1035,7 +1051,7 @@ static void load_thread(void *a, void *b, void *c)
 						session(&t, &rq);
 					} else {
 						static const char bad[] = "RB ERR expected RBLOAD1, RBPOKE1, "
-							"RBPING1, RBFLASH1 [FAST], RBBOOT1 <hex> or RBSTAT1\n";
+							"RBPING1, RBFLASH1 [FAST], RBBOOT1 <hex> [mode] or RBSTAT1\n";
 
 						(void)zsock_send(s, bad, sizeof(bad) - 1, 0);
 					}
