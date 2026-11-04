@@ -1,0 +1,101 @@
+Add a SiFive PWM config fragment, IO port and punchthrough IOBinder.
+
+rocket-chip-blocks has HasPeripheryPWM but Chipyard has no fragment to add a
+PWM block, no Port type for it and no IOBinder, so firtool deletes the PWM
+outputs of any system that has one. Generic; upstream candidate.
+
+diff --git a/generators/chipyard/src/main/scala/config/fragments/PeripheralFragments.scala b/generators/chipyard/src/main/scala/config/fragments/PeripheralFragments.scala
+index cf1af463..5fb45c04 100644
+--- a/generators/chipyard/src/main/scala/config/fragments/PeripheralFragments.scala
++++ b/generators/chipyard/src/main/scala/config/fragments/PeripheralFragments.scala
+@@ -17,6 +17,7 @@ import sifive.blocks.devices.uart._
+ import sifive.blocks.devices.spi._
+ import sifive.blocks.devices.i2c._
+ import sifive.blocks.devices.timer._
++import sifive.blocks.devices.pwm._
+ 
+ import testchipip._
+ 
+@@ -114,6 +115,18 @@ class WithI2C(address: BigInt = 0x10040000) extends Config((site, here, up) => {
+   )
+ })
+ 
++/**
++  * Config fragment for adding a SiFive PWM peripheral to the SoC.
++  *
++  * Zephyr's SiFive PWM driver uses comparator 0 to establish the period, so
++  * one four-comparator block exposes three independently usable PWM channels.
++  * RiskyBird therefore instantiates two blocks for four motor outputs.
++  */
++class WithPWM(address: BigInt = 0x10050000, ncmp: Int = 4) extends Config((site, here, up) => {
++  case PeripheryPWMKey => up(PeripheryPWMKey) ++ Seq(
++    PWMParams(address = address, ncmp = ncmp))
++})
++
+ class WithNoDebug extends Config((site, here, up) => {
+   case DebugModuleKey => None
+ })
+diff --git a/generators/chipyard/src/main/scala/iobinders/IOBinders.scala b/generators/chipyard/src/main/scala/iobinders/IOBinders.scala
+index 8cfa1f52..1717ec14 100644
+--- a/generators/chipyard/src/main/scala/iobinders/IOBinders.scala
++++ b/generators/chipyard/src/main/scala/iobinders/IOBinders.scala
+@@ -25,6 +25,7 @@ import sifive.blocks.devices.gpio._
+ import sifive.blocks.devices.uart._
+ import sifive.blocks.devices.spi._
+ import sifive.blocks.devices.i2c._
++import sifive.blocks.devices.pwm._
+ import tracegen.{TraceGenSystemModuleImp}
+ 
+ import chipyard.iocell._
+@@ -213,6 +214,24 @@ class WithI2CPunchthrough extends OverrideIOBinder({
+   }
+ })
+ 
++// Brings the sifive PWM comparator outputs out of DigitalTop.
++//
++// Without this the outputs have no consumer anywhere above the controller, and
++// firtool removes the whole path: in a shell built with PeripheryPWMKey set but
++// no binder, the generated TLPWM has no gpio port at all. The comparators still
++// count and the registers still read back, so software looks healthy while
++// nothing can ever reach a pin.
++class WithPWMPunchthrough extends OverrideIOBinder({
++  (system: HasPeripheryPWM) => {
++    val ports = system.pwm.zipWithIndex.map { case (p, i) =>
++      val io_pwm = IO(p.cloneType).suggestName(s"pwm_$i")
++      io_pwm <> p
++      PWMPort(() => io_pwm, i)
++    }
++    (ports, Nil)
++  }
++})
++
+ // DOC include start: WithUARTIOCells
+ class WithUARTIOCells extends OverrideIOBinder({
+   (system: HasPeripheryUART) => {
+diff --git a/generators/chipyard/src/main/scala/iobinders/Ports.scala b/generators/chipyard/src/main/scala/iobinders/Ports.scala
+index 4298c966..899acb4e 100644
+--- a/generators/chipyard/src/main/scala/iobinders/Ports.scala
++++ b/generators/chipyard/src/main/scala/iobinders/Ports.scala
+@@ -5,6 +5,7 @@ import chisel3.experimental.{Analog}
+ import sifive.blocks.devices.uart.{UARTPortIO}
+ import sifive.blocks.devices.spi.{SPIFlashParams, SPIPortIO}
+ import sifive.blocks.devices.gpio.{GPIOPortIO}
++import sifive.blocks.devices.pwm.{PWMPortIO}
+ import testchipip.util.{ClockedIO}
+ import testchipip.serdes.{TLSerdesser, SerialIO, SerialTLParams}
+ import testchipip.spi.{SPIChipIO}
+@@ -49,6 +50,14 @@ case class SPIFlashPort    (val getIO: () => SPIChipIO, val params: SPIFlashPara
+ case class SPIPort         (val getIO: () => SPIPortIO)
+     extends Port[SPIPortIO]
+ 
++// One port per PWM controller, carrying that block's whole comparator vector.
++// Unlike GPIOPort, which chipyard splits one-per-pin, a PWM block's outputs are
++// only meaningful together: comparator 0 sets the shared period and cannot be
++// used as an output, so a binder has to see the vector to know which indices
++// are real channels.
++case class PWMPort         (val getIO: () => PWMPortIO, val pwmId: Int)
++    extends Port[PWMPortIO]
++
+ case class BlockDevicePort (val getIO: () => ClockedIO[BlockDeviceIO], val params: BlockDeviceConfig)
+     extends Port[ClockedIO[BlockDeviceIO]]
+ 

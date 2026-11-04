@@ -1,0 +1,98 @@
+Gemmini: non-blocking STATUS_OP (funct 125) and a has_loop_matmul knob.
+
+Lets software poll the accelerator's busy state without fencing, and lets a
+config drop the matmul loop unroller. Defaults keep the stock behaviour.
+Generic; carried from the RiskyBird gemmini fork (7d91e9e).
+
+diff --git a/src/main/scala/gemmini/Controller.scala b/src/main/scala/gemmini/Controller.scala
+index e704ff97..3bc2ee30 100644
+--- a/src/main/scala/gemmini/Controller.scala
++++ b/src/main/scala/gemmini/Controller.scala
+@@ -162,7 +162,15 @@ class GemminiModule[T <: Data: Arithmetic, U <: Data, V <: Data]
+ 
+   // Counters
+   val counters = Module(new CounterController(outer.config.num_counter, outer.xLen))
+-  io.resp <> counters.io.out  // Counter access command will be committed immediately
++  // riskybird: arbitrate the single RoCC response port between counter reads
++  // and the non-draining status-poll op (STATUS_OP). Both commit immediately.
++  val status_resp = Wire(Decoupled(chiselTypeOf(counters.io.out.bits)))
++  status_resp.valid := false.B
++  status_resp.bits := DontCare
++  val status_resp_arb = Module(new Arbiter(chiselTypeOf(counters.io.out.bits), 2))
++  status_resp_arb.io.in(0) <> counters.io.out  // counter access command
++  status_resp_arb.io.in(1) <> status_resp      // status poll
++  io.resp <> status_resp_arb.io.out
+   counters.io.event_io.external_values(0) := 0.U
+   counters.io.event_io.event_signal(0) := false.B
+   counters.io.in.valid := false.B
+@@ -259,7 +267,13 @@ class GemminiModule[T <: Data: Arithmetic, U <: Data, V <: Data]
+     has_training_convs, has_max_pool, has_first_layer_optimizations, has_dw_convs) }
+   else (raw_cmd, false.B)
+ 
+-  val (loop_cmd, loop_matmul_unroller_busy, loop_completed) = withClock (gated_clock) { LoopMatmul(if (has_loop_conv) conv_cmd else raw_cmd, reservation_station.io.matmul_ld_completed, reservation_station.io.matmul_st_completed, reservation_station.io.matmul_ex_completed,
++  val pre_loop_cmd = if (has_loop_conv) conv_cmd else raw_cmd
++  val (loop_cmd, loop_matmul_unroller_busy, loop_completed) = if (!has_loop_matmul) {
++    // LoopMatmul stripped: the ISA-level loop_ws/loop_conv unrollers are gone, so
++    // tiling must be done in software (ModelBlaster's gemmini kernels already emit
++    // explicit mvin/preload/compute/mvout sequences for the non-loop path).
++    (pre_loop_cmd, false.B, VecInit(false.B, false.B))
++  } else withClock (gated_clock) { LoopMatmul(pre_loop_cmd, reservation_station.io.matmul_ld_completed, reservation_station.io.matmul_st_completed, reservation_station.io.matmul_ex_completed,
+     meshRows*tileRows, coreMaxAddrBits, reservation_station_entries, max_lds, max_exs, max_sts, sp_banks * sp_bank_entries, acc_banks * acc_bank_entries,
+     inputType.getWidth, accType.getWidth, dma_maxbytes, new MvinRs2(mvin_rows_bits, mvin_cols_bits, local_addr_t),
+     new PreloadRs(mvin_rows_bits, mvin_cols_bits, local_addr_t), new PreloadRs(mvout_rows_bits, mvout_cols_bits, local_addr_t),
+@@ -476,6 +490,7 @@ class GemminiModule[T <: Data: Arithmetic, U <: Data, V <: Data]
+ 
+     val is_flush = risc_funct === FLUSH_CMD
+     val is_counter_op = risc_funct === COUNTER_OP
++    val is_status_op = risc_funct === STATUS_OP
+     val is_clock_gate_en = risc_funct === CLKGATE_EN
+ 
+     /*
+@@ -500,6 +515,23 @@ class GemminiModule[T <: Data: Arithmetic, U <: Data, V <: Data]
+       counters.io.in.bits := unrolled_cmd.bits.cmd
+     }
+ 
++    .elsewhen (is_status_op) {
++      // riskybird: non-draining read of the outstanding-work signal the
++      // RISC-V `fence` drains on (io.busy minus the transient input-pipeline
++      // valids, so a poll never reports itself busy). Committed immediately.
++      val gemmini_work_outstanding = loop_conv_unroller_busy || loop_matmul_unroller_busy ||
++                                     reservation_station.io.busy || spad.module.io.busy
++      status_resp.valid := unrolled_cmd.valid
++      status_resp.bits.rd := unrolled_cmd.bits.cmd.inst.rd
++      status_resp.bits.data := Cat(
++        0.U((xLen - 4).W),
++        loop_conv_unroller_busy || loop_matmul_unroller_busy, // bit3: loop unrollers
++        spad.module.io.busy,                                  // bit2: scratchpad/DMA (mvin+mvout)
++        reservation_station.io.busy,                          // bit1: reservation station
++        gemmini_work_outstanding)                             // bit0: overall busy (== fence drains)
++      unrolled_cmd.ready := status_resp.ready
++    }
++
+     .elsewhen (is_clock_gate_en) {
+       unrolled_cmd.ready := true.B
+     }
+diff --git a/src/main/scala/gemmini/GemminiConfigs.scala b/src/main/scala/gemmini/GemminiConfigs.scala
+index e5a73de1..01dbf11d 100644
+--- a/src/main/scala/gemmini/GemminiConfigs.scala
++++ b/src/main/scala/gemmini/GemminiConfigs.scala
+@@ -92,6 +92,7 @@ case class GemminiArrayConfig[T <: Data : Arithmetic, U <: Data, V <: Data](
+                                                                              has_normalizations: Boolean = false,
+                                                                              has_first_layer_optimizations: Boolean = true,
+                                                                              has_loop_conv: Boolean = true,
++                                                                             has_loop_matmul: Boolean = true,
+ 
+                                                                              use_firesim_simulation_counters: Boolean = false,
+ 
+diff --git a/src/main/scala/gemmini/GemminiISA.scala b/src/main/scala/gemmini/GemminiISA.scala
+index 74afb657..2f8d9730 100644
+--- a/src/main/scala/gemmini/GemminiISA.scala
++++ b/src/main/scala/gemmini/GemminiISA.scala
+@@ -58,6 +58,7 @@ object GemminiISA {
+   val COMPUTE_CISC = 17.U(7.W)
+ 
+   val COUNTER_OP   = 126.U(7.W)
++  val STATUS_OP    = 125.U(7.W) // riskybird: non-draining busy-line status poll
+ 
+   //==========================================================================
+   // dataflow configuration

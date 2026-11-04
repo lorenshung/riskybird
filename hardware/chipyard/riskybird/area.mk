@@ -1,12 +1,9 @@
 # RiskyBird FPGA area-characterization flow.
 #
-# This file is RiskyBird-owned collateral living inside the Chipyard backend.
-# It is hooked into the backend by exactly one line at the end of fpga/Makefile:
-#
-#     -include $(base_dir)/riskybird/area.mk
-#
-# Everything else RiskyBird adds to Chipyard's FPGA flow lives in this
-# directory. See ./README.md.
+# Included last by hardware/chipyard/fpga/rb-fpga.mk, the wrapper rb runs in
+# place of Chipyard's fpga/Makefile, so every variable the stock Makefile
+# defines (build_dir, synth_list_f, MODEL, BOARD, CONFIG, SUB_PROJECT,
+# FPGA_BRAND) is already set.
 #
 # Targets:
 #   rb-area            synthesize only, emit a hierarchical utilization report
@@ -18,10 +15,10 @@
 #   rb area --board ku040 --config SaturnKU040OspiConfig --attrs hierarchy
 #
 # Usage (directly):
-#   make -C backends/chipyard/fpga SUB_PROJECT=ku040 \
-#        CONFIG=RocketKU040OspiConfig RB_ATTRS=none rb-area
+#   make -C backends/chipyard/fpga -f $PWD/hardware/chipyard/fpga/rb-fpga.mk \
+#        SUB_PROJECT=ku040 CONFIG=RocketKU040OspiConfig RB_ATTRS=none rb-area
 
-rb_dir := $(base_dir)/riskybird
+rb_dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # Which RTL attribute injections to apply to gen-collateral before synthesis.
 #   none       pristine generated RTL (default)

@@ -15,7 +15,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from tools.rb import area, plotting
-from tools.rb.boards import BOARDS, CHIPYARD, ROOT
+from tools.rb.boards import BOARDS, CHIPYARD, CHIPYARD_FPGA_MAKEFILE, CHIPYARD_OVERLAY, ROOT
 
 # The setup branch carries neither the experiments/ tree nor an initialised
 # Chipyard; tests over either skip there rather than fail.
@@ -554,33 +554,37 @@ class MakeCommandTests(unittest.TestCase):
             area.make_command(BOARDS["ku040"], "everything", force=False)
 
 
-@unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
 class BackendIntegrationTests(unittest.TestCase):
-    """The Chipyard-side hook must stay present, visible, and self-contained."""
+    """The area flow lives in hardware/chipyard and reaches Chipyard only
+    through the rb-fpga.mk wrapper; the backend's own Makefile is stock."""
 
     def test_riskybird_directory_holds_the_whole_flow(self) -> None:
-        rb_dir = CHIPYARD / "riskybird"
-        for name in ("README.md", "area.mk", "tcl/rb_synth_area.tcl", "tcl/rb_attributes.tcl"):
+        rb_dir = CHIPYARD_OVERLAY / "riskybird"
+        for name in ("area.mk", "tcl/rb_synth_area.tcl", "tcl/rb_attributes.tcl"):
             self.assertTrue((rb_dir / name).is_file(), f"missing {name}")
 
-    def test_chipyard_is_hooked_exactly_once_and_optionally(self) -> None:
-        makefile = (CHIPYARD / "fpga" / "Makefile").read_text()
-        hooks = [
-            line
-            for line in makefile.splitlines()
-            if "riskybird" in line and "include" in line
+    def test_wrapper_includes_stock_makefile_then_area_flow(self) -> None:
+        lines = [
+            line.strip()
+            for line in CHIPYARD_FPGA_MAKEFILE.read_text().splitlines()
+            if line.strip().startswith("include")
         ]
-        self.assertEqual(len(hooks), 1, f"expected one include hook, found {hooks}")
-        # `-include` keeps Chipyard buildable if the directory is deleted.
-        self.assertTrue(hooks[0].strip().startswith("-include"))
+        self.assertEqual(
+            lines, ["include Makefile", "include $(rb_chipyard_dir)/riskybird/area.mk"]
+        )
+
+    @unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
+    def test_stock_makefile_has_no_riskybird_hook(self) -> None:
+        makefile = (CHIPYARD / "fpga" / "Makefile").read_text()
+        self.assertNotIn("riskybird", makefile)
 
     def test_area_mk_defines_the_expected_targets(self) -> None:
-        text = (CHIPYARD / "riskybird" / "area.mk").read_text()
+        text = (CHIPYARD_OVERLAY / "riskybird" / "area.mk").read_text()
         for target in ("rb-area:", "rb-area-force:", "rb-area-restore:"):
             self.assertIn(target, text)
 
     def test_injection_defaults_to_pristine_rtl(self) -> None:
-        self.assertIn("RB_ATTRS ?= none", (CHIPYARD / "riskybird" / "area.mk").read_text())
+        self.assertIn("RB_ATTRS ?= none", (CHIPYARD_OVERLAY / "riskybird" / "area.mk").read_text())
 
     def test_riskybird_does_not_patch_the_shared_bitstream_flow(self) -> None:
         """The upstream DRC downgrade must not be adopted: it hides pin errors."""
@@ -622,7 +626,7 @@ class StudyDefinitionTests(unittest.TestCase):
     def test_runnable_studies_only_reference_defined_configs(self) -> None:
         """A runnable study must not name a config that cannot elaborate."""
         configs_file = (
-            CHIPYARD / "fpga" / "src" / "main" / "scala" / "ku040" / "Configs.scala"
+            CHIPYARD_OVERLAY / "fpga" / "src" / "main" / "scala" / "ku040" / "Configs.scala"
         )
         if not configs_file.is_file():
             self.skipTest("Chipyard KU040 config source is unavailable")

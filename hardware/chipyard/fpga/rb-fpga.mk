@@ -1,12 +1,27 @@
-# RiskyBird additions to chipyard/fpga/Makefile, extracted from chipyard 7346121.
-# The originals still live in the backend's fpga/Makefile until its pin moves to
-# the plain tip; not wired up yet (make -C fpga -f rb-fpga.mk is the plan).
+#########################################################################################
+# RiskyBird wrapper around a plain Chipyard's fpga/Makefile.
+#
+#   make -C backends/chipyard/fpga -f $(RB_ROOT)/hardware/chipyard/fpga/rb-fpga.mk \
+#        SUB_PROJECT=arty200t CONFIG=RocketArty200TDroneFullDDRConfig verilog
+#
+# (`rb chipyard verilog|bitstream` and `rb area` run exactly that.) It adds the
+# RiskyBird sub-projects, then includes the stock Makefile, then RiskyBird's
+# area/impl flow. The Scala for these sub-projects reaches Chipyard through the
+# sbt plugin hardware/chipyard/project/RiskyBird.scala; the Vivado board directories
+# through the links in .backend-overlays. -C fpga is required: the stock
+# Makefile takes base_dir from the working directory.
+#
+# Every assignment is ?=, so a value given on the command line wins, and the
+# stock Makefile's own blocks (also ?=) cannot override these.
+#########################################################################################
+
+rb_chipyard_dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))..)
 
 ifeq ($(SUB_PROJECT),arty200t)
 	# Trenz TE0712 carrying the XC7A200T. Same carrier and same 484-ball
 	# footprint as arty100t; the part string in
-	# fpga-shells/xilinx/arty_a7_200/tcl/board.tcl is the only physical
-	# difference.
+	# hardware/fpga-shells/xilinx/arty_a7_200/tcl/board.tcl is the only
+	# physical difference.
 	SBT_PROJECT       ?= chipyard_fpga
 	MODEL             ?= Arty200THarness
 	VLOG_MODEL        ?= Arty200THarness
@@ -36,13 +51,22 @@ ifeq ($(SUB_PROJECT),ku040)
 	BOARD             ?= ku040
 	FPGA_BRAND        ?= xilinx
 endif
-#########################################################################################
-# RiskyBird additions
-#
-# All RiskyBird-owned collateral in this Chipyard checkout lives in
-# $(base_dir)/riskybird/. This is the only hook. See that directory's README.md.
-# Included last so every variable above (build_dir, synth_list_f, MODEL, BOARD,
-# CONFIG, SUB_PROJECT, FPGA_BRAND) is already defined.
-#########################################################################################
--include $(base_dir)/riskybird/area.mk
+ifeq ($(SUB_PROJECT),arty100t)
+	# The stock arty100t sub-project, on the TE0712-100T: its Scala (Arty100T
+	# harness, binders, configs and fpga-shells' Arty100TShell/MIG) is
+	# shadowed by hardware/, and its Vivado board files are the reworked
+	# arty_a7_100 directory, linked in as te0712_100t.
+	BOARD             ?= te0712_100t
+endif
 
+include Makefile
+
+include $(rb_chipyard_dir)/riskybird/area.mk
+
+# Chipyard rebuilds its jar when one of its own sources changes; make it see
+# the overlay's too (the AutoPlugin in hardware/chipyard/project compiles them).
+rb_root := $(abspath $(rb_chipyard_dir)/../..)
+rb_overlay_sources := $(shell find $(rb_root)/hardware/chipyard $(rb_root)/hardware/rtl \
+	$(rb_root)/hardware/fpga-shells/src $(rb_root)/hardware/gemmini \
+	-path '*/recovery' -prune -o \( -name '*.scala' -o -name '*.sv' -o -name '*.hex' \) -print)
+$(GENERATOR_CLASSPATH): $(rb_overlay_sources)

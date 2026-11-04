@@ -29,8 +29,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DRIVER = (
     ROOT / "backends/zephyr-chipyard-sw/zephyr_ws/zephyr/drivers/pwm/pwm_sifive.c"
 )
-BINDER = ROOT / "backends/chipyard/fpga/src/main/scala/arty200t/HarnessBinders.scala"
-CONFIGS = ROOT / "backends/chipyard/fpga/src/main/scala/arty200t/Configs.scala"
+# RiskyBird's Chipyard sources live in hardware/chipyard (the sbt overlay), so
+# these checks need no Chipyard checkout; only the generated-src ones do.
+BINDER = ROOT / "hardware/chipyard/fpga/src/main/scala/arty200t/HarnessBinders.scala"
+CONFIGS = ROOT / "hardware/chipyard/fpga/src/main/scala/arty200t/Configs.scala"
 OVERLAY = ROOT / "hardware/zephyr/targets/fpga/workloads/motor_4.overlay"
 WORKLOAD = ROOT / "workloads/motor_4/src/main.c"
 BOOTUP_WORKLOAD = ROOT / "workloads/bootup_check/src/main.c"
@@ -195,7 +197,6 @@ class PackagePinTests(unittest.TestCase):
         self.assertTrue(motor_pins <= used)
 
 
-@unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
 class BinderTests(unittest.TestCase):
     def setUp(self) -> None:
         self.binder = BINDER.read_text(encoding="utf-8")
@@ -226,7 +227,6 @@ class BinderTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
-    @unittest.skipUnless(CHIPYARD_READY, "backends/chipyard is not initialised")
     def test_motor_config_exists_and_punches_the_pwm_ports_through(self) -> None:
         body = CONFIGS.read_text(encoding="utf-8").split(f"class {MOTOR_CONFIG}", 1)
         self.assertEqual(len(body), 2, f"{MOTOR_CONFIG} is missing")

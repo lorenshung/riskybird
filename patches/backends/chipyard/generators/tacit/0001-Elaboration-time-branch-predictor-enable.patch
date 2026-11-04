@@ -1,0 +1,109 @@
+Tacit: elaboration-time enable for the DSC branch predictor (default on).
+
+Generic; carried from the RiskyBird tacit fork (dd7a19c).
+
+diff --git a/src/main/scala/DSCBranchPredictor.scala b/src/main/scala/DSCBranchPredictor.scala
+index bc92d40..e839442 100644
+--- a/src/main/scala/DSCBranchPredictor.scala
++++ b/src/main/scala/DSCBranchPredictor.scala
+@@ -13,7 +13,15 @@ object CounterState {
+   val STRONG_TAKEN = 3.U(2.W)
+ }
+ 
+-case class TacitBPParams(xlen: Int, n_entries: Int)
++// `enable` gates ELABORATION of the predictor, not a runtime mode.
++//
++// The predictor only ever feeds TacitEncoder's BrPredict path (`bp_mode === 2`).
++// The mode register resets to 0 (BrTarget) and no software in the PYNQ-Z1 tutorial
++// writes it, so on that platform the predictor is 1024 x 2 bits of flops and a
++// 1024:1 mux whose output reaches nothing.  With `enable = false` TacitEncoder does
++// not instantiate it at all and hard-wires itself to BrTarget; with `enable = true`
++// (the default, so every existing call site is unchanged) BrPredict still works.
++case class TacitBPParams(xlen: Int, n_entries: Int, enable: Boolean = true)
+ 
+ class DSCBranchPredictor(params: TacitBPParams) extends Module {
+   val io = IO(new Bundle {
+diff --git a/src/main/scala/TacitEncoder.scala b/src/main/scala/TacitEncoder.scala
+index 6880882..d79d672 100644
+--- a/src/main/scala/TacitEncoder.scala
++++ b/src/main/scala/TacitEncoder.scala
+@@ -202,8 +202,18 @@ class TacitEncoderModule(outer: TacitEncoder) extends LazyTraceEncoderModule(out
+   // 1: branch prediction and skip jump
+   // 2: branch prediction and don't skip jump
+ 
+-  def is_bt_mode = io.control.bp_mode === 0.U
+-  def is_bp_mode = io.control.bp_mode === 2.U 
++  // Is the DSC branch predictor elaborated at all?  See TacitBPParams.
++  //
++  // When it is not, the encoder is hard-wired to BrTarget: `is_bp_mode` becomes a
++  // Scala `false.B` literal, so every consumer of the predictor's response folds
++  // away, and `is_bt_mode` becomes `true.B`, so the bp_mode register is ignored
++  // rather than being able to select a mode this encoder can no longer implement.
++  // That is what lets a trace from a no-predictor encoder decode with the decoder's
++  // own defaults (`--br-mode 0`) with no extra flag on either side.
++  val useBP = outer.bpParams.enable
++
++  def is_bt_mode = if (useBP) io.control.bp_mode === 0.U else true.B
++  def is_bp_mode = if (useBP) io.control.bp_mode === 2.U else false.B
+ 
+   // states
+   val sIdle :: sSync :: sData :: Nil = Enum(3)
+@@ -260,15 +270,22 @@ class TacitEncoderModule(outer: TacitEncoder) extends LazyTraceEncoderModule(out
+   val comp_header   = Wire(UInt(CompressedHeaderType.getWidth.W)) // compressed header
+   
+   // branch predictor
+-  val bp = Module(new DSCBranchPredictor(outer.bpParams))
++  //
++  // `bp` is an Option so that with useBP = false the module is not instantiated --
++  // the 1024 x 2-bit counter file, its 1024:1 read mux and its write decoder are
++  // never emitted, rather than being emitted and left unread.  bp_hit_count and
++  // bp_miss_flag exist only to carry the predictor's running hit run-length into a
++  // BrPredict packet, so they are constants in that case and fold away with it.
++  val bp = if (useBP) Some(Module(new DSCBranchPredictor(outer.bpParams))) else None
++  val bp_resp = bp.map(_.io.resp).getOrElse(false.B)
+   val bp_hit_count_next = Wire(UInt(32.W))
+   val bp_inference_valid = Wire(Bool())
+   val bp_hit_count_en = Wire(Bool())
+-  val bp_hit_count = RegEnable(bp_hit_count_next, 0.U, bp_hit_count_en)
++  val bp_hit_count = if (useBP) RegEnable(bp_hit_count_next, 0.U, bp_hit_count_en) else 0.U(32.W)
+   bp_hit_count_next := bp_hit_count // default behavior is to hold the value
+   val bp_miss_flag_next = Wire(Bool())
+   val bp_miss_flag_en = Wire(Bool())
+-  val bp_miss_flag = RegEnable(bp_miss_flag_next, false.B, bp_miss_flag_en)
++  val bp_miss_flag = if (useBP) RegEnable(bp_miss_flag_next, false.B, bp_miss_flag_en) else false.B
+   bp_miss_flag_next := false.B // default behavior is to set to false
+   val bp_flush_hit = Wire(Bool())
+   bp_flush_hit := false.B
+@@ -350,12 +367,14 @@ class TacitEncoderModule(outer: TacitEncoder) extends LazyTraceEncoderModule(out
+                             (ingress_1.group(ingress_1_msg_idx).iaddr ^ ingress_1.group(ingress_1_msg_idx + 1.U).iaddr) >> 1.U)
+ 
+   // driving branch predictor signals
+-  bp.io.req_pc := ingress_0.group(ingress_0_msg_idx).iaddr
+   bp_inference_valid := ingress_0.group(ingress_0_msg_idx).iretire === 1.U && 
+                         (ingress_0.group(ingress_0_msg_idx).itype === TraceItype.ITBrTaken || ingress_0.group(ingress_0_msg_idx).itype === TraceItype.ITBrNTaken) &&
+                         pipeline_advance && io.control.enable
+-  bp.io.update_valid := bp_inference_valid
+-  bp.io.update_taken := ingress_0.group(ingress_0_msg_idx).itype === TraceItype.ITBrTaken
++  bp.foreach { p =>
++    p.io.req_pc := ingress_0.group(ingress_0_msg_idx).iaddr
++    p.io.update_valid := bp_inference_valid
++    p.io.update_taken := ingress_0.group(ingress_0_msg_idx).itype === TraceItype.ITBrTaken
++  }
+   bp_hit_count_en := pipeline_advance && io.control.enable
+   bp_miss_flag_en := pipeline_advance && io.control.enable
+ 
+@@ -392,11 +411,11 @@ class TacitEncoderModule(outer: TacitEncoder) extends LazyTraceEncoderModule(out
+         // ingress0 logic - branch resolution
+         when (ingress_0_has_branch) {
+           val taken = ingress_0.group(ingress_0_msg_idx).itype === TraceItype.ITBrTaken
+-          bp_hit_count_next := Mux((bp.io.resp === taken) && is_bp_mode, 
++          bp_hit_count_next := Mux((bp_resp === taken) && is_bp_mode, 
+                               bp_hit_count + 1.U, 
+                               0.U) // reset if responded with miss
+-          bp_miss_flag_next := (bp.io.resp =/= taken) && is_bp_mode 
+-          bp_flush_hit := (bp.io.resp =/= taken) && is_bp_mode && bp_hit_count > 0.U 
++          bp_miss_flag_next := (bp_resp =/= taken) && is_bp_mode 
++          bp_flush_hit := (bp_resp =/= taken) && is_bp_mode && bp_hit_count > 0.U 
+         }
+         .elsewhen (ingress_0_has_flush) { // these two conditions are mutually exclusive
+           bp_flush_hit := is_bp_mode && bp_hit_count > 0.U

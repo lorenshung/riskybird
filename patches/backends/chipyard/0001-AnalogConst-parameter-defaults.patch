@@ -1,0 +1,22 @@
+Give AnalogConst's parameters defaults.
+
+Vivado reads a .v blackbox in Verilog-2001 mode, which rejects a parameter
+declared without a default. Every instantiation overrides both parameters, so
+the elaborated hardware is unchanged. Generic; upstream candidate.
+
+diff --git a/generators/chipyard/src/main/resources/vsrc/Analog.v b/generators/chipyard/src/main/resources/vsrc/Analog.v
+index 0a9abf03..1233545c 100644
+--- a/generators/chipyard/src/main/resources/vsrc/Analog.v
++++ b/generators/chipyard/src/main/resources/vsrc/Analog.v
+@@ -2,7 +2,10 @@
+ 
+ `timescale 1ns/1ps
+ 
+-module AnalogConst #(CONST, WIDTH) (
++// Defaults are required: Vivado reads a .v file in Verilog-2001 mode, which
++// rejects a parameter declared without an initial value. Every instantiation
++// overrides both, so this changes no elaborated hardware.
++module AnalogConst #(parameter CONST = 0, parameter WIDTH = 1) (
+     output [WIDTH-1:0] io
+ );
+ 

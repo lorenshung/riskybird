@@ -254,4 +254,5 @@ class WithUartTxDma(
   uartTxDataAddr: BigInt = 0x10021000L
 ) extends Config((site, here, up) => {
   case UartTxDmaKey => Some(UartTxDmaParams(address = address, uartTxDataAddr = uartTxDataAddr))
+  case chipyard.BuildSystem => (p: Parameters) => new chipyard.RbDigitalTop()(p) // the system with this periphery's trait
 })

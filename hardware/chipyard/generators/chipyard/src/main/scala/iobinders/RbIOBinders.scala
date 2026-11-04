@@ -2,8 +2,7 @@ package chipyard.iobinders
 
 // Extracted from chipyard 7346121:
 //   generators/chipyard/src/main/scala/iobinders/IOBinders.scala
-// The original still lives in the backend until its pin moves to the plain
-// tip; keep the two in step until then.
+// Compiled into Chipyard by the overlay plugin, hardware/chipyard/project/RiskyBird.scala.
 
 import chisel3._
 

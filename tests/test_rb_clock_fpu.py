@@ -266,7 +266,7 @@ class Fp16ListSyncTests(unittest.TestCase):
     """FP16_SCALAR_FPU_CONFIGS is a name list, so it can fall behind the Scala."""
 
     def test_list_matches_the_scala_sources(self) -> None:
-        scala_dir = boards.CHIPYARD / "fpga" / "src" / "main" / "scala" / "arty200t"
+        scala_dir = boards.CHIPYARD_OVERLAY / "fpga" / "src" / "main" / "scala" / "arty200t"
         if not scala_dir.is_dir():
             self.skipTest(f"Chipyard not checked out: {scala_dir}")
         configs = with_rocket_fpu16_configs(scala_dir)

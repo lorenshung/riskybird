@@ -1,0 +1,47 @@
+Tacit: WithTacitEncoder(useBP = false).
+
+Makes the branch predictor a fragment parameter and defaults it OFF, which
+flips the stock default (the predictor is unused unless software selects
+BrPredict mode, and costs ~3k LUT per encoder). Carried to keep RiskyBird's
+Tacit shells as built; whether upstream should default it off is open.
+
+diff --git a/chipyard/TacitConfigs.scala b/chipyard/TacitConfigs.scala
+index 4c036e1..d6c975a 100644
+--- a/chipyard/TacitConfigs.scala
++++ b/chipyard/TacitConfigs.scala
+@@ -10,8 +10,15 @@ import freechips.rocketchip.trace.{TraceCoreParams, TraceEncoderParams}
+ import shuttle.common.ShuttleTileAttachParams
+ import tacit.{TacitEncoder, TacitBPParams}
+ 
+-// Add a Tacit encoder to each tile
+-class WithTacitEncoder extends Config((site, here, up) => {
++// Add a Tacit encoder to each tile.
++//
++// `useBP` elaborates the DSC branch predictor, which the encoder only uses in
++// BrPredict mode (bp_mode === 2).  The mode register resets to 0 (BrTarget) and the
++// PYNQ-Z1 tutorial never writes it, so on that platform the predictor was 1024 x 2
++// bits of flops plus a 1024:1 mux driving nothing: measured post-route at 3,045 LUT
++// and 2,048 FF per encoder, 75% of the encoder.  Default it off; pass `true` to get
++// BrPredict back (and then pass `--br-mode 2` to the decoder to match).
++class WithTacitEncoder(useBP: Boolean = false) extends Config((site, here, up) => {
+   case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
+     case tp: RocketTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(
+       traceParams = Some(TraceEncoderParams(
+@@ -23,7 +30,7 @@ class WithTacitEncoder extends Config((site, here, up) => {
+         ),
+         bufferDepth = 16,
+         coreStages = 5,
+-        bpParams = TacitBPParams(xlen = tp.tileParams.core.xLen, n_entries = 1024))(p)),
++        bpParams = TacitBPParams(xlen = tp.tileParams.core.xLen, n_entries = 1024, enable = useBP))(p)),
+         useArbiterMonitor = false
+       )),
+       core = tp.tileParams.core.copy(enableTraceCoreIngress = true)))
+@@ -37,7 +44,7 @@ class WithTacitEncoder extends Config((site, here, up) => {
+         ),
+         bufferDepth = 16,
+         coreStages = 7,
+-        bpParams = TacitBPParams(xlen = tp.tileParams.core.xLen, n_entries = 1024))(p)),
++        bpParams = TacitBPParams(xlen = tp.tileParams.core.xLen, n_entries = 1024, enable = useBP))(p)),
+         useArbiterMonitor = false
+       )),
+       core = tp.tileParams.core.copy(enableTraceCoreIngress = true)))

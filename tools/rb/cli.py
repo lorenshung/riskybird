@@ -45,6 +45,7 @@ from .artifacts import (
 from .boards import (
     BOARDS,
     CHIPYARD,
+    CHIPYARD_FPGA_MAKEFILE,
     FP16_SCALAR_FPU_CONFIGS,
     INT_NOPERMUTE_VECTOR_CONFIGS,
     FPGA_ZEPHYR_BOARD,
@@ -586,6 +587,8 @@ def chipyard_build(board: Board, target: str) -> None:
             "make",
             "-C",
             CHIPYARD / "fpga",
+            "-f",
+            CHIPYARD_FPGA_MAKEFILE,
             f"SUB_PROJECT={board.sub_project}",
             f"CONFIG={board.config}",
             make_target,

@@ -1,0 +1,23 @@
+Add a WithSPITiedOff harness binder.
+
+Drives the inputs of a generic SPI port that no board binder connects, instead
+of leaving them undriven. Generic; upstream candidate.
+
+diff --git a/generators/chipyard/src/main/scala/harness/HarnessBinders.scala b/generators/chipyard/src/main/scala/harness/HarnessBinders.scala
+index fd282203..6a646455 100644
+--- a/generators/chipyard/src/main/scala/harness/HarnessBinders.scala
++++ b/generators/chipyard/src/main/scala/harness/HarnessBinders.scala
+@@ -76,6 +76,13 @@ class WithSimSPIFlashModel(rdOnly: Boolean = true) extends HarnessBinder({
+   }
+ })
+ 
++/** Keep generic SPI inputs defined until a physical-board binder overrides this. */
++class WithSPITiedOff extends HarnessBinder({
++  case (th: HasHarnessInstantiators, port: SPIPort, chipId: Int) => {
++    port.io.dq.foreach(_.i := false.B)
++  }
++})
++
+ class WithI2CTiedOff extends HarnessBinder({
+   case (th: HasHarnessInstantiators, port: I2CPort, chipId: Int) => {
+     port.io <> DontCare

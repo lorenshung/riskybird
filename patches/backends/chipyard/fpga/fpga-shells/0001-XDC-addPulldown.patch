@@ -1,0 +1,19 @@
+fpga-shells: XDC.addPulldown.
+
+Lets a shell or harness binder put a PULLDOWN constraint on a port, next to
+the existing addPullup. Generic; upstream candidate.
+
+diff --git a/src/main/scala/shell/xilinx/XilinxShell.scala b/src/main/scala/shell/xilinx/XilinxShell.scala
+index 7ac08e9..09b9364 100644
+--- a/src/main/scala/shell/xilinx/XilinxShell.scala
++++ b/src/main/scala/shell/xilinx/XilinxShell.scala
+@@ -26,6 +26,9 @@ class XDC(val name: String)
+   def addPullup(io: IOPin) {
+     addConstraint(s"set_property PULLUP {TRUE} ${io.sdcPin}")
+   }
++  def addPulldown(io: IOPin) {
++    addConstraint(s"set_property PULLDOWN {TRUE} ${io.sdcPin}")
++  }
+   def addIOB(io: IOPin) {
+     if (io.isOutput) {
+       addConstraint(s"set_property IOB {TRUE} [ get_cells -of_objects [ all_fanin -flat -startpoints_only ${io.sdcPin}]]")

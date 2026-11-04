@@ -466,6 +466,7 @@ class WithOspiCapture(
   frameBufferDepth: Int = 324 * 324 + 1
 ) extends Config((site, here, up) => {
   case OspiKey => Some(OspiParams(address = address, frameBufferDepth = frameBufferDepth))
+  case chipyard.BuildSystem => (p: Parameters) => new chipyard.RbDigitalTop()(p) // the system with this periphery's trait
 })
 
 /** Config fragment: enable the OSPI capture peripheral *with* the TileLink DMA master path.
@@ -477,4 +478,5 @@ class WithOspiCaptureDma(
   frameBufferDepth: Int = 324 * 324 + 1
 ) extends Config((site, here, up) => {
   case OspiKey => Some(OspiParams(address = address, frameBufferDepth = frameBufferDepth, enableDma = true))
+  case chipyard.BuildSystem => (p: Parameters) => new chipyard.RbDigitalTop()(p) // the system with this periphery's trait
 })

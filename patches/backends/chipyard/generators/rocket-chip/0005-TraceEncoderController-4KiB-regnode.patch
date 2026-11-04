@@ -1,0 +1,17 @@
+TraceEncoderController: 4 KiB register node.
+
+Pairs with tacit's TraceSinkDMA widening. Generic.
+
+diff --git a/src/main/scala/trace/TraceEncoderController.scala b/src/main/scala/trace/TraceEncoderController.scala
+index 6a5c2bc7b..3edcb36e5 100644
+--- a/src/main/scala/trace/TraceEncoderController.scala
++++ b/src/main/scala/trace/TraceEncoderController.scala
+@@ -25,7 +25,7 @@ class TraceEncoderController(addr: BigInt, beatBytes: Int)(implicit p: Parameter
+ 
+   val device = new SimpleDevice("trace-encoder-controller", Seq("ucbbar,trace0"))
+   val node = TLRegisterNode(
+-    address = Seq(AddressSet(addr, 0xFF)),
++    address = Seq(AddressSet(addr, 0xFFF)),
+     device = device,
+     beatBytes = beatBytes
+   )

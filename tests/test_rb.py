@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from tools.rb.artifacts import zephyr_build_dir
+from tools.rb import boards
 from tools.rb.boards import BOARDS, ROOT, TARGETS, WORKLOADS
 from tools.rb.cli import (
     RbError,
@@ -231,17 +232,11 @@ class RegistryTests(unittest.TestCase):
             self.assertFalse(selected.is_scratchpad_config, config)
             self.assertEqual(selected.config_memory_size, board.memory_size, config)
 
-    @unittest.skipUnless(
-        (ROOT / "backends" / "chipyard" / "build.sbt").is_file(),
-        "backends/chipyard is not initialised",
-    )
     def test_registry_scratchpad_flags_match_the_chipyard_configs(self) -> None:
         """Every KU040 config's registry classification must follow the ddr
         argument it actually elaborates with, not just its name."""
         source = (
-            ROOT
-            / "backends"
-            / "chipyard"
+            boards.CHIPYARD_OVERLAY
             / "fpga"
             / "src"
             / "main"

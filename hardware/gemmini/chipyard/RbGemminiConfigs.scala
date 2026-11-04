@@ -2,8 +2,7 @@ package chipyard
 
 // Extracted from gemmini 7d91e9e:
 //   chipyard/GemminiConfigs.scala; only the configs RiskyBird appended
-// The original still lives in the backend until its pin moves to the plain
-// tip; keep the two in step until then.
+// Compiled into Chipyard by the overlay plugin, hardware/chipyard/project/RiskyBird.scala.
 
 import org.chipsalliance.cde.config.Config
 

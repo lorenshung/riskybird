@@ -1,0 +1,13 @@
+# Symlinks tools/backend-patches creates inside the backends. RiskyBird code
+# stays in this repository; these are the only places a backend sees it.
+#
+# Each line: LINK  TARGET   (both relative to this checkout)
+
+# sbt AutoPlugin: compiles hardware/** into Chipyard's own projects.
+backends/chipyard/project/RiskyBird.scala               hardware/chipyard/project/RiskyBird.scala
+# Vivado board directories. fpga-shells' prologue.tcl resolves BOARD beside
+# xilinx/common, so a board must appear there. te0712_100t is the reworked
+# Arty A7-100 board the arty100t sub-project uses (hardware/chipyard/fpga/rb-fpga.mk).
+backends/chipyard/fpga/fpga-shells/xilinx/arty_a7_200   hardware/fpga-shells/xilinx/arty_a7_200
+backends/chipyard/fpga/fpga-shells/xilinx/ku040         hardware/fpga-shells/xilinx/ku040
+backends/chipyard/fpga/fpga-shells/xilinx/te0712_100t   hardware/fpga-shells/xilinx/arty_a7_100

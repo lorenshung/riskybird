@@ -1,8 +1,9 @@
 """FPGA resource-utilization characterization and reporting.
 
 This module owns the top-level half of RiskyBird's area-characterization flow.
-The Vivado-side half lives in ``backends/chipyard/riskybird/`` and is invoked
-through Chipyard's FPGA Makefile; everything here turns its text reports into
+The Vivado-side half lives in ``hardware/chipyard/riskybird/`` and is invoked
+through ``hardware/chipyard/fpga/rb-fpga.mk``, the wrapper around Chipyard's
+FPGA Makefile; everything here turns its text reports into
 records with provenance, and turns records into tables and figures.
 
 Design rules this module enforces:
@@ -33,13 +34,13 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from . import fingerprint
-from .boards import BOARDS, CHIPYARD, ROOT, Board
+from .boards import BOARDS, CHIPYARD, CHIPYARD_FPGA_MAKEFILE, ROOT, Board
 
 
 RESULTS_DIR = ROOT / "results" / "area"
 SCHEMA = "riskybird.area-record.v1"
 
-# Attribute-injection modes accepted by backends/chipyard/riskybird/area.mk.
+# Attribute-injection modes accepted by hardware/chipyard/riskybird/area.mk.
 ATTR_MODES = ("none", "hierarchy", "dsp", "all")
 
 # Chipyard submodules whose revision changes generated RTL, and therefore area.
@@ -661,6 +662,8 @@ def make_command(board: Board, attrs: str, force: bool) -> list[str]:
         "make",
         "-C",
         str(CHIPYARD / "fpga"),
+        "-f",
+        str(CHIPYARD_FPGA_MAKEFILE),
         f"SUB_PROJECT={board.sub_project}",
         f"CONFIG={board.config}",
         f"RB_ATTRS={attrs}",
@@ -673,6 +676,8 @@ def restore_command(board: Board) -> list[str]:
         "make",
         "-C",
         str(CHIPYARD / "fpga"),
+        "-f",
+        str(CHIPYARD_FPGA_MAKEFILE),
         f"SUB_PROJECT={board.sub_project}",
         f"CONFIG={board.config}",
         "rb-area-restore",

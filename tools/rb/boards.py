@@ -73,6 +73,13 @@ INT_NOPERMUTE_VECTOR_CONFIGS = frozenset({
     "RocketArty200TDroneGemminiSaturnIntAt35Config",
 })
 CHIPYARD = ROOT / "backends" / "chipyard"
+# RiskyBird's Chipyard sources, compiled into the plain backend by the sbt
+# plugin hardware/chipyard/project/RiskyBird.scala (linked in by
+# tools/backend-patches).
+CHIPYARD_OVERLAY = ROOT / "hardware" / "chipyard"
+# Every Chipyard FPGA make goes through this wrapper around fpga/Makefile: it
+# adds the arty200t/ku040 sub-projects and the rb-area/rb-impl flow.
+CHIPYARD_FPGA_MAKEFILE = CHIPYARD_OVERLAY / "fpga" / "rb-fpga.mk"
 ZEPHYR_BACKEND = ROOT / "backends" / "zephyr-chipyard-sw"
 # The PyTorch -> quantized -> Zephyr/RISC-V compilation pipeline behind
 # `rb modelblaster`. A backend in its own right rather than a submodule of the

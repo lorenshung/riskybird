@@ -1,0 +1,60 @@
+Tacit: widen TraceSinkDMA's collect counter; 4 KiB register node.
+
+Pairs with rocket-chip's TraceEncoderController patch. Generic.
+
+diff --git a/src/main/scala/TraceSinkDMA.scala b/src/main/scala/TraceSinkDMA.scala
+index d3123b2..fdfe8d5 100644
+--- a/src/main/scala/TraceSinkDMA.scala
++++ b/src/main/scala/TraceSinkDMA.scala
+@@ -24,7 +24,7 @@ class TraceSinkDMA(params: TraceSinkDMAParams)(implicit p: Parameters) extends L
+ 
+   val device = new SimpleDevice("trace-sink-dma", Seq("ucbbar,trace0"))
+   val regnode = TLRegisterNode(
+-    address = Seq(AddressSet(params.regNodeBaseAddr, 0xFF)),
++    address = Seq(AddressSet(params.regNodeBaseAddr, 0xFFF)),
+     device = device,
+     beatBytes = params.beatBytes
+   )
+@@ -43,8 +43,13 @@ class TraceSinkDMA(params: TraceSinkDMAParams)(implicit p: Parameters) extends L
+     
+     // tracks how much trace data have we written in total
+     val addr_counter = RegInit(0.U(64.W))
+-    // tracks how much trace data have we collected in current transaction
+-    val collect_counter = RegInit(0.U(4.W))
++    // tracks how much trace data have we collected in current transaction.
++    // Must be able to hold busWidth/8 (the full-beat count), so size it as
++    // log2Ceil(busWidth/8)+1 bits. A fixed 4-bit counter maxes at 15 and can
++    // never reach 16 on a 128-bit system bus (WithSystemBusWidth(128) =>
++    // busWidth/8 = 16), so collect_full never fires and no beat is ever written
++    // during a run -- the trace is silently discarded. Widen it.
++    val collect_counter = RegInit(0.U((log2Ceil(busWidth / 8) + 1).W))
+     val msg_buffer = RegInit(VecInit(Seq.fill(busWidth / 8)(0.U(8.W))))
+ 
+     val dma_start_addr = RegInit(0.U(64.W))
+@@ -178,9 +183,25 @@ case object TraceSinkDMAInjector extends SubsystemInjector((p, baseSubsystem) =>
+   if (traceSinkDMAs.nonEmpty) {
+     val sbus = baseSubsystem.locateTLBusWrapper(SBUS)
+     traceSinkDMAs.foreach { case (t, s) =>
++      // The sink DMA is built INSIDE the tile, so the source half of its async crossing
++      // belongs in the tile's clock domain.  sbus.crossOut(s.node) puts it in the SBUS's
++      // domain, which is only equivalent while the tile is clocked by the sbus.  For a tile
++      // on its own clock (rocket.WithAsynchronousCDCs) that left every A-channel signal of
++      // the sink crossing unsynchronised -- 1,790 CDC-1 endpoints in report_cdc on the
++      // PYNQ-Z1 L2-on-FCLK1 build (iiswc-tutorial MEMORY_BANDWIDTH.md section 6).  So cross
++      // out of the tile's PRCI domain when the tile is asynchronous, and keep the original
++      // construction otherwise, which leaves every synchronous-tile config byte-identical.
++      val tileXType = q(TilesLocated(InSubsystem))
++        .find(_.tileParams.tileId == t.tileId).map(_.crossingParams.crossingType)
++      val tileDomain = hierarchicalSubsystem.tile_prci_domains.get(t.tileId)
+       t { // in the implicit clock domain of tile
+         sbus.coupleFrom(t.tileParams.baseName) { bus =>
+-          bus := sbus.crossOut(s.node)(ValName("trace_sink_dma"))(AsynchronousCrossing())
++          (tileXType, tileDomain) match {
++            case (Some(_: AsynchronousCrossing), Some(d)) =>
++              bus := d.crossOut(s.node)(ValName("trace_sink_dma"))(AsynchronousCrossing())
++            case _ =>
++              bus := sbus.crossOut(s.node)(ValName("trace_sink_dma"))(AsynchronousCrossing())
++          }
+         }
+         t.connectTLSlave(s.regnode, t.xBytes)
+       }

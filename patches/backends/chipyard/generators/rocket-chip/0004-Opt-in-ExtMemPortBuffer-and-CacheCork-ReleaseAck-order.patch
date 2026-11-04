@@ -1,0 +1,86 @@
+Opt-in ExtMemPortBuffer and TLCacheCorkReleaseAckFirst.
+
+Both default off, which elaborates the same Verilog as without the patch.
+Generic.
+
+diff --git a/src/main/scala/subsystem/Ports.scala b/src/main/scala/subsystem/Ports.scala
+index 7a9fda1ca..1791024c0 100644
+--- a/src/main/scala/subsystem/Ports.scala
++++ b/src/main/scala/subsystem/Ports.scala
+@@ -44,6 +44,17 @@ case class SlavePortParams(beatBytes: Int, idBits: Int, sourceBits: Int)
+ // if incohBase is set, creates an incoherent alias for the region that hangs off the sbus
+ case class MemoryPortParams(master: MasterPortParams, nMemoryChannels: Int, incohBase: Option[BigInt] = None)
+ 
++/** A TLBuffer between the memory bus and each ExtMem channel's TLToAXI4.  Opt-in.
++  *
++  * With several clients on the memory bus, the path from a client's A channel through the
++  * mbus crossbar, TLToAXI4's per-source stall lookup and the AXI4UserYanker queues -- and
++  * the ready that fans back across every crossbar input -- is combinational, and it grows
++  * with the number of clients and sources (iiswc-tutorial fpga/pynq-z2/docs/MEMORY_BANDWIDTH.md
++  * section 8: 15 logic levels, 13.9 ns, with four clients).  This cuts it at one cycle of
++  * latency each way.  False leaves the chain textually, and the generated Verilog exactly,
++  * as it was. */
++case object ExtMemPortBuffer extends Field[Boolean](false)
++
+ case object ExtMem extends Field[Option[MemoryPortParams]](None)
+ case object ExtBus extends Field[Option[MasterPortParams]](None)
+ case object ExtIn extends Field[Option[SlavePortParams]](None)
+@@ -104,6 +115,18 @@ trait CanHaveMasterAXI4MemPort { this: BaseSubsystem =>
+       })
+     })
+ 
++    if (p(ExtMemPortBuffer)) {
++      mbus.coupleTo(s"memory_controller_port_named_$portName") {
++        (DisableMonitors { implicit p => memAXI4Node := AXI4UserYanker() }
++          := AXI4IdIndexer(idBits)
++          := TLToAXI4()
++          := TLWidthWidget(mbus.beatBytes)
++          := TLBuffer()
++          := mem_bypass_xbar
++          := _
++        )
++      }
++    } else {
+     mbus.coupleTo(s"memory_controller_port_named_$portName") {
+       // Disable monitors on this connection since the class with this trait (i.e. DigitalTop) doesn't provide an
+       // implicit clock for the monitor.
+@@ -115,6 +138,7 @@ trait CanHaveMasterAXI4MemPort { this: BaseSubsystem =>
+         := _
+       )
+     }
++    }
+   }
+ 
+   val mem_axi4 = InModuleBody { memAXI4Node.makeIOs() }
+diff --git a/src/main/scala/tilelink/CacheCork.scala b/src/main/scala/tilelink/CacheCork.scala
+index a8518d97d..6dad7706b 100644
+--- a/src/main/scala/tilelink/CacheCork.scala
++++ b/src/main/scala/tilelink/CacheCork.scala
+@@ -17,6 +17,14 @@ import freechips.rocketchip.util.IDPool
+ 
+ import freechips.rocketchip.util.DataToAugmentedData
+ 
++/** Serve the cork's locally generated ReleaseAcks AHEAD of the outer GrantData on the inner
++  * D channel.  The default arbitration is data-first; under a dense miss stream through an
++  * InclusiveCache that starves ReleaseAcks, fills the 2-entry ReleaseAck queue, stops the
++  * cache scheduling Releases, and so delays every Acquire behind them (iiswc-tutorial
++  * fpga/pynq-z2/docs/MEMORY_BANDWIDTH.md section 6).  Opt-in: false leaves the arbiter, and
++  * the generated Verilog, exactly as they were. */
++case object TLCacheCorkReleaseAckFirst extends Field[Boolean](false)
++
+ case class TLCacheCorkParams(
+   unsafe: Boolean = false,
+   sinkIds: Int = 8)
+@@ -169,7 +177,11 @@ class TLCacheCork(params: TLCacheCorkParams = TLCacheCorkParams())(implicit p: P
+ 
+         // Combine the sources of messages into the channels
+         TLArbiter(TLArbiter.lowestIndexFirst)(out.a, (edgeOut.numBeats1(c_a.bits), c_a), (edgeOut.numBeats1(a_a.bits), a_a))
+-        TLArbiter(TLArbiter.lowestIndexFirst)(in_d,  (edgeIn .numBeats1(d_d.bits), d_d), (0.U, Queue(c_d, 2)), (0.U, Queue(a_d, 2)))
++        if (p(TLCacheCorkReleaseAckFirst)) {
++          TLArbiter(TLArbiter.lowestIndexFirst)(in_d,  (0.U, Queue(c_d, 2)), (edgeIn .numBeats1(d_d.bits), d_d), (0.U, Queue(a_d, 2)))
++        } else {
++          TLArbiter(TLArbiter.lowestIndexFirst)(in_d,  (edgeIn .numBeats1(d_d.bits), d_d), (0.U, Queue(c_d, 2)), (0.U, Queue(a_d, 2)))
++        }
+ 
+         // Tie off unused ports
+         in.b.valid := false.B
