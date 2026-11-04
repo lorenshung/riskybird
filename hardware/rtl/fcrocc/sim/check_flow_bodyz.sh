@@ -18,7 +18,7 @@ W=${1:-$(mktemp -d)}
 mkdir -p "$W"
 cc -O2 -o "$W/fc_rocc_asm" "$ASM/fc_rocc_asm.c" -lm
 for b in 0 1; do
-    c++ -O2 -I"$FC" -DIMU_OFFSET_Y=-0.016f -DFC_FLOW_BODYZ=$b "$HERE/ref_complementary.cpp" \
+    c++ -O2 -I"$FC" -DIMU_OFFSET_Y=0.016f -DFC_FLOW_BODYZ=$b "$HERE/ref_complementary.cpp" \
         -o "$W/ref$b" -lm
 done
 python3 -I "$HERE/gen_tilt_trace.py" "$W/tilt.csv" --truth "$W/truth.csv"

@@ -25,6 +25,9 @@ EXTRACT = "extract"
 # Copies that must still be byte-identical to the manifest blob.
 UNMODIFIED = ("hardware/rtl/fcrocc/prototype/", "hardware/rtl/fcrocc/sim/",
               "hardware/rtl/fcrocc/vsrc/")
+# Deliberate changes since the move (see prune/pin-clean-proof.txt, section 9): the IMU lever-arm
+# sign in the boot image (IMU_OFFSET_Y -0.016 -> +0.016). The ROM itself is unchanged.
+CHANGED_ON_PURPOSE = ("hardware/rtl/fcrocc/vsrc/fc_rocc_init.hex",)
 
 
 def rows():
@@ -60,7 +63,8 @@ class ManifestTest(unittest.TestCase):
 
     def test_unmodified_copies_match(self):
         for r in rows():
-            if r["destination"].startswith(UNMODIFIED) and r["blob"] != EXTRACT:
+            if (r["destination"].startswith(UNMODIFIED) and r["blob"] != EXTRACT
+                    and r["destination"] not in CHANGED_ON_PURPOSE):
                 out = subprocess.run(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{r['destination']}"],
                                      capture_output=True, text=True)
                 if out.returncode == 0:

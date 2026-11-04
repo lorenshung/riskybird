@@ -21,7 +21,7 @@
 
 ; ---- physical / tuning parameters (C names; f = float, as in the C sources) ----
 .set GRAVITY        = 9.81f
-.set IMU_OFFSET_Y   = -0.016f     ; IMU lever arm, body y (m). C default is 0; PCB value -0.016
+.set IMU_OFFSET_Y   = 0.016f      ; IMU lever arm, body y (m; +y = left, FLU). C default is 0; PCB value +0.016
 .set IMU_ALPHA_TAU  = 0.02f       ; gyro-derivative LP time constant (s)
 .set KP             = 0.5f        ; Mahony gravity-trim gain
 .set Z_GAIN         = 0.5f        ; ToF observer, z

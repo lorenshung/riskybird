@@ -403,6 +403,33 @@ $ git status --short
         sha256 5cf73861b7300dda471a15a8530d8f3eb30b562537f9a85a55d7ca085da102e0, 1411360 bytes
       Not flashed or run.
 
+9. IMU lever-arm sign (FcRoCC / fp16 / comments)
+--------------------------------------------------
+  The estimator body frame is FLU (+y = left); the BMI088 is 16 mm LEFT of the CoM, so
+  IMU_OFFSET_Y = +0.016 (PCB U3 at body y = +16 mm; flown presets pass -DIMU_OFFSET_Y=0.016f;
+  FLIGHT_TUNING_LOG lines 23-24). Stale copies had the opposite sign and are corrected:
+    workloads/flight_controller/src/estimator_complementary.cpp   comments only (default stays 0)
+    workloads/flight_controller/src/fp16_fc_glue.c                OFF_Y -0.016f -> +0.016f
+    hardware/rtl/fcrocc/asm/fc_rocc.fca, fcr_disasm.py            IMU_OFFSET_Y -0.016f -> +0.016f
+    hardware/rtl/fcrocc/sim/ref_complementary.cpp, check_flow_bodyz.sh, gen_tilt_trace.py
+                                                                  documented/used -DIMU_OFFSET_Y and
+                                                                  the synthetic lever arm, same flip
+  The default FcRoCC image changed on purpose. Regenerated with fc_rocc_asm from fc_rocc.fca
+  (the unchanged source reproduced the old files byte for byte first):
+    vsrc/fc_rocc_init.hex, workloads/flight_controller/src/fc_rocc_fw.h (FCR_INIT[3]),
+    variants/flow_bodyz1/fc_rocc_init.hex and fc_rocc_fw.h: register r3 IMU_RY
+    0xfffffffbe76d (-0.016, Q24) -> 0x000000041893 (+0.016).
+    vsrc/fc_rocc_rom.hex, fc_rocc_map.svh (default and variant) and variants rom.hex: unchanged;
+    the constant lives in the boot image, not in the microwords. Disassembly of the old and new
+    ROM is identical (961 lines); the --init listing differs only in the r3 line.
+  tests/test_prune_manifest.py no longer pins vsrc/fc_rocc_init.hex to its manifest blob.
+  No flown preset uses this path: none sets ROSE_USE_ROCC or ROSE_USE_FP16, so no flown build
+  reads FCR_INIT or OFF_Y. Float flight_controller builds (t33-hover-1.5m, arty200t) have
+  byte-identical allocated sections before and after (comment-only change in the float path).
+  Replay parity (new ROM + init vs ref_complementary -DIMU_OFFSET_Y=0.016f, check_flow_bodyz.sh):
+  velocity max difference <= 1.8e-5 m/s for FLOW_BODYZ=0 and 1. Not re-run: the RTL replay
+  (sim/replay_rtl.csv) and the stored sim/replay_ref.csv still reflect the old sign.
+
 Appendix: comparison scripts
 --- cmp-gen.py
 #!/usr/bin/env python3

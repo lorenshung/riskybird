@@ -6,7 +6,7 @@ motion (the drag-balanced attitude of steady flight), which is where the flow up
 (fc_flow_to_world(), FC_FLOW_BODYZ) is large: bz = (R^T v)_z ~ v*sin(tilt).
 
 Kinematically exact, noise-free sensors:
-  accel   specific force at the IMU, R^T (a_w + g z) + alpha x r + w x (w x r), r = (0, -0.016, 0)
+  accel   specific force at the IMU, R^T (a_w + g z) + alpha x r + w x (w x r), r = (0, +0.016, 0)
   gyro    body rate w, from the quaternion derivative
   flow    body x/y velocity (R^T v)_xy -- what fc_flow_velocity() delivers (angular flow x slant)
   height  down-ToF SLANT range to the floor along body -z, z / R[8]
@@ -20,7 +20,7 @@ import sys
 DT = 0.002
 T_END = 12.0
 G = 9.81
-IMU_R = (0.0, -0.016, 0.0)
+IMU_R = (0.0, 0.016, 0.0)
 Z0 = 1.0
 D = math.radians
 

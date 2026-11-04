@@ -6,7 +6,7 @@
  * code the EST microcode mirrors, and writes the estimator columns of a replay CSV (u0..u3 are 0:
  * the microcode controller is not modelled here). Configure it as the microcode is built:
  *
- *   c++ -O2 -I../../../../workloads/flight_controller/src -DIMU_OFFSET_Y=-0.016f \
+ *   c++ -O2 -I../../../../workloads/flight_controller/src -DIMU_OFFSET_Y=0.016f \
  *       -DFC_FLOW_BODYZ=0|1 ref_complementary.cpp -o ref_complementary -lm
  *   ./ref_complementary SENSORS.csv OUT.csv
  *

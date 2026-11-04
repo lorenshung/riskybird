@@ -53,7 +53,7 @@
  * (omega x r). Left uncompensated, those rotational terms integrate into velocity/position as fake
  * translation -- a rotation-correlated drift that is WORST on takeoff (the velocity integrator that
  * otherwise trims it hasn't wound up yet). r for riskybird v3 (PCB): IMU is 16 mm LEFT of the CoM
- * -> IMU_OFFSET_Y = -0.016. Default 0 (opt-in); set via -DIMU_OFFSET_* . */
+ * -> IMU_OFFSET_Y = +0.016 (body +y = left, FLU). Default 0 (opt-in); set via -DIMU_OFFSET_* . */
 /* Down-ToF floor-step handling (see update()). 0 = off: every sample is fused as before. */
 #ifndef TOF_STEP_REJECT_M
 #define TOF_STEP_REJECT_M 0.0f
@@ -65,7 +65,7 @@
 #define IMU_OFFSET_X 0.0f      /* body +x = forward */
 #endif
 #ifndef IMU_OFFSET_Y
-#define IMU_OFFSET_Y 0.0f      /* body +y = right; PCB value -0.016 (16 mm left) */
+#define IMU_OFFSET_Y 0.0f      /* body +y = left (FLU); PCB value +0.016 (16 mm left) */
 #endif
 #ifndef IMU_OFFSET_Z
 #define IMU_OFFSET_Z 0.0f      /* body +z = up */

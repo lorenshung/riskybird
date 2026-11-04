@@ -32,7 +32,7 @@
 #define M_VELI 21
 
 #define GRAV 9.81f
-#define OFF_Y (-0.016f)
+#define OFF_Y (0.016f)
 #define ATAU 0.02f
 #define ZUPT 0.05f
 #define VMAXV 5.0f
