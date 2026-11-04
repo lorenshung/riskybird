@@ -691,15 +691,165 @@ def gantt_svg(run: Run, path: Path | None = None, *, subtitle: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 
+# Where `generate` runs ModelBlaster's example runner, and so where everything
+# it writes lands: IR, generated C, the gate's verify builds, the kernel cache.
+#
+# examples/_run_lib.sh writes all of that under <REPO_ROOT>/examples/<model>/,
+# and run.sh takes REPO_ROOT from its own location -- so run in place it writes
+# into backends/modelblaster, a pin we keep as a clean upstream checkout, and
+# can rewrite the kernel cache the backend tracks under
+# examples/<model>/<quant>/cache/. This directory stands in for the
+# ModelBlaster root instead: every top-level entry is a link back into the
+# backend except examples/, where the model being generated gets real
+# directories for what the runner writes (see _prepare_codegen_root). The
+# runner, its flags and its stages are ModelBlaster's, unchanged.
+CODEGEN_ROOT = ROOT / "build" / "modelblaster"
+
+# What _run_lib.sh creates under examples/<model>/<quant>/. These are real
+# directories under CODEGEN_ROOT; everything else there links to the backend.
+_RUNNER_OUTPUTS = ("generated", "build", "cache")
+
+# The shell whose Gemmini header the verification gate compiles against when
+# `generate` is not given --config.
+#
+# The gate's verify images are built with -isystem per_config/default16x16, a
+# directory that does not serve gemmini.h's "include/gemmini_params.h", so the
+# header actually used is ModelBlaster's fallback,
+# cores/gemmini/include/gemmini_params.h. Before the prune that was a link to
+# this shell's header; the rb-clean pin points it at default16x16, which has an
+# mvin scale (float scale_t) these shells do not elaborate -- so kernels were
+# accepted or rejected against a Gemmini that is not on the drone. The four
+# Arty drone shells' headers are identical. CODEGEN_ROOT overlays the fallback
+# with the selected shell's header instead (see _prepare_codegen_root).
+DEFAULT_GEMMINI_CONFIG = "RocketArty200TDroneGemminiSaturnFp16At35Config"
+
+
+def gemmini_header(config: str) -> Path:
+    """The gemmini_params.h captured for `config`, in either per_config layout."""
+    directory = per_config_header_dir(config)
+    for candidate in (directory / "include" / "gemmini_params.h",
+                      directory / "gemmini_params.h"):
+        if candidate.is_file():
+            return candidate
+    raise ModelBlasterError(
+        f"no gemmini_params.h captured for {config!r} (looked in "
+        f"{per_config_header_dir(config)}); elaborate that config and copy its "
+        "generated header to hardware/modelblaster/cores/gemmini/include/"
+        f"per_config/{config}/"
+    )
+
+
 def generated_dir(model: str, quant: str, target: str) -> Path:
     """Where ModelBlaster's codegen lands for this (model, quant, target).
 
     Mirrors examples/_run_lib.sh: IR_DIR is <example>/<quant>/generated and
-    GEN_DIR is IR_DIR/<TARGET>. Stated here rather than discovered, so a layout
-    change upstream fails loudly in `generate` instead of silently building the
+    GEN_DIR is IR_DIR/<TARGET>, with the example under CODEGEN_ROOT rather than
+    the backend. Stated here rather than discovered, so a layout change
+    upstream fails loudly in `generate` instead of silently building the
     previous model's sources.
     """
-    return MODELBLASTER / "examples" / model / quant / "generated" / target
+    return CODEGEN_ROOT / "examples" / model / quant / "generated" / target
+
+
+def _sync_links(directory: Path, wanted: dict[str, Path]) -> None:
+    """Make `directory` hold exactly these links into the backend.
+
+    Links into the backend that are no longer wanted are removed, so a file
+    that left ModelBlaster with a pin move does not linger here. Real files and
+    directories are never touched; one in the way of a link is an error rather
+    than something to delete.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    for entry in directory.iterdir():
+        if entry.is_symlink() and entry.name not in wanted:
+            if Path(os.readlink(entry)).is_relative_to(MODELBLASTER):
+                entry.unlink()
+    for name, target in wanted.items():
+        link = directory / name
+        if link.is_symlink():
+            if Path(os.readlink(link)) == target:
+                continue
+            link.unlink()
+        elif link.exists():
+            raise ModelBlasterError(
+                f"{link} is a real file or directory where the codegen root "
+                f"needs a link to {target}; move it aside"
+            )
+        link.symlink_to(target)
+
+
+def _prepare_codegen_root(
+    model: str, quant: str, target: str, *, header: Path | None = None,
+) -> Path:
+    """Lay out CODEGEN_ROOT for one run and return the run.sh to execute.
+
+    run.sh is reached through a link, so its REPO_ROOT -- `cd "$(dirname
+    $0)/../.." && pwd`, which does not resolve links -- is CODEGEN_ROOT.
+
+    `header`, when given, takes the place of ModelBlaster's fallback
+    cores/gemmini/include/gemmini_params.h: cores/, cores/gemmini/ and
+    cores/gemmini/include/ become real directories of links, and that one entry
+    links to `header` instead. The gate's verify builds take their include
+    paths from <repo_root>, which is CODEGEN_ROOT, so they compile against it.
+
+    The kernel cache for this (quant, target) is re-seeded from the backend's
+    tracked copy on every run, so each run starts from the state a run in a
+    clean checkout of the pin would: the same cached kernels, nothing carried
+    over from an earlier run. The IR and the generated directory are left in
+    place, as they would be in the backend (_run_lib.sh reuses an IR that is
+    already on disk unless FORCE_EXTRACT=1).
+    """
+    root = CODEGEN_ROOT
+    source = MODELBLASTER / "examples" / model
+    overlay = ("cores", "gemmini", "include") if header is not None else ()
+    if header is None and (root / "cores").is_dir() and not (root / "cores").is_symlink():
+        shutil.rmtree(root / "cores")   # an earlier run's overlay; it holds only links
+    _sync_links(root, {
+        entry.name: entry for entry in MODELBLASTER.iterdir()
+        if entry.name not in (".git", "examples") + overlay[:1]
+    })
+    if header is not None:
+        for depth in range(1, len(overlay) + 1):
+            upstream = MODELBLASTER.joinpath(*overlay[:depth])
+            here = root.joinpath(*overlay[:depth])
+            if here.is_symlink():
+                here.unlink()
+            wanted = {
+                entry.name: entry for entry in upstream.iterdir()
+                if entry.name != (overlay[depth] if depth < len(overlay)
+                                  else "gemmini_params.h")
+            }
+            if depth == len(overlay):
+                wanted["gemmini_params.h"] = header
+            _sync_links(here, wanted)
+    _sync_links(root / "examples", {
+        entry.name: entry for entry in (MODELBLASTER / "examples").iterdir()
+        if entry.name != model
+    })
+
+    def real_dir(entry: Path) -> bool:
+        return entry.is_dir() and not entry.is_symlink()
+
+    _sync_links(root / "examples" / model, {
+        entry.name: entry for entry in source.iterdir() if not real_dir(entry)
+    })
+    # Every subdirectory of the example (int8/, fp32/, ...) is a real one here,
+    # holding links to its contents but not to the runner's outputs.
+    for name in sorted({e.name for e in source.iterdir() if real_dir(e)} | {quant}):
+        upstream = source / name
+        _sync_links(root / "examples" / model / name, {
+            entry.name: entry for entry in upstream.iterdir()
+            if entry.name not in _RUNNER_OUTPUTS
+        } if upstream.is_dir() else {})
+    cache = root / "examples" / model / quant / "cache" / target
+    if cache.exists():
+        shutil.rmtree(cache)
+    tracked = source / quant / "cache" / target
+    if tracked.is_dir():
+        shutil.copytree(tracked, cache, symlinks=True)
+    else:
+        cache.mkdir(parents=True)
+    return root / "examples" / model / "run.sh"
 
 
 def generate(
@@ -709,13 +859,20 @@ def generate(
     target: str,
     curated: bool = True,
     drift_atol: int | None = None,
+    gemmini_config: str | None = None,
     env: dict[str, str] | None = None,
 ) -> Path:
     """Run ModelBlaster stages 1-3 and return the generated directory.
 
+    `gemmini_config` names the shell whose Gemmini header the verification
+    gate compiles its images against (default DEFAULT_GEMMINI_CONFIG).
+
     STAGE_ONLY=1 is what keeps this honest: it stops the flow after codegen, so
     nothing here ever runs spike. The image that goes on the board is built by
     rb, from RiskyBird's overlays, against exactly these sources.
+
+    The runner executes from CODEGEN_ROOT, so nothing is written into
+    backends/modelblaster.
     """
     run_sh = MODELBLASTER / "examples" / model / "run.sh"
     overlay_sh = RB_MODELBLASTER / "examples" / model / "run.sh"
@@ -763,7 +920,7 @@ def generate(
             # exactly 2 LSB, and accepting that takes conv2d from 460,351,223
             # cycles of scalar reference to 1,989,282 on the accelerator.
             **({"MB_DRIFT_ATOL": str(drift_atol)} if drift_atol else {}),
-            # examples/_run_lib.sh does `cd "${REPO_ROOT}"` into modelblaster/
+            # examples/_run_lib.sh does `cd "${REPO_ROOT}"` (CODEGEN_ROOT here)
             # and then runs `python -m modelblaster.pipeline.*`, which only
             # resolves if the package's PARENT is importable. Upstream gets that
             # from `pip install -e`; this backend's conda env has no such
@@ -779,9 +936,12 @@ def generate(
     if curated:
         environment["GLOBAL_CURATED_DIR"] = str(MODELBLASTER / "kernels")
     _with_chipyard_tools(environment)
+    gemmini_config = gemmini_config or DEFAULT_GEMMINI_CONFIG
+    header = gemmini_header(gemmini_config)
+    print(f"verification gate's Gemmini header: {gemmini_config} ({header})")
 
     result = subprocess.run(
-        ["bash", str(run_sh)],
+        ["bash", str(_prepare_codegen_root(model, quant, target, header=header))],
         cwd=str(MODELBLASTER.parent),
         env=environment,
         text=True,
@@ -828,7 +988,8 @@ def generate(
     log = out / "codegen.log"
     log.write_text(result.stdout + result.stderr)
     print(f"codegen log: {log}")
-    _record_verification(out, environment, drift_atol=drift_atol)
+    _record_verification(out, environment, drift_atol=drift_atol,
+                         gemmini_config=gemmini_config)
     return out
 
 
@@ -850,7 +1011,8 @@ CODEGEN_MARKER = ".rb-codegen.json"
 
 
 def _record_verification(
-    gen_dir: Path, environment: dict[str, str], *, drift_atol: int | None = None
+    gen_dir: Path, environment: dict[str, str], *, drift_atol: int | None = None,
+    gemmini_config: str | None = None,
 ) -> None:
     spike = shutil.which("spike", path=environment.get("PATH", ""))
     disabled = [
@@ -866,6 +1028,10 @@ def _record_verification(
         # Travels with the sources, so a published directory carries the
         # accuracy it was accepted at rather than leaving it to be remembered.
         "drift_atol": drift_atol,
+        # The shell whose Gemmini header the gate's verify images were built
+        # with; a build for a shell with a different header is not what was
+        # verified.
+        "gemmini_config": gemmini_config,
     }, indent=2) + "\n")
 
 

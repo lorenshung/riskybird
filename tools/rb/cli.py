@@ -3594,7 +3594,7 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
     if action == "generate":
         out = modelblaster.generate(
             args.model, quant=args.quant, target=args.target,
-            drift_atol=args.drift_atol,
+            drift_atol=args.drift_atol, gemmini_config=args.config,
         )
         print(out)
         return 0
@@ -4574,6 +4574,13 @@ def build_parser() -> argparse.ArgumentParser:
         "skip verification -- the gate still runs and still measures. On "
         "dronet/gemmini_q31, --drift-atol 2 is what lets conv2d_s8 onto Gemmini "
         "at a bounded 2 LSB, worth 460,351,223 -> 1,989,282 cycles",
+    )
+    mb_generate.add_argument(
+        "--config", metavar="CLASS",
+        help="the shell whose Gemmini header the verification gate compiles "
+        "its images against, as for `rb modelblaster build --config` "
+        f"(default: {modelblaster.DEFAULT_GEMMINI_CONFIG}, the drone shell "
+        "ModelBlaster's fallback header named before the rb-clean pin)",
     )
     mb_generate.set_defaults(func=cmd_modelblaster)
 

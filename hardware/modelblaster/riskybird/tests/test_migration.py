@@ -78,13 +78,19 @@ class MigrationTests(unittest.TestCase):
                 p.chmod(0o755)
             fragment = d / 'console.conf'
             fragment.touch()
-            env = dict(os.environ, PATH=f'{d}:/usr/bin:/bin', MB=str(RB_ROOT / 'backends/modelblaster'),
+            # An empty stand-in for the backend: the recipes run from inside it
+            # but must write only to SCRATCH, never into the pinned checkout.
+            backend = d / 'modelblaster'
+            backend.mkdir()
+            env = dict(os.environ, PATH=f'{d}:/usr/bin:/bin', MB=str(backend),
+                       SCRATCH=str(d / 'scratch'),
                        ZCS=folder, ZEPHYR_BASE=folder, ZEPHYR_SDK_INSTALL_DIR=folder,
                        CONSOLE_CONF=str(fragment), CONSOLE_OVERLAY=str(fragment))
             for script in scripts:
                 result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 37, (str(script), result.stdout, result.stderr))
                 self.assertNotIn('STACK3_BUILD_DONE', result.stdout)
+                self.assertEqual(list(backend.iterdir()), [], str(script))
 
 
 # unittest.mock is not loaded by importing unittest alone on every interpreter.

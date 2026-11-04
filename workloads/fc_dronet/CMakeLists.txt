@@ -14,8 +14,8 @@
 #
 # Build (see scripts/build_fc_dronet.sh for the canonical invocation):
 #   west build -p -b chipyard_riscv64 workloads/fc_dronet -- \
-#     -DMB_REPO=<abs path to a modelblaster checkout @10b50ba/equivalent> \
-#     -DMODEL_DIR=<MB_REPO>/examples/dronet/int8/generated_gray/hetero_tiled_rvvadd \
+#     -DMB_REPO=<abs path to a modelblaster checkout; default backends/modelblaster> \
+#     -DMODEL_DIR=<generated model dir; default build/fc_dronet/hetero_tiled_rvvadd> \
 #     -DMODELBLASTER_KERNEL_CFLAGS="-march=rv64imac_zve64x;-mabi=lp64;..." \
 #     -DEXTRA_CPPFLAGS="-DROSE_MOTORS_INHIBIT=1 -DROSE_PROFILE=1"
 
@@ -35,15 +35,17 @@ list(APPEND DTS_ROOT ${RB_ROOT}/hardware/zephyr)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(rose_fc_dronet)
 
-# DroNet model + modelblaster runtime. MB_REPO/MODEL_DIR default to this
-# checkout's backends/modelblaster submodule but are meant to be passed in by
-# build_fc_dronet.sh so the exact 10b50ba integrated files are used.
+# DroNet model + modelblaster runtime. MB_REPO (only read, for the Gemmini
+# runtime headers) defaults to this checkout's backends/modelblaster submodule.
+# MODEL_DIR defaults to where scripts/gen_dronet_model.sh provisions the exact
+# 10b50ba integrated files: this repository's build/ directory, never the
+# backend, which stays a clean upstream pin.
 if(NOT DEFINED MB_REPO)
   set(MB_REPO ${RB_ROOT}/backends/modelblaster)
 endif()
 get_filename_component(MB_REPO "${MB_REPO}" ABSOLUTE)
 if(NOT DEFINED MODEL_DIR)
-  set(MODEL_DIR ${MB_REPO}/examples/dronet/int8/generated_gray/hetero_tiled_rvvadd)
+  set(MODEL_DIR ${RB_ROOT}/build/fc_dronet/hetero_tiled_rvvadd)
 endif()
 get_filename_component(MODEL_DIR "${MODEL_DIR}" ABSOLUTE)
 
@@ -136,18 +138,21 @@ zephyr_link_libraries(-Wl,--no-relax)
 
 # The generated DroNet kernels.c is the ONLY V (Saturn RVV) translation unit:
 # give it the Gemmini+RVV march + include/-D set. Everything else builds no-V.
-# The Gemmini parameters of the shell this runs on. ModelBlaster's own fallback
-# header (cores/gemmini/include/gemmini_params.h) used to be a symlink to this
-# config and now points at default16x16, and gemmini.h includes it by a quoted
-# path that no -isystem order overrides, so the header is force-included: its
-# include guard then makes every later include of either path a no-op.
+# GEMMINI_PARAMS_DIR is the shell's per_config directory, ahead of ModelBlaster's
+# own include paths. It serves both spellings of the header the way ModelBlaster's
+# per_config/ layout does: gemmini.h's "include/gemmini_params.h" (from
+# include/gemmini_params.h there) and the kernels' <gemmini_params.h>. Without
+# it, gemmini.h falls through to ModelBlaster's default16x16 header.
 if(NOT DEFINED GEMMINI_PARAMS_DIR)
   set(GEMMINI_PARAMS_DIR ${RB_ROOT}/hardware/modelblaster/cores/gemmini/include/per_config/RocketArty200TDroneGemminiSaturnFp16At35Config)
 endif()
 if(NOT DEFINED MODELBLASTER_KERNEL_CFLAGS OR "${MODELBLASTER_KERNEL_CFLAGS}" STREQUAL "")
+  if(NOT EXISTS "${GEMMINI_PARAMS_DIR}/include/gemmini_params.h")
+    message(FATAL_ERROR "GEMMINI_PARAMS_DIR='${GEMMINI_PARAMS_DIR}' has no include/gemmini_params.h; "
+                        "gemmini.h would silently take ModelBlaster's default16x16 header.")
+  endif()
   set(MODELBLASTER_KERNEL_CFLAGS
     "-march=rv64imac_zve64x;-mabi=lp64;\
--include;${GEMMINI_PARAMS_DIR}/gemmini_params.h;\
 -isystem${GEMMINI_PARAMS_DIR};\
 -isystem${MB_REPO}/cores/gemmini/include;\
 -isystem${MB_REPO}/cores/gemmini;\
