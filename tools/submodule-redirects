@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Point nested duplicate submodules at the top-level backends instead.
+
+RoSE nests its own Chipyard, and its xpu-rt nests another Chipyard and another
+zephyr-chipyard-sw; zephyr-chipyard-sw nests another ModelBlaster. Initialised
+as declared, this checkout would hold three Chipyards and four Zephyrs. The
+backends' own branches are shared upstream infrastructure, so rather than edit
+their .gitmodules, this rewrites only the local checkout, from the table in
+.submodule-redirects:
+
+  1. PATH stays uninitialised (a clean checkout there is deinitialised; its git
+     directory is kept, so nothing is lost).
+  2. PATH becomes a relative symlink to the backend in this checkout.
+  3. `skip-worktree` on PATH keeps OWNER's `git status` clean of the
+     symlink-for-gitlink typechange.
+  4. `submodule.<name>.update = none` in OWNER's config. This is the part that
+     makes it safe: without it, `git submodule update --init --recursive`
+     follows the symlink and checks OWNER's pin out in the backend itself.
+  5. `submodule.<name>.active = false`, because `git submodule sync` ignores
+     `update` and would otherwise follow the symlink and rewrite the
+     backend's `origin` to the URL OWNER declares (seen: our Chipyard fork
+     repointed at ucb-bar/chipyard).
+
+A "-" target does 1, 4 and 5 only: the path stays empty.
+
+What this does not cover:
+  * An explicit `git submodule update --checkout PATH` overrides `update`.
+    Do not run it inside an OWNER.
+  * `git submodule update --init PATH` (Chipyard's own init script does this)
+    still skips PATH, but sets `active = true` again, which re-arms the
+    `sync` hazard in 5. `check` reports it; run `apply` again after any such
+    script.
+  * `git submodule foreach --recursive` still walks into the symlinks, so it
+    reaches each backend a second time under OWNER's path.
+  * `git submodule status` prints OWNER's pin for PATH with no `+`, even
+    though the backend is at a different commit. Use `check` instead.
+  * A branch switch in OWNER that changes PATH's pin can trip on the
+    skip-worktree bit; run `apply` again afterwards.
+
+    tools/submodule-redirects apply [--force]   # idempotent
+    tools/submodule-redirects check             # exit 1 on any problem
+    tools/submodule-redirects undo
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+TABLE = ROOT / ".submodule-redirects"
+
+
+def git(repo: Path, *args: str, check: bool = True) -> str:
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    if check and r.returncode != 0:
+        raise SystemExit(f"git -C {repo} {' '.join(args)}: {r.stderr.strip()}")
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def is_repo(path: Path) -> bool:
+    return (path / ".git").exists() and not path.is_symlink()
+
+
+def read_table() -> list[tuple[str, str, str]]:
+    rows = []
+    for n, line in enumerate(TABLE.read_text().splitlines(), 1):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        fields = line.split()
+        if len(fields) != 3:
+            raise SystemExit(f"{TABLE.name}:{n}: expected OWNER PATH TARGET")
+        rows.append((fields[0], fields[1], fields[2]))
+    return rows
+
+
+def submodule_name(owner: Path, path: str) -> str:
+    out = git(owner, "config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$")
+    for line in out.splitlines():
+        key, value = line.split(None, 1)
+        if value == path:
+            return key[len("submodule."):-len(".path")]
+    raise SystemExit(f"{owner}: no submodule at {path} in .gitmodules")
+
+
+def ensure_owner(owner_rel: str) -> Path:
+    """Initialise OWNER (non-recursively) from the nearest repo above it."""
+    owner = ROOT / owner_rel
+    if is_repo(owner):
+        return owner
+    parent = owner.parent
+    while parent != ROOT and not is_repo(parent):
+        parent = parent.parent
+    rel = os.path.relpath(owner, parent)
+    print(f"  init {owner_rel} (no nested submodules)")
+    git(parent, "submodule", "update", "--init", rel)
+    return owner
+
+
+def link_text(full: Path, target: Path) -> str:
+    return os.path.relpath(target, full.parent)
+
+
+def apply(force: bool) -> None:
+    for owner_rel, path, target_rel in read_table():
+        owner = ensure_owner(owner_rel)
+        full = owner / path
+        name = submodule_name(owner, path)
+        label = f"{owner_rel}/{path}"
+        if target_rel != "-":
+            target = ROOT / target_rel
+            if not is_repo(target):
+                raise SystemExit(f"{label}: target {target_rel} is not checked out")
+        if is_repo(full):
+            dirty = git(full, "status", "--porcelain", "--untracked-files=no")
+            if dirty and not force:
+                raise SystemExit(f"{label}: checked out with local changes; "
+                                 "commit or stash them, or pass --force")
+            print(f"  deinit {label}")
+            git(owner, "submodule", "deinit", *(["-f"] if force else []), path)
+        if target_rel != "-":
+            want = link_text(full, target)
+            if full.is_symlink():
+                if os.readlink(full) != want:
+                    raise SystemExit(f"{label}: symlink points at {os.readlink(full)}, "
+                                     f"expected {want}")
+            else:
+                if full.exists():
+                    if any(full.iterdir()):
+                        raise SystemExit(f"{label}: not empty; refusing to replace it")
+                    full.rmdir()
+                full.symlink_to(want)
+                print(f"  link {label} -> {want}")
+            git(owner, "update-index", "--skip-worktree", path)
+        git(owner, "submodule", "init", path)
+        git(owner, "config", f"submodule.{name}.update", "none")
+        git(owner, "config", f"submodule.{name}.active", "false")
+    print("applied; run `tools/submodule-redirects check`")
+
+
+def undo() -> None:
+    for owner_rel, path, target_rel in read_table():
+        owner = ROOT / owner_rel
+        if not is_repo(owner):
+            continue
+        full = owner / path
+        name = submodule_name(owner, path)
+        if full.is_symlink():
+            full.unlink()
+            full.mkdir()
+            print(f"  unlink {owner_rel}/{path}")
+        git(owner, "update-index", "--no-skip-worktree", path, check=False)
+        git(owner, "config", "--unset", f"submodule.{name}.update", check=False)
+        git(owner, "config", "--unset", f"submodule.{name}.active", check=False)
+    print("undone; paths are left uninitialised")
+
+
+def check() -> int:
+    bad = 0
+    owners = set()
+    for owner_rel, path, target_rel in read_table():
+        owner = ROOT / owner_rel
+        label = f"{owner_rel}/{path}"
+        problems = []
+        if not is_repo(owner):
+            print(f"FAIL {label}: owner not checked out")
+            bad += 1
+            continue
+        owners.add(owner)
+        full = owner / path
+        name = submodule_name(owner, path)
+        pin = git(owner, "ls-tree", "HEAD", path).split()[2][:10]
+        if git(owner, "config", f"submodule.{name}.update", check=False) != "none":
+            problems.append("update != none")
+        if git(owner, "config", f"submodule.{name}.active", check=False) != "false":
+            problems.append("active != false")
+        if target_rel == "-":
+            if is_repo(full) or full.is_symlink():
+                problems.append("expected empty and uninitialised")
+            where = "disabled"
+        else:
+            target = ROOT / target_rel
+            if not full.is_symlink():
+                problems.append("not a symlink")
+            elif full.resolve() != target.resolve():
+                problems.append(f"resolves to {full.resolve()}")
+            if not git(owner, "ls-files", "-v", path).startswith("S "):
+                problems.append("skip-worktree not set")
+            head = git(target, "rev-parse", "HEAD", check=False)[:10]
+            origin = git(target, "remote", "get-url", "origin", check=False)
+            where = f"-> {target_rel} @ {head}  origin {origin}"
+        status = "ok  " if not problems else "FAIL"
+        bad += bool(problems)
+        print(f"{status} {label}  (pin {pin}) {where}"
+              + (f"  [{'; '.join(problems)}]" if problems else ""))
+    for owner in sorted(owners):
+        dirty = git(owner, "status", "--porcelain", "--untracked-files=no")
+        if dirty:
+            bad += 1
+            print(f"FAIL {os.path.relpath(owner, ROOT)}: status not clean:\n{dirty}")
+    return 1 if bad else 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    a = sub.add_parser("apply")
+    a.add_argument("--force", action="store_true",
+                   help="deinitialise checkouts with local changes (discards them)")
+    sub.add_parser("check")
+    sub.add_parser("undo")
+    args = ap.parse_args()
+    if args.cmd == "apply":
+        apply(args.force)
+        return check()
+    if args.cmd == "undo":
+        undo()
+        return 0
+    return check()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

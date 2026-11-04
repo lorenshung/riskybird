@@ -3,28 +3,48 @@
 # separate copies of Chipyard. Initialise only what the tier you want needs.
 #
 #   bench tier    git submodule update --init backends/zephyr-chipyard-sw
-#   silicon tier  ... plus backends/chipyard   (Linux only; needs Vivado)
+#   silicon tier  ... plus backends/chipyard backends/saturn
+#                 (Linux only; needs Vivado)
 #   models        ... plus backends/modelblaster  (~143 MiB)
+#   sim           ... plus backends/RoSE (then only the RoSE submodules you
+#                 need; its nested Chipyard is redirected, see below)
 #
-# backends/modelblaster remains the path used by `rb modelblaster`. The merged
-# Zephyr backend also uses a nested ModelBlaster checkout; both select the same
-# commit. Consolidating the caller paths is a separate tested change.
+# Every backend is pinned at a plain upstream commit with no RiskyBird content.
+# RiskyBird's own code lives under hardware/, workloads/ and tools/, and reaches
+# the backends only through tools/backend-patches (the overlay links in
+# .backend-overlays, e.g. Chipyard's sbt drop-in, and the generic patch queue
+# in patches/). Run, after initialising a tier:
+#
+#   tools/submodule-redirects apply   # nested duplicates -> top-level backends
+#   tools/backend-patches apply       # overlay links + patch queue
+#
+# backends/saturn is the one non-upstream pin: Saturn's RiskyBird changes
+# (e73d9bc) conflict with upstream and cannot ride a working-tree patch, so
+# Chipyard's generators/saturn is redirected to this checkout.
 #
 # hardware/pcb is the board itself (KiCad), checked in as a plain directory.
 # Its one nested submodule, gym-pybullet-drones under riskybird-academy, is
 # listed below and is not part of any tier.
 [submodule "backends/zephyr-chipyard-sw"]
 	path = backends/zephyr-chipyard-sw
-	url = https://github.com/lorenshung/zephyr-chipyard-sw.git
-	branch = integration/riskybird-20260928
+	url = https://github.com/ucb-bar/zephyr-chipyard-sw.git
+	branch = rb-clean
 [submodule "backends/chipyard"]
 	path = backends/chipyard
-	url = https://github.com/lorenshung/chipyard.git
-	branch = integration
+	url = https://github.com/ucb-bar/chipyard.git
+	branch = main
 [submodule "backends/modelblaster"]
 	path = backends/modelblaster
-	url = https://github.com/lorenshung/ModelBlaster.git
-	branch = integration/riskybird-20260928
+	url = https://github.com/ucb-bar/ModelBlaster.git
+	branch = rb-clean
+[submodule "backends/saturn"]
+	path = backends/saturn
+	url = https://github.com/CobbledSteel/saturn-vectors.git
+	branch = saturn-vmem-be-gate
+[submodule "backends/RoSE"]
+	path = backends/RoSE
+	url = https://github.com/ucb-bar/RoSE.git
+	branch = rose-2-dev
 [submodule "hardware/pcb/riskybird-academy/sim/gym-pybullet-drones"]
 	path = hardware/pcb/riskybird-academy/sim/gym-pybullet-drones
 	url = https://github.com/ucb-bar/gym-pybullet-drones.git

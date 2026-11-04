@@ -1,0 +1,18 @@
+# Nested submodules that duplicate a top-level backend. Applied by
+# tools/submodule-redirects; see that script for how and why.
+#
+# Each line: OWNER  PATH  TARGET
+#   OWNER   repo that declares the submodule, relative to this checkout
+#   PATH    the submodule's path inside OWNER
+#   TARGET  checkout to point PATH at, relative to this checkout,
+#           or "-" to leave PATH uninitialised and empty
+#
+# OWNER must be checked out; `apply` initialises a missing OWNER without its
+# own submodules (the redirects below are what replace them).
+
+backends/RoSE                   soc/sim/chipyard              backends/chipyard
+backends/RoSE/soc/sw/xpu-rt     hw/chipyard                   backends/chipyard
+backends/RoSE/soc/sw/xpu-rt     zephyr-chipyard-sw            backends/zephyr-chipyard-sw
+backends/zephyr-chipyard-sw     modelblaster                  backends/modelblaster
+backends/chipyard               generators/saturn             backends/saturn
+backends/chipyard               software/zephyrproject/zephyr -

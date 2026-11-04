@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""Put RiskyBird's additions into the backend checkouts: overlay links and a patch queue.
+
+Every backend is pinned at a plain upstream commit. What RiskyBird adds lives
+in this repository and reaches the backends two ways:
+
+  overlay links   .backend-overlays lists symlinks to create inside a backend
+                  (e.g. Chipyard's sbt drop-in, hardware/chipyard/riskybird.sbt,
+                  which compiles hardware/** into Chipyard's own projects).
+                  Each link is also written to the owning repository's
+                  info/exclude, so it never shows as untracked there.
+  patch queue     patches/<path of the checkout>/NNNN-*.patch, applied in name
+                  order, for the few edits that must change a backend's own
+                  files. Only generic infrastructure goes here: each patch is a
+                  candidate upstream pull request, deleted from the queue once
+                  its fix is in the pinned commit. RiskyBird-specific code
+                  belongs in the overlay, never in a patch.
+
+Nothing is committed inside a backend, so each checkout stays at the commit its
+owner pins and the pins stay honest. The owner of a patched checkout would then
+report it as modified, so `apply` sets `submodule.<name>.ignore = dirty` in that
+owner's local config. With that set, `git status` no longer guards the backend;
+`check` does:
+
+  check   rebuilds HEAD + queue in a scratch index and compares it with the
+          working tree (tracked files only). Fails on a missing hunk, an extra
+          edit, a missing or wrong overlay link, or a checkout that has moved
+          off its owner's pin (e.g. after a bump: rebase the queue, then
+          `apply`).
+
+    tools/backend-patches apply     # idempotent
+    tools/backend-patches check     # exit 1 on any problem
+    tools/backend-patches revert    # back to the pristine pin, links removed
+
+Initialise the nested checkouts a queue targets first (`rb env setup` does, via
+Chipyard's own init script), then run tools/submodule-redirects apply, then
+this.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+QUEUE = ROOT / "patches"
+OVERLAYS = ROOT / ".backend-overlays"
+
+
+def git(repo: Path, *args: str, check: bool = True, env: dict | None = None) -> str:
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True,
+                       env={**os.environ, **(env or {})})
+    if check and r.returncode != 0:
+        raise SystemExit(f"git -C {repo} {' '.join(args)}: {r.stderr.strip()}")
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def queues() -> list[tuple[Path, list[Path]]]:
+    out = []
+    for d in sorted({p.parent for p in QUEUE.rglob("*.patch")}):
+        out.append((ROOT / d.relative_to(QUEUE), sorted(d.glob("*.patch"))))
+    return out
+
+
+def overlays() -> list[tuple[Path, Path]]:
+    rows = []
+    if not OVERLAYS.is_file():
+        return rows
+    for n, line in enumerate(OVERLAYS.read_text().splitlines(), 1):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        fields = line.split()
+        if len(fields) != 2:
+            raise SystemExit(f"{OVERLAYS.name}:{n}: expected LINK TARGET")
+        rows.append((ROOT / fields[0], ROOT / fields[1]))
+    return rows
+
+
+def is_repo(path: Path) -> bool:
+    return (path / ".git").exists() and not path.is_symlink()
+
+
+def owner_of(path: Path) -> Path:
+    parent = path.parent
+    while not is_repo(parent):
+        parent = parent.parent
+    return parent
+
+
+def pinned(repo: Path) -> str:
+    owner = owner_of(repo)
+    entry = git(owner, "ls-tree", "HEAD", os.path.relpath(repo, owner))
+    if not entry:
+        raise SystemExit(f"{repo}: not a submodule of {owner}")
+    return entry.split()[2]
+
+
+def submodule_name(owner: Path, path: str) -> str:
+    out = git(owner, "config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$")
+    for line in out.splitlines():
+        key, value = line.split(None, 1)
+        if value == path:
+            return key[len("submodule."):-len(".path")]
+    raise SystemExit(f"{owner}: no submodule at {path} in .gitmodules")
+
+
+def queue_diff(repo: Path, patches: list[Path]) -> str:
+    """Tracked working-tree differences from HEAD + queue ("" when they match).
+
+    Nested submodules are left out: each is a queue or a redirect of its own
+    and is checked as one.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        env = {"GIT_INDEX_FILE": str(Path(tmp) / "index")}
+        git(repo, "read-tree", "HEAD", env=env)
+        r = subprocess.run(["git", "-C", str(repo), "apply", "--cached", *map(str, patches)],
+                           capture_output=True, text=True, env={**os.environ, **env})
+        if r.returncode != 0:
+            return f"queue does not apply to HEAD: {r.stderr.strip()}"
+        git(repo, "update-index", "-q", "--refresh", env=env, check=False)
+        return git(repo, "diff", "--name-status", "--ignore-submodules=all", env=env)
+
+
+def local_edits(repo: Path) -> str:
+    return git(repo, "diff", "HEAD", "--name-status", "--ignore-submodules=all")
+
+
+def rel(p: Path) -> str:
+    return os.path.relpath(p, ROOT)
+
+
+def exclude_file(repo: Path) -> Path:
+    return repo / git(repo, "rev-parse", "--git-path", "info/exclude")
+
+
+def exclude_entry(link: Path) -> tuple[Path, str]:
+    owner = owner_of(link)
+    return owner, "/" + os.path.relpath(link, owner)
+
+
+def link_text(link: Path, target: Path) -> str:
+    return os.path.relpath(target, link.parent)
+
+
+def check() -> int:
+    bad = 0
+    for repo, patches in queues():
+        problems = []
+        if not is_repo(repo):
+            print(f"FAIL {rel(repo)}: not checked out")
+            bad += 1
+            continue
+        head, pin = git(repo, "rev-parse", "HEAD"), pinned(repo)
+        if head != pin:
+            problems.append(f"HEAD {head[:10]} is not the pin {pin[:10]}")
+        diff = queue_diff(repo, patches)
+        if diff:
+            problems.append("working tree differs from pin + queue:\n    "
+                            + diff.replace("\n", "\n    "))
+        owner = owner_of(repo)
+        name = submodule_name(owner, os.path.relpath(repo, owner))
+        if git(owner, "config", f"submodule.{name}.ignore", check=False) != "dirty":
+            problems.append(f"{rel(owner) or '.'} lacks submodule.{name}.ignore=dirty")
+        bad += bool(problems)
+        print(f"{'ok  ' if not problems else 'FAIL'} {rel(repo)} @ {pin[:10]} "
+              f"+ {len(patches)} patch(es)" + (f"  [{'; '.join(problems)}]" if problems else ""))
+    for link, target in overlays():
+        problems = []
+        want = link_text(link, target)
+        if not target.exists():
+            problems.append(f"target {rel(target)} missing")
+        if not link.is_symlink():
+            problems.append("not a symlink")
+        elif os.readlink(link) != want:
+            problems.append(f"points at {os.readlink(link)}, expected {want}")
+        else:
+            owner, entry = exclude_entry(link)
+            exclude = exclude_file(owner)
+            if not exclude.is_file() or entry not in exclude.read_text().splitlines():
+                problems.append(f"not in {rel(owner)}'s info/exclude")
+        bad += bool(problems)
+        print(f"{'ok  ' if not problems else 'FAIL'} link {rel(link)} -> {rel(target)}"
+              + (f"  [{'; '.join(problems)}]" if problems else ""))
+    return 1 if bad else 0
+
+
+def apply() -> None:
+    for repo, patches in queues():
+        if not is_repo(repo):
+            raise SystemExit(f"{rel(repo)}: not checked out")
+        if git(repo, "rev-parse", "HEAD") != pinned(repo):
+            raise SystemExit(f"{rel(repo)}: not at its pin; `git submodule update` it first")
+        owner = owner_of(repo)
+        name = submodule_name(owner, os.path.relpath(repo, owner))
+        git(owner, "config", f"submodule.{name}.ignore", "dirty")
+        if not queue_diff(repo, patches):
+            print(f"  {rel(repo)}: already applied")
+            continue
+        if local_edits(repo):
+            raise SystemExit(f"{rel(repo)}: has edits that are not the queue; "
+                             "revert or commit them first")
+        git(repo, "apply", *map(str, patches))
+        print(f"  {rel(repo)}: applied {len(patches)} patch(es)")
+    for link, target in overlays():
+        if not link.parent.is_dir():
+            raise SystemExit(f"{rel(link)}: its backend is not checked out")
+        want = link_text(link, target)
+        if link.is_symlink():
+            if os.readlink(link) != want:
+                raise SystemExit(f"{rel(link)}: points at {os.readlink(link)}, expected {want}")
+        elif link.exists():
+            raise SystemExit(f"{rel(link)}: exists and is not our link; refusing to replace it")
+        else:
+            link.symlink_to(want)
+            print(f"  link {rel(link)} -> {want}")
+        owner, entry = exclude_entry(link)
+        exclude = exclude_file(owner)
+        lines = exclude.read_text().splitlines() if exclude.is_file() else []
+        if entry not in lines:
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            exclude.write_text("\n".join([*lines, entry]) + "\n")
+
+
+def revert() -> None:
+    for link, target in overlays():
+        if link.is_symlink() and os.readlink(link) == link_text(link, target):
+            link.unlink()
+            print(f"  unlink {rel(link)}")
+    for repo, patches in queues():
+        if not is_repo(repo) or queue_diff(repo, patches):
+            print(f"  {rel(repo)}: queue not applied cleanly; leaving it alone")
+            continue
+        git(repo, "apply", "-R", *map(str, reversed(patches)))
+        print(f"  {rel(repo)}: reverted")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("cmd", choices=("apply", "check", "revert"))
+    args = ap.parse_args()
+    if args.cmd == "apply":
+        apply()
+        return check()
+    if args.cmd == "revert":
+        revert()
+        return 0
+    return check()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
