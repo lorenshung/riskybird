@@ -147,6 +147,10 @@ class CodegenRootTests(unittest.TestCase):
             ".git/HEAD": "ref: refs/heads/main\n",
             "pipeline/extract_graph.py": "",
             "kernels/gemmini_q31/k.c": "kernel\n",
+            "cores/gemmini/include/gemmini.h": "",
+            "cores/gemmini/include/gemmini_params.h": "default16x16\n",
+            "cores/gemmini/include/per_config/default16x16/gemmini_params.h": "",
+            "cores/gemmini/rocc-software/src/xcustom.h": "",
             "examples/_run_lib.sh": "",
             "examples/lenet/run.sh": "",
             "examples/dronet/run.sh": "",
@@ -230,12 +234,47 @@ class CodegenRootTests(unittest.TestCase):
         mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
         self.assertFalse(os.path.lexists(self.root / "examples/added"))
 
+    def test_the_shell_header_replaces_the_fallback_header(self) -> None:
+        before = self._backend_snapshot()
+        shell = Path(self._tmp.name) / "shell" / "gemmini_params.h"
+        shell.parent.mkdir()
+        shell.write_text("drone shell\n")
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31", header=shell)
+        include = self.root / "cores/gemmini/include"
+        for rel in ("cores", "cores/gemmini", "cores/gemmini/include"):
+            path = self.root / rel
+            self.assertTrue(path.is_dir() and not path.is_symlink(), rel)
+        self.assertEqual(Path(os.readlink(include / "gemmini_params.h")), shell)
+        self.assertEqual((include / "gemmini_params.h").read_text(), "drone shell\n")
+        self.assertEqual(Path(os.readlink(include / "gemmini.h")),
+                         self.mb / "cores/gemmini/include/gemmini.h")
+        self.assertEqual(Path(os.readlink(include / "per_config")),
+                         self.mb / "cores/gemmini/include/per_config")
+        self.assertEqual(Path(os.readlink(self.root / "cores/gemmini/rocc-software")),
+                         self.mb / "cores/gemmini/rocc-software")
+        self.assertEqual(self._backend_snapshot(), before)
+        # Without a header the root goes back to linking the backend's cores/.
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertEqual(Path(os.readlink(self.root / "cores")), self.mb / "cores")
+        self.assertEqual(self._backend_snapshot(), before)
+
     def test_a_real_file_in_the_way_is_not_deleted(self) -> None:
         (self.root / "examples/dronet").mkdir(parents=True)
         (self.root / "examples/dronet/run.sh").write_text("mine\n")
         with self.assertRaises(mb.ModelBlasterError):
             mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
         self.assertEqual((self.root / "examples/dronet/run.sh").read_text(), "mine\n")
+
+
+class GateHeaderTests(unittest.TestCase):
+    def test_default_is_a_captured_drone_shell(self) -> None:
+        header = mb.gemmini_header(mb.DEFAULT_GEMMINI_CONFIG)
+        self.assertTrue(header.is_file())
+        self.assertTrue(header.is_relative_to(mb.RB_MODELBLASTER))
+
+    def test_an_uncaptured_config_is_refused(self) -> None:
+        with self.assertRaises(mb.ModelBlasterError):
+            mb.gemmini_header("NoSuchShellConfig")
 
 
 class PerConfigHeaderTests(unittest.TestCase):
