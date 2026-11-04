@@ -121,7 +121,7 @@ class HierarchicalNotionStore(NotionStore):
             return self._image_body(acknowledged, note_id)
 
         def attach(parent):
-            for block in self._children(parent):
+            for block in self._child_blocks(parent):
                 kind = block["type"]
                 if kind == "image" and block[kind]["type"] == "external":
                     target = block[kind]["external"]["url"]
@@ -159,7 +159,7 @@ class HierarchicalNotionStore(NotionStore):
             if self._archived(ancestor):
                 raise NotFound("A parent folder is archived.")
 
-    def _children(self, parent):
+    def _child_blocks(self, parent):
         cursor = None
         seen = set()
         while True:
@@ -177,6 +177,17 @@ class HierarchicalNotionStore(NotionStore):
                 raise ProviderError("Invalid Notion pagination cursor.")
             seen.add(cursor)
 
+    def _children(self, parent):
+        # The store's create/discovery path wants (id, title) pairs of note pages.
+        # Asset pages carry no ShyNote metadata, so they are not notes.
+        excluded = set(self.index.get("asset_pages", []))
+        for block in self._child_blocks(parent):
+            if block["type"] != "child_page" or self._archived(block):
+                continue
+            note_id = self._id(block["id"])
+            if note_id not in excluded:
+                yield note_id, block["child_page"]["title"]
+
     def list_notes(self):
         excluded = set(self.index.get("asset_pages", []))
         notes = []
@@ -187,7 +198,7 @@ class HierarchicalNotionStore(NotionStore):
             if parent in visited:
                 raise ProviderError("Repeated Notion page in notebook hierarchy.")
             visited.add(parent)
-            for block in self._children(parent):
+            for block in self._child_blocks(parent):
                 if block["type"] != "child_page" or self._archived(block):
                     continue
                 note_id = self._id(block["id"])

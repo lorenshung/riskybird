@@ -1,0 +1,1206 @@
+; fc_rocc.fca -- FcRoCC flight-controller microcode (estimator + hierarchical PID), Q24.24.
+;
+; Assemble:  fc_rocc_asm -o build fc_rocc.fca   (usage: the header of fc_rocc_asm.c)
+; Recovered 2026-11 from the checked-in vsrc/fc_rocc_rom.hex + fc_rocc_init.hex; assembling
+; this file reproduces both, and workloads/flight_controller/src/fc_rocc_fw.h, byte for byte.
+;
+; Fixed-point formats: Q24 by default.  q (Q30), pos (Q27), vel (Q28), alpha/w_prev (Q25),
+; alt_int (Q29), vel_int (Q30) and the slew 'prev' tilt (Q31) are kept wider for drift.
+; mul.S d,a,b = sat((a*b) >> S): Q24*Q24 -> mul.24, Q30*Q30 -> mul.30, Q24*Q24 -> Q28 is mul.20 ...
+; vsh d,a,K shifts by the signed integer in register K (the Qx_TO_Qy constants below).
+;
+; Value names: `name:rN` binds a name to the register it is written into; later operands
+; use the name.  The assembler rejects a name whose register has since been overwritten, so
+; renaming or reordering cannot silently read the wrong value.  New code can take a fresh
+; register with `name:new`, and an inline constant with `=EXPR` (e.g. `=0.9f`, `=1.5@q30`).
+;
+; NR blocks: reciprocal 1/x (24 words) normalises x to [1,2) in Q30 by its MSB, seeds
+; y0 = 1.5 - x/2, iterates y = y*(2 - x*y) 5x, then shifts back (result Q24, or Q16 for 1/dt).
+; rsqrt (41 words) normalises by an even shift to [1,4), seeds y0 = 1.05 - 0.14x, iterates
+; y = y*(1.5 - x*y^2/2) 6x.  Neither guards x <= 0 (the C code's 1e-9 / 1e-3 checks are absent).
+
+; ---- physical / tuning parameters (C names; f = float, as in the C sources) ----
+.set GRAVITY        = 9.81f
+.set IMU_OFFSET_Y   = -0.016f     ; IMU lever arm, body y (m). C default is 0; PCB value -0.016
+.set IMU_ALPHA_TAU  = 0.02f       ; gyro-derivative LP time constant (s)
+.set KP             = 0.5f        ; Mahony gravity-trim gain
+.set Z_GAIN         = 0.5f        ; ToF observer, z
+.set VZ_GAIN        = 0.3f        ; ToF observer, vz
+.set LEAD           = 1.0f        ; get_state translation lead (x dt)
+.set LEAD_ATT       = 0.5f        ; get_state attitude lead (x dt)
+.set TOF_MIN_COS    = 0.05f       ; R[8] > this => down-ToF is vertical enough
+.set ZUPT_HEIGHT_M  = 0.05f
+.set VMAX           = 5.0f        ; velocity backstop (m/s)
+.set NAT_FREQ_H     = 2.0f
+.set DAMP_H         = 0.7f
+.set KI_HEIGHT      = 1.5f
+.set ALT_INT_MAX    = 3.0f
+.set ALT_INT_GROUND_M = 0.05f
+.set KI_VEL         = 0.8f
+.set VEL_INT_MAX    = 2.0f
+.set VEL_TC         = 0.5f
+.set VEL_TILT_MAX   = 0.26f
+.set TILT_SLEW_RADPS = 1.0f
+.set TAU_ROLL       = 0.10f       ; = tau_pitch
+.set TAU_YAW        = 0.25f
+.set TAU_ROLLRATE   = 0.025f      ; = tau_pitchRate
+.set TAU_YAWRATE    = 0.05f
+.set MASS           = 0.06f       ; kg (controller_pid.cpp default PID_MASS_KG is 0.032f)
+.set J0             = 16e-6f
+.set J1             = 16e-6f
+.set J2             = 29e-6f
+.set L_ARM          = 33e-3f
+.set K_DRAG         = 0.01f
+.set MOTOR_SCALE    = 0.9f
+.set MOTOR_TRIM_LEFT = 0.87f
+.set DUTY_OFFSET    = 0.583f
+.set THRUST_A       = 26.919633f
+.set THRUST_B       = 35.754861f
+.set PROP_GAIN      = 1.33f
+.set GRAMS_PER_NEWTON = 101.9368f
+.set MOTORS         = 4.0f
+
+; ---- firmware map exports (fc_rocc_fw.h) ----
+.export QA 24
+.export Q_POS 27
+.export Q_VEL 28
+
+; ---- constants (boot image).  Several registers carry more than one meaning; each extra
+; name re-derives the same bits from its own parameter and the assembler checks they agree.
+.const ONE              r0   = 1.0f                        ; 1.0; also LEAD x dt, slew rate x dt, duty ceiling, cos-poly 1
+.const LEAD_H           r0   = LEAD
+.const TILT_SLEW        r0   = TILT_SLEW_RADPS
+.const DUTY_MAX         r0   = 1.0f
+.const COS_C0           r0   = 1.0f
+.const TWO              r1   = 2.0f                        ; 2.0; also 1/VEL_TC
+.const INV_VEL_TC       r1   = 1.0f/VEL_TC
+.const G                r2   = GRAVITY
+.const IMU_RY           r3   = IMU_OFFSET_Y
+.const HALF             r4   = 0.5f                        ; 0.5; also KP, Z_GAIN, LEAD_ATT, cos-poly x^2/2
+.const KP_GAIN          r4   = KP
+.const Z_GAIN_K         r4   = Z_GAIN
+.const LEAD_A           r4   = LEAD_ATT
+.const COS_C2           r4   = 0.5f
+.const NHALF            r5   = -0.5f
+.const I24              r60  = 24 int                      ; NR: Q24 binary point (msb - 24 = exponent)
+.const I6               r61  = 6 int                       ; NR: 30-24; also Q24->Q30 shift
+.const Q24_TO_Q30       r61  = 6 int
+.const HALF_Q30         r62  = 0.5 q30
+.const THREEHALF_Q30    r63  = 1.5 q30                     ; NR 1.5; same bits = 3.0 in Q29 (alt_int clamp)
+.const ALT_INT_MAX_Q29  r63  = ALT_INT_MAX q29
+.const TWO_Q30          r64  = 2.0 q30                     ; NR 2.0; same bits = VEL_INT_MAX in Q30
+.const VEL_INT_MAX_Q30  r64  = VEL_INT_MAX q30
+.const I30              r65  = 30 int
+.const I16              r66  = 16 int
+.const ATAU             r67  = IMU_ALPHA_TAU
+.const SHR1             r68  = -1 int                      ; VSH -1: NR exponent halving; Q25->Q24
+.const Q25_TO_Q24       r68  = -1 int
+.const SHL1             r69  = 1 int                       ; VSH +1: NR re-double; Q24->Q25, Q27->Q28; flag 1
+.const Q24_TO_Q25       r69  = 1 int
+.const Q27_TO_Q28       r69  = 1 int
+.const TRUE             r69  = 1 int
+.const RSQ_SEED_A       r70  = 0.14 q30                    ; rsqrt seed y0 = 1.05 - 0.14*x on x in [1,4) (Q30)
+.const RSQ_SEED_B       r71  = 1.05 q30
+.const GATE_SLOPE       r72  = 1.0f/(0.5f*GRAVITY)
+.const ZERO             r73  = 0                           ; 0 (selects, clamps)
+.const Q30_TO_Q24       r74  = -6 int
+.const TOF_COS_MIN      r75  = TOF_MIN_COS                 ; 0.05: ToF tilt gate, ZUPT height, ground band
+.const ZUPT_H           r75  = ZUPT_HEIGHT_M
+.const ALT_INT_GROUND   r75  = ALT_INT_GROUND_M
+.const Q24_TO_Q28       r76  = 4 int
+.const VMAX_Q28         r77  = VMAX q28
+.const Q24_TO_Q27       r78  = 3 int
+.const VZ_GAIN_K        r79  = VZ_GAIN
+.const Q28_TO_Q24       r80  = -4 int
+.const Q27_TO_Q24       r81  = -3 int
+.const KI_H             r82  = KI_HEIGHT
+.const Q24_TO_Q29       r83  = 5 int
+.const Q29_TO_Q24       r84  = -5 int
+.const NF2              r85  = NAT_FREQ_H*NAT_FREQ_H       ; 4.0: NF^2 and the 4 in 4*TA
+.const FOUR             r85  = 4.0f
+.const NEG_2DN          r86  = -2.0f*DAMP_H*NAT_FREQ_H
+.const COS_C4           r87  = 1.0f/24.0f
+.const KI_V             r88  = KI_VEL
+.const INV_G            r89  = 1.0f/GRAVITY
+.const TILT_MAX         r90  = VEL_TILT_MAX
+.const Q31_TO_Q24       r91  = -7 int
+.const Q24_TO_Q31       r92  = 7 int
+.const NEG_INV_TR       r93  = -1.0f/TAU_ROLL
+.const NEG_INV_TY       r94  = -1.0f/TAU_YAW
+.const NEG_INV_TRR      r95  = -1.0f/TAU_ROLLRATE
+.const NEG_INV_TYR      r96  = -1.0f/TAU_YAWRATE
+.const MASS_K           r97  = MASS
+.const J0_K             r98  = J0                          ; J0 == J1
+.const J1_K             r98  = J1
+.const J2_K             r99  = J2
+.const MIX_L            r100 = 0.25/L_ARM
+.const MIX_K            r101 = 0.25/K_DRAG
+.const MIX_T            r102 = 0.25f
+.const MSCALE           r103 = MOTOR_SCALE
+.const TRIM_L           r104 = MOTOR_TRIM_LEFT
+.const DUTY_OFS         r105 = DUTY_OFFSET
+.const MOT_PROP         r106 = MOTORS/PROP_GAIN
+.const GPN              r107 = GRAMS_PER_NEWTON
+.const TA               r108 = THRUST_A
+.const TB               r109 = THRUST_B
+.const INV_2TA          r110 = 1.0f/(2.0f*THRUST_A)
+
+; ---- inputs (PUSH, Q24; flags 0/1) ----
+.input AX     r6           ; accel (m/s^2, Q24)
+.input AY     r7
+.input AZ     r8
+.input GX     r9           ; gyro (rad/s, Q24)
+.input GY     r10
+.input GZ     r11
+.input F0     r12          ; flow velocity (m/s, Q24)
+.input F1     r13
+.input H      r14          ; down-ToF slant range (m, Q24)
+.input DT     r15          ; step (s, Q24)
+.input FV     r16          ; flow valid (0/1)
+.input TV     r17          ; ToF valid (0/1)
+.input DESH   r18          ; controller: height setpoint (m)
+.input DESV1  r19          ; controller: vx setpoint
+.input DESV2  r20          ; controller: vy setpoint
+.input YAWT   r21          ; controller: yaw target
+
+; ---- persistent state (boot values) ----
+.state Q_W          r22  = 1.0 q30
+.state Q_X          r23  = 0 q30
+.state Q_Y          r24  = 0 q30
+.state Q_Z          r25  = 0 q30
+.state POS_X        r26  = 0 q27
+.state POS_Y        r27  = 0 q27
+.state POS_Z        r28  = 0 q27
+.state VEL_X        r29  = 0 q28
+.state VEL_Y        r30  = 0 q28
+.state VEL_Z        r31  = 0 q28
+.state ALPHA_X      r32  = 0 q25
+.state WPREV_X      r33  = 0 q25
+.state ALPHA_Y      r34  = 0 q25
+.state WPREV_Y      r35  = 0 q25
+.state ALPHA_Z      r36  = 0 q25
+.state WPREV_Z      r37  = 0 q25
+.state HAVE_WPREV   r38  = 0 int
+.state ALT_INT      r39  = 0 q29
+.state VEL_INT_1    r40  = 0 q30
+.state VEL_INT_2    r41  = 0 q30
+.state ROLL_PREV    r42  = 0 q31
+.state PITCH_PREV   r43  = 0 q31
+
+; ---- estimator state-out (POP; EST_X..Z Q27, EST_R* Q24 Rodrigues, EST_V* Q28, EST_W* Q24) ----
+.sout EST_X   r44
+.sout EST_Y   r45
+.sout EST_Z   r46
+.sout EST_R1  r47
+.sout EST_R2  r48
+.sout EST_R3  r49
+.sout EST_VX  r50
+.sout EST_VY  r51
+.sout EST_VZ  r52
+.sout EST_WX  r53
+.sout EST_WY  r54
+.sout EST_WZ  r55
+
+; ---- controller outputs (POP; duty - 0.583, Q24) ----
+.output U0 r56
+.output U1 r57
+.output U2 r58
+.output U3 r59
+
+; ============================================================================================
+.program EST
+
+; ---- EST 1. reciprocal 1/dt  (Newton-Raphson, 5 iterations, result Q16)
+    msb      nr_m:r111, DT
+    sub      nr_e:r112, nr_m, I24
+    sub      nr_sh:r111, I6, nr_e
+    vsh      nr_x:r113, DT, nr_sh
+    mul.30   nr_t:r111, nr_x, HALF_Q30
+    sub      nr_y:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_t:r111, nr_x, nr_y
+    sub      nr_c:r115, TWO_Q30, nr_t
+    mul.30   nr_y:r111, nr_y, nr_c
+    mul.30   nr_t:r115, nr_x, nr_y
+    sub      nr_c:r114, TWO_Q30, nr_t
+    mul.30   nr_y:r115, nr_y, nr_c
+    mul.30   nr_t:r114, nr_x, nr_y
+    sub      nr_c:r111, TWO_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    mul.30   nr_t:r115, nr_x, nr_y
+    sub      nr_c:r111, TWO_Q30, nr_t
+    mul.30   nr_y:r115, nr_y, nr_c
+    mul.30   nr_t:r114, nr_x, nr_y
+    sub      nr_c:r113, TWO_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    sub      nr_t:r115, I16, nr_e
+    sub      nr_sh:r112, nr_t, I30
+    vsh      inv_dt:r115, nr_y, nr_sh
+
+; ---- EST 1. lever-arm compensation: k = dt/(IMU_ALPHA_TAU+dt)  (NR reciprocal, Q24)
+    add      tau_dt:r114, ATAU, DT
+    msb      nr_m:r112, tau_dt
+    sub      nr_e:r113, nr_m, I24
+    sub      nr_sh:r112, I6, nr_e
+    vsh      nr_x:r111, tau_dt, nr_sh
+    mul.30   nr_t:r114, nr_x, HALF_Q30
+    sub      nr_y:r112, THREEHALF_Q30, nr_t
+    mul.30   nr_t:r114, nr_x, nr_y
+    sub      nr_c:r116, TWO_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    mul.30   nr_t:r116, nr_x, nr_y
+    sub      nr_c:r112, TWO_Q30, nr_t
+    mul.30   nr_y:r116, nr_y, nr_c
+    mul.30   nr_t:r114, nr_x, nr_y
+    sub      nr_c:r112, TWO_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    mul.30   nr_t:r116, nr_x, nr_y
+    sub      nr_c:r112, TWO_Q30, nr_t
+    mul.30   nr_y:r116, nr_y, nr_c
+    mul.30   nr_t:r114, nr_x, nr_y
+    sub      nr_c:r111, TWO_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    sub      nr_t:r116, I24, nr_e
+    sub      nr_sh:r113, nr_t, I30
+    vsh      inv_tau:r116, nr_y, nr_sh
+    mul.24   k_alpha:r114, inv_tau, DT
+
+; ---- EST 1. angular-accel LP  alpha += k*((g - w_prev)/dt - alpha); w_prev = g  (state Q25)
+    vsh      wp_x:r116, WPREV_X, Q25_TO_Q24
+    sub      dw_x:r113, GX, wp_x
+    mul.16   deriv_x:r116, dw_x, inv_dt
+    vsh      al_x:r113, ALPHA_X, Q25_TO_Q24
+    sub      t:r111, deriv_x, al_x
+    mul.24   t:r116, k_alpha, t
+    vsh      t:r111, t, Q24_TO_Q25
+    add      al_x_upd:r116, ALPHA_X, t
+    sel      alpha_x_new:r111, HAVE_WPREV, al_x_upd, ALPHA_X ; first step: keep alpha (no w_prev yet)
+    vsh      wprev_x_new:r116, GX, Q24_TO_Q25
+    vsh      wp_y:r113, WPREV_Y, Q25_TO_Q24
+    sub      dw_y:r112, GY, wp_y
+    mul.16   deriv_y:r113, dw_y, inv_dt
+    vsh      al_y:r112, ALPHA_Y, Q25_TO_Q24
+    sub      t:r117, deriv_y, al_y
+    mul.24   t:r113, k_alpha, t
+    vsh      t:r117, t, Q24_TO_Q25
+    add      al_y_upd:r113, ALPHA_Y, t
+    sel      alpha_y_new:r117, HAVE_WPREV, al_y_upd, ALPHA_Y
+    vsh      wprev_y_new:r113, GY, Q24_TO_Q25
+    vsh      wp_z:r112, WPREV_Z, Q25_TO_Q24
+    sub      dw_z:r118, GZ, wp_z
+    mul.16   deriv_z:r112, dw_z, inv_dt
+    vsh      al_z:r118, ALPHA_Z, Q25_TO_Q24
+    sub      t:r115, deriv_z, al_z
+    mul.24   t:r118, k_alpha, t
+    vsh      t:r115, t, Q24_TO_Q25
+    add      al_z_upd:r118, ALPHA_Z, t
+    sel      alpha_z_new:r115, HAVE_WPREV, al_z_upd, ALPHA_Z
+    vsh      wprev_z_new:r118, GZ, Q24_TO_Q25
+
+; ---- EST 1. a = accel - (alpha x r + w x (w x r)),  r = (0, IMU_OFFSET_Y, 0)
+    vsh      alx:r114, alpha_x_new, Q25_TO_Q24
+    vsh      alz:r112, alpha_z_new, Q25_TO_Q24
+    mul.24   gxgy:r119, GX, GY
+    neg      t:r120, alz
+    add      t:r112, t, gxgy
+    mul.24   lev_x:r120, IMU_RY, t
+    mul.24   gxgx:r112, GX, GX
+    mul.24   gzgz:r119, GZ, GZ
+    add      t:r121, gzgz, gxgx
+    neg      t:r119, t
+    mul.24   lev_y:r121, IMU_RY, t
+    mul.24   gygz:r119, GY, GZ
+    add      t:r112, alx, gygz
+    mul.24   lev_z:r119, IMU_RY, t
+    sub      acx:r112, AX, lev_x
+    sub      acy:r120, AY, lev_y
+    sub      acz:r121, AZ, lev_z
+
+; ---- EST 2. Mahony trim: |a| = a2 * rsqrt(a2)  (rsqrt: NR, 6 iterations)
+    mul.24   acz2:r119, acz, acz
+    mul.24   acy2:r114, acy, acy
+    mul.24   acx2:r122, acx, acx
+    add      t:r123, acx2, acy2
+    add      a2:r122, t, acz2
+    msb      nr_m:r123, a2
+    sub      nr_e:r119, nr_m, I24
+    vsh      nr_h:r123, nr_e, SHR1
+    vsh      nr_e2:r119, nr_h, SHL1
+    sub      nr_sh:r114, I6, nr_e2
+    vsh      nr_x:r119, a2, nr_sh
+    mul.30   nr_t:r114, nr_x, RSQ_SEED_A
+    sub      nr_y:r124, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r114, nr_y, nr_y
+    mul.30   nr_t:r125, nr_x, nr_y2
+    mul.30   nr_t:r114, nr_t, HALF_Q30
+    sub      nr_c:r125, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    mul.30   nr_y2:r125, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r125, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r125, nr_y, nr_c
+    mul.30   nr_y2:r124, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r124, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r124, nr_y, nr_c
+    mul.30   nr_y2:r125, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r125, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r125, nr_y, nr_c
+    mul.30   nr_y2:r124, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r124, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r124, nr_y, nr_c
+    mul.30   nr_y2:r125, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r125, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r125, nr_y, nr_c
+    sub      nr_t:r124, I24, nr_h
+    sub      nr_sh:r123, nr_t, I30
+    vsh      inv_amag:r124, nr_y, nr_sh
+    mul.24   amag:r125, a2, inv_amag
+
+; ---- EST 2. gate = max(0, 1 - |(|a| - g)| / (g/2)),  k = KP*gate
+    sub      dead_d:r122, amag, G                    ; dead: |a|-g via SEL, overwritten unread (pc 148)
+    neg      dead_nd:r123, dead_d
+    clt      dead_lt:r122, amag, G
+    sub      dead_d2:r114, amag, G
+    sel      dead_abs:r119, dead_lt, dead_d2, dead_nd
+    sub      g_m_a:r123, G, amag                     ; |a|-g recomputed as max(a-b, b-a)
+    sub      a_m_g:r122, amag, G
+    max      amag_err:r125, a_m_g, g_m_a
+    mul.24   t:r123, amag_err, GATE_SLOPE
+    sub      t:r125, ONE, t
+    max      gate:r123, t, ZERO
+    mul.24   kgate:r125, KP_GAIN, gate
+
+; ---- EST 2. a_hat = a/|a|;  vu = R^T (0,0,1) from q;  e = a_hat x vu;  w = gyro + k*e
+    mul.24   anx:r123, acx, inv_amag
+    mul.24   any:r122, acy, inv_amag
+    mul.24   anz:r119, acz, inv_amag
+    vsh      qw:r124, Q_W, Q30_TO_Q24
+    vsh      qx:r114, Q_X, Q30_TO_Q24
+    vsh      qy:r126, Q_Y, Q30_TO_Q24
+    vsh      qz:r127, Q_Z, Q30_TO_Q24
+    mul.24   qwqy:r128, qw, qy
+    mul.24   qxqz:r129, qx, qz
+    sub      t:r130, qxqz, qwqy
+    mul.24   vux:r129, TWO, t
+    mul.24   qwqx:r130, qw, qx
+    mul.24   qyqz:r128, qy, qz
+    add      t:r131, qyqz, qwqx
+    mul.24   vuy:r130, TWO, t
+    mul.24   qyqy:r131, qy, qy
+    mul.24   qxqx:r128, qx, qx
+    add      t:r132, qxqx, qyqy
+    mul.24   t:r131, TWO, t
+    sub      vuz:r132, ONE, t
+    mul.24   az_vuy:r131, anz, vuy
+    mul.24   ay_vuz:r128, any, vuz
+    sub      ex:r133, ay_vuz, az_vuy
+    mul.24   ax_vuz:r131, anx, vuz
+    mul.24   az_vux:r132, anz, vux
+    sub      ey:r119, az_vux, ax_vuz
+    mul.24   ay_vux:r132, any, vux
+    mul.24   ax_vuy:r129, anx, vuy
+    sub      ez:r130, ax_vuy, ay_vux
+    mul.24   t:r132, kgate, ex
+    add      wx:r133, GX, t
+    mul.24   t:r132, kgate, ey
+    add      wy:r119, GY, t
+    mul.24   t:r132, kgate, ez
+    add      wz:r130, GZ, t
+
+; ---- EST 3. quaternion integrate  dq = 1/2 q (x) (0,w);  q += dq*dt  (q in Q30)
+    mul.24   qz_wz:r132, qz, wz
+    mul.24   qy_wy:r125, qy, wy
+    mul.24   qx_wx:r129, qx, wx
+    add      t:r123, qx_wx, qy_wy
+    add      t:r129, t, qz_wz
+    mul.24   dqw:r132, NHALF, t
+    mul.24   qy_wz:r129, qy, wz
+    mul.24   qz_wy:r123, qz, wy
+    mul.24   qw_wx:r125, qw, wx
+    sub      t:r122, qw_wx, qz_wy
+    add      t:r125, t, qy_wz
+    mul.24   dqx:r129, HALF, t
+    mul.24   qz_wx:r125, qz, wx
+    mul.24   qx_wz:r127, qx, wz
+    mul.24   qw_wy:r122, qw, wy
+    sub      t:r123, qw_wy, qx_wz
+    add      t:r127, t, qz_wx
+    mul.24   dqy:r125, HALF, t
+    mul.24   qx_wy:r127, qx, wy
+    mul.24   qy_wx:r119, qy, wx
+    mul.24   qw_wz:r133, qw, wz
+    sub      t:r130, qw_wz, qy_wx
+    add      t:r133, t, qx_wy
+    mul.24   dqz:r130, HALF, t
+    mul.18   t:r133, dqw, DT
+    add      qiw:r132, Q_W, t
+    mul.18   t:r133, dqx, DT
+    add      qix:r129, Q_X, t
+    mul.18   t:r133, dqy, DT
+    add      qiy:r125, Q_Y, t
+    mul.18   t:r133, dqz, DT
+    add      qiz:r130, Q_Z, t
+
+; ---- EST 3. normalise q /= |q|  (rsqrt)
+    vsh      qiw24:r133, qiw, Q30_TO_Q24
+    vsh      qix24:r127, qix, Q30_TO_Q24
+    vsh      qiy24:r119, qiy, Q30_TO_Q24
+    vsh      qiz24:r124, qiz, Q30_TO_Q24
+    mul.24   qiz2:r126, qiz24, qiz24
+    mul.24   qiy2:r124, qiy24, qiy24
+    add      s_zy:r119, qiy2, qiz2
+    mul.24   qix2:r126, qix24, qix24
+    mul.24   qiw2:r127, qiw24, qiw24
+    add      s_wx:r133, qiw2, qix2
+    add      qn2:r127, s_wx, s_zy
+    msb      nr_m:r133, qn2
+    sub      nr_e:r119, nr_m, I24
+    vsh      nr_h:r133, nr_e, SHR1
+    vsh      nr_e2:r119, nr_h, SHL1
+    sub      nr_sh:r126, I6, nr_e2
+    vsh      nr_x:r119, qn2, nr_sh
+    mul.30   nr_t:r127, nr_x, RSQ_SEED_A
+    sub      nr_y:r126, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r127, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r127, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_y2:r126, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r126, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r126, nr_y, nr_c
+    mul.30   nr_y2:r127, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r127, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_y2:r126, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r126, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r126, nr_y, nr_c
+    mul.30   nr_y2:r127, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r127, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_y2:r126, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r126, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r126, nr_y, nr_c
+    sub      nr_t:r127, I24, nr_h
+    sub      nr_sh:r133, nr_t, I30
+    vsh      inv_qn:r127, nr_y, nr_sh
+    mul.24   qnw:r133, qiw, inv_qn
+    mul.24   qnx:r132, qix, inv_qn
+    mul.24   qny:r129, qiy, inv_qn
+    mul.24   qnz:r125, qiz, inv_qn
+
+; ---- EST 4. rotation matrix R(q), row-major R0..R8
+    vsh      qw:r130, qnw, Q30_TO_Q24
+    vsh      qx:r127, qnx, Q30_TO_Q24
+    vsh      qy:r126, qny, Q30_TO_Q24
+    vsh      qz:r124, qnz, Q30_TO_Q24
+    mul.24   pa:r119, qz, qz
+    mul.24   pb:r114, qy, qy
+    add      t:r123, pb, pa
+    mul.24   t:r119, TWO, t
+    sub      R0:r123, ONE, t
+    mul.24   pa:r119, qw, qz
+    mul.24   pb:r114, qx, qy
+    sub      t:r122, pb, pa
+    mul.24   R1:r119, TWO, t
+    mul.24   pa:r122, qw, qy
+    mul.24   pb:r114, qx, qz
+    add      t:r131, pb, pa
+    mul.24   R2:r122, TWO, t
+    mul.24   pa:r131, qw, qz
+    mul.24   pb:r114, qx, qy
+    add      t:r128, pb, pa
+    mul.24   R3:r131, TWO, t
+    mul.24   pa:r128, qz, qz
+    mul.24   pb:r114, qx, qx
+    add      t:r134, pb, pa
+    mul.24   t:r128, TWO, t
+    sub      R4:r134, ONE, t
+    mul.24   pa:r128, qw, qx
+    mul.24   pb:r114, qy, qz
+    sub      t:r135, pb, pa
+    mul.24   R5:r128, TWO, t
+    mul.24   pa:r135, qw, qy
+    mul.24   pb:r114, qx, qz
+    sub      t:r136, pb, pa
+    mul.24   R6:r135, TWO, t
+    mul.24   pa:r136, qw, qx
+    mul.24   pb:r114, qy, qz
+    add      t:r137, pb, pa
+    mul.24   R7:r136, TWO, t
+    mul.24   pa:r137, qy, qy
+    mul.24   pb:r114, qx, qx
+    add      t:r138, pb, pa
+    mul.24   t:r137, TWO, t
+    sub      R8:r138, ONE, t
+
+; ---- EST 5. ToF tilt gate + vertical height;  world accel a_w = R a - g
+    clt      tilt_ok:r137, TOF_COS_MIN, R8
+    mul.0    tof_vert:r114, TV, tilt_ok              ; tof_vert = TV && tilt_ok (mul.0 = AND of 0/1)
+    mul.24   h_vert:r137, H, R8
+    mul.24   R2_az:r139, R2, acz
+    mul.24   R1_ay:r122, R1, acy
+    mul.24   R0_ax:r140, R0, acx
+    add      t:r141, R0_ax, R1_ay
+    add      awx:r140, t, R2_az
+    mul.24   R5_az:r141, R5, acz
+    mul.24   R4_ay:r128, R4, acy
+    mul.24   R3_ax:r139, R3, acx
+    add      t:r122, R3_ax, R4_ay
+    add      awy:r139, t, R5_az
+    mul.24   R8_az:r141, R8, acz
+    mul.24   R7_ay:r138, R7, acy
+    mul.24   R6_ax:r136, R6, acx
+    add      t:r135, R6_ax, R7_ay
+    add      t:r138, t, R8_az
+    sub      awz:r141, t, G
+
+; ---- EST 5. velocity integrate v += a_w*dt  (vel Q28)
+    mul.20   t:r138, awx, DT
+    add      vx_p:r135, VEL_X, t
+    mul.20   t:r138, awy, DT
+    add      vy_p:r136, VEL_Y, t
+    mul.20   t:r138, awz, DT
+    add      vz_p:r112, VEL_Z, t
+
+; ---- EST 6. flow fuse v_xy = R[0..1, 3..4] * flow  /  ZUPT on the ground  / clamp |v| <= VMAX
+    mul.24   R1_f1:r138, R1, F1
+    mul.24   R0_f0:r119, R0, F0
+    add      t:r123, R0_f0, R1_f1
+    vsh      vfx:r138, t, Q24_TO_Q28
+    mul.24   R4_f1:r123, R4, F1
+    mul.24   R3_f0:r134, R3, F0
+    add      t:r131, R3_f0, R4_f1
+    vsh      vfy:r134, t, Q24_TO_Q28
+    clt      hv_low:r131, h_vert, ZUPT_H
+    mul.0    zupt:r123, tof_vert, hv_low             ; zupt = tof_vert && h_vert < ZUPT
+    sel      vx_z:r131, zupt, ZERO, vx_p
+    sel      vy_z:r135, zupt, ZERO, vy_p
+    sel      vx_f:r136, FV, vfx, vx_z
+    sel      vy_f:r138, FV, vfy, vy_z
+    neg      nvmax:r135, VMAX_Q28                    ; -VMAX (recomputed below)
+    min      t:r134, vx_f, VMAX_Q28
+    max      vx_c:r136, t, nvmax
+    neg      nvmax:r135, VMAX_Q28                    ; -VMAX again (redundant)
+    min      t:r134, vy_f, VMAX_Q28
+    max      vy_c:r138, t, nvmax
+
+; ---- EST 6. position integrate p += v*dt  (pos Q27)
+    mul.25   t:r135, vx_c, DT
+    add      px_p:r134, POS_X, t
+    mul.25   t:r135, vy_c, DT
+    add      py_p:r131, POS_Y, t
+    mul.25   t:r135, vz_p, DT
+    add      pz_p:r123, POS_Z, t
+
+; ---- EST 6. ToF altitude observer  z += Z_GAIN*rz,  vz += VZ_GAIN*rz  (when tof_vert)
+    vsh      h_q27:r135, h_vert, Q24_TO_Q27
+    sub      rz:r137, h_q27, pz_p
+    mul.24   dz:r135, Z_GAIN_K, rz
+    vsh      rz_q28:r119, rz, Q27_TO_Q28
+    mul.24   dvz:r137, VZ_GAIN_K, rz_q28
+    sel      dz_g:r119, tof_vert, dz, ZERO
+    add      pz_new:r135, pz_p, dz_g
+    sel      dvz_g:r123, tof_vert, dvz, ZERO
+    add      vz_new:r137, vz_p, dvz_g
+
+; ---- EST 7. get_state lead: quaternion predicted by LEAD_ATT*dt with the raw gyro
+    mul.24   h_lead:r123, LEAD_H, DT
+    mul.24   ha:r112, LEAD_A, DT
+    mul.24   qz_gz:r114, qz, GZ
+    mul.24   qy_gy:r119, qy, GY
+    mul.24   qx_gx:r120, qx, GX
+    add      t:r121, qx_gx, qy_gy
+    add      t:r120, t, qz_gz
+    mul.24   dpw:r121, NHALF, t
+    mul.24   qy_gz:r120, qy, GZ
+    mul.24   qz_gy:r114, qz, GY
+    mul.24   qw_gx:r119, qw, GX
+    sub      t:r122, qw_gx, qz_gy
+    add      t:r119, t, qy_gz
+    mul.24   dpx:r122, HALF, t
+    mul.24   qz_gx:r119, qz, GX
+    mul.24   qx_gz:r120, qx, GZ
+    mul.24   qw_gy:r114, qw, GY
+    sub      t:r128, qw_gy, qx_gz
+    add      t:r120, t, qz_gx
+    mul.24   dpy:r128, HALF, t
+    mul.24   qx_gy:r120, qx, GY
+    mul.24   qy_gx:r119, qy, GX
+    mul.24   qw_gz:r114, qw, GZ
+    sub      t:r142, qw_gz, qy_gx
+    add      t:r119, t, qx_gy
+    mul.24   dpz:r142, HALF, t
+    mul.24   t:r119, dpw, ha
+    add      pw:r121, qw, t
+    mul.24   t:r130, dpx, ha
+    add      px:r122, qx, t
+    mul.24   t:r130, dpy, ha
+    add      py:r128, qy, t
+    mul.24   t:r130, dpz, ha
+    add      pz:r142, qz, t
+
+; ---- EST 7. normalise the lead quaternion (rsqrt)
+    mul.24   pzpz:r130, pz, pz
+    mul.24   pypy:r124, py, py
+    add      s1:r112, pypy, pzpz
+    mul.24   pxpx:r130, px, px
+    mul.24   pwpw:r124, pw, pw
+    add      s2:r126, pwpw, pxpx
+    add      pn2:r130, s2, s1
+    msb      nr_m:r126, pn2
+    sub      nr_e:r112, nr_m, I24
+    vsh      nr_h:r126, nr_e, SHR1
+    vsh      nr_e2:r112, nr_h, SHL1
+    sub      nr_sh:r124, I6, nr_e2
+    vsh      nr_x:r112, pn2, nr_sh
+    mul.30   nr_t:r130, nr_x, RSQ_SEED_A
+    sub      nr_y:r124, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r130, nr_y, nr_y
+    mul.30   nr_t:r127, nr_x, nr_y2
+    mul.30   nr_t:r130, nr_t, HALF_Q30
+    sub      nr_c:r127, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r130, nr_y, nr_c
+    mul.30   nr_y2:r127, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r127, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_y2:r130, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r130, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r130, nr_y, nr_c
+    mul.30   nr_y2:r127, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r127, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_y2:r130, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r130, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r130, nr_y, nr_c
+    mul.30   nr_y2:r127, nr_y, nr_y
+    mul.30   nr_t:r124, nr_x, nr_y2
+    mul.30   nr_t:r127, nr_t, HALF_Q30
+    sub      nr_c:r124, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    sub      nr_t:r130, I24, nr_h
+    sub      nr_sh:r126, nr_t, I30
+    vsh      inv_pn:r130, nr_y, nr_sh
+    mul.24   pnw:r127, pw, inv_pn
+    mul.24   pnx:r121, px, inv_pn
+    mul.24   pny:r122, py, inv_pn
+    mul.24   pnz:r128, pz, inv_pn
+
+; ---- EST 7. Rodrigues r = q_xyz / q_w  (NR reciprocal of q_w)
+    msb      nr_m:r142, pnw
+    sub      nr_e:r130, nr_m, I24
+    sub      nr_sh:r142, I6, nr_e
+    vsh      nr_x:r126, pnw, nr_sh
+    mul.30   nr_t:r142, nr_x, HALF_Q30
+    sub      nr_y:r127, THREEHALF_Q30, nr_t
+    mul.30   nr_t:r142, nr_x, nr_y
+    sub      nr_c:r124, TWO_Q30, nr_t
+    mul.30   nr_y:r142, nr_y, nr_c
+    mul.30   nr_t:r127, nr_x, nr_y
+    sub      nr_c:r124, TWO_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_t:r142, nr_x, nr_y
+    sub      nr_c:r124, TWO_Q30, nr_t
+    mul.30   nr_y:r142, nr_y, nr_c
+    mul.30   nr_t:r127, nr_x, nr_y
+    sub      nr_c:r124, TWO_Q30, nr_t
+    mul.30   nr_y:r127, nr_y, nr_c
+    mul.30   nr_t:r142, nr_x, nr_y
+    sub      nr_c:r126, TWO_Q30, nr_t
+    mul.30   nr_y:r142, nr_y, nr_c
+    sub      nr_t:r127, I24, nr_e
+    sub      nr_sh:r130, nr_t, I30
+    vsh      inv_pw:r127, nr_y, nr_sh
+    mul.24   rod1:r142, pnx, inv_pw
+    mul.24   rod2:r121, pny, inv_pw
+    mul.24   rod3:r122, pnz, inv_pw
+
+; ---- EST 7. translation lead  p + v*h,  v + a_w*h  (h = LEAD*dt)
+    mul.25   t:r128, vx_c, h_lead
+    add      out_px:r127, px_p, t
+    mul.25   t:r128, vy_c, h_lead
+    add      out_py:r130, py_p, t
+    mul.25   t:r128, vz_new, h_lead
+    add      out_pz:r126, pz_new, t
+    mul.20   t:r128, awx, h_lead
+    add      out_vx:r140, vx_c, t
+    mul.20   t:r128, awy, h_lead
+    add      out_vy:r139, vy_c, t
+    mul.20   t:r128, awz, h_lead
+    add      out_vz:r141, vz_new, t
+
+; ---- EST    commit state + state-out
+    mov      ALPHA_X, alpha_x_new
+    mov      WPREV_X, wprev_x_new
+    mov      ALPHA_Y, alpha_y_new
+    mov      WPREV_Y, wprev_y_new
+    mov      ALPHA_Z, alpha_z_new
+    mov      WPREV_Z, wprev_z_new
+    mov      HAVE_WPREV, TRUE
+    mov      Q_W, qnw
+    mov      Q_X, qnx
+    mov      Q_Y, qny
+    mov      Q_Z, qnz
+    mov      VEL_X, vx_c
+    mov      VEL_Y, vy_c
+    mov      VEL_Z, vz_new
+    mov      POS_X, px_p
+    mov      POS_Y, py_p
+    mov      POS_Z, pz_new
+    mov      EST_X, out_px
+    mov      EST_Y, out_py
+    mov      EST_Z, out_pz
+    mov      EST_R1, rod1
+    mov      EST_R2, rod2
+    mov      EST_R3, rod3
+    mov      EST_VX, out_vx
+    mov      EST_VY, out_vy
+    mov      EST_VZ, out_vz
+    mov      EST_WX, GX
+    mov      EST_WY, GY
+    mov      EST_WZ, GZ
+    halt
+
+; ============================================================================================
+.program CTRL
+
+; ---- CTRL 8. altitude loop: alt_int += KI_H*(desH - z)*dt (Q29, clamp, ground reset)
+    vsh      vx:r128, EST_VX, Q28_TO_Q24
+    vsh      vy:r123, EST_VY, Q28_TO_Q24
+    vsh      vz:r124, EST_VZ, Q28_TO_Q24
+    vsh      z:r112, EST_Z, Q27_TO_Q24
+    clt      ground:r119, z, ALT_INT_GROUND
+    sub      h_err:r120, DESH, z
+    mul.24   t:r114, KI_H, h_err
+    mul.24   t:r120, t, DT
+    vsh      t:r114, t, Q24_TO_Q29
+    add      ai:r120, ALT_INT, t
+    neg      nmax:r114, ALT_INT_MAX_Q29
+    min      t:r143, ai, ALT_INT_MAX_Q29
+    max      ai:r120, t, nmax
+    sel      alt_int_new:r143, ground, ZERO, ai
+    vsh      ai24:r120, alt_int_new, Q29_TO_Q24
+
+; ---- CTRL 8. desAcc = -2*DH*NF*vz - NF^2*(z - desH) + alt_int
+    sub      dz_err:r114, z, DESH
+    mul.24   t1:r112, NF2, dz_err
+    mul.24   t2:r114, NEG_2DN, vz
+    sub      t:r124, t2, t1
+    add      acc_z:r114, t, ai24
+
+; ---- CTRL 8. cos(r1), cos(r2) by 1 - x^2/2 + x^4/24;  desNorm = (g + desAcc)/(cr*cp)
+    mul.24   x2:r124, EST_R1, EST_R1
+    mul.24   x4:r120, x2, x2
+    mul.24   c4:r112, COS_C4, x4
+    mul.24   c2:r120, COS_C2, x2
+    sub      t:r124, COS_C0, c2
+    add      cr:r120, t, c4
+    mul.24   x2:r124, EST_R2, EST_R2
+    mul.24   x4:r112, x2, x2
+    mul.24   c4:r144, COS_C4, x4
+    mul.24   c2:r112, COS_C2, x2
+    sub      t:r124, COS_C0, c2
+    add      cp:r112, t, c4
+    mul.24   crcp:r144, cr, cp
+    msb      nr_m:r120, crcp
+    sub      nr_e:r112, nr_m, I24
+    sub      nr_sh:r120, I6, nr_e
+    vsh      nr_x:r124, crcp, nr_sh
+    mul.30   nr_t:r144, nr_x, HALF_Q30
+    sub      nr_y:r120, THREEHALF_Q30, nr_t
+    mul.30   nr_t:r144, nr_x, nr_y
+    sub      nr_c:r145, TWO_Q30, nr_t
+    mul.30   nr_y:r144, nr_y, nr_c
+    mul.30   nr_t:r145, nr_x, nr_y
+    sub      nr_c:r120, TWO_Q30, nr_t
+    mul.30   nr_y:r145, nr_y, nr_c
+    mul.30   nr_t:r144, nr_x, nr_y
+    sub      nr_c:r120, TWO_Q30, nr_t
+    mul.30   nr_y:r144, nr_y, nr_c
+    mul.30   nr_t:r145, nr_x, nr_y
+    sub      nr_c:r120, TWO_Q30, nr_t
+    mul.30   nr_y:r145, nr_y, nr_c
+    mul.30   nr_t:r144, nr_x, nr_y
+    sub      nr_c:r124, TWO_Q30, nr_t
+    mul.30   nr_y:r144, nr_y, nr_c
+    sub      nr_t:r145, I24, nr_e
+    sub      nr_sh:r112, nr_t, I30
+    vsh      inv_crcp:r145, nr_y, nr_sh
+    add      t:r144, G, acc_z
+    mul.24   des_norm:r114, t, inv_crcp
+
+; ---- CTRL 9. horizontal velocity PI: vel_int += KI_V*e*dt (Q30, clamp, ground reset)
+    sub      verr1:r145, DESV1, vx
+    sub      verr2:r128, DESV2, vy
+    mul.24   t:r123, KI_V, verr1
+    mul.24   t:r144, t, DT
+    vsh      t:r123, t, Q24_TO_Q30
+    add      vi1:r144, VEL_INT_1, t
+    mul.24   t:r123, KI_V, verr2
+    mul.24   t:r112, t, DT
+    vsh      t:r123, t, Q24_TO_Q30
+    add      vi2:r112, VEL_INT_2, t
+    neg      nmax:r123, VEL_INT_MAX_Q30
+    min      t:r124, vi1, VEL_INT_MAX_Q30
+    max      vi1:r144, t, nmax
+    neg      nmax:r124, VEL_INT_MAX_Q30
+    min      t:r123, vi2, VEL_INT_MAX_Q30
+    max      vi2:r112, t, nmax
+    sel      vel_int1_new:r124, ground, ZERO, vi1
+    sel      vel_int2_new:r144, ground, ZERO, vi2
+
+; ---- CTRL 9. desAcc = e/VEL_TC + vel_int;  desRoll = -dA2/g, desPitch = dA1/g, clamp
+    vsh      vi1_24:r112, vel_int1_new, Q30_TO_Q24
+    mul.24   t:r123, INV_VEL_TC, verr1
+    add      acc1:r145, t, vi1_24
+    vsh      vi2_24:r123, vel_int2_new, Q30_TO_Q24
+    mul.24   t:r112, INV_VEL_TC, verr2
+    add      acc2:r128, t, vi2_24
+    neg      nacc2:r123, acc2
+    mul.24   des_roll:r128, nacc2, INV_G
+    mul.24   des_pitch:r123, acc1, INV_G
+    neg      ntilt:r145, TILT_MAX
+    min      t:r112, des_roll, TILT_MAX
+    max      des_roll:r128, t, ntilt
+    neg      ntilt:r145, TILT_MAX
+    min      t:r112, des_pitch, TILT_MAX
+    max      des_pitch:r123, t, ntilt
+
+; ---- CTRL 9. tilt slew limit |d(des)/dt| <= TILT_SLEW_RADPS (prev in Q31, ground reset)
+    mul.24   dmax:r145, TILT_SLEW, DT
+    vsh      t:r112, ROLL_PREV, Q31_TO_Q24
+    sel      roll_prev:r120, ground, ZERO, t
+    vsh      t:r112, PITCH_PREV, Q31_TO_Q24
+    sel      pitch_prev:r146, ground, ZERO, t
+    add      hi:r119, roll_prev, dmax
+    sub      lo:r112, roll_prev, dmax
+    min      t:r120, des_roll, hi
+    max      des_roll:r128, t, lo
+    add      hi:r120, pitch_prev, dmax
+    sub      lo:r112, pitch_prev, dmax
+    min      t:r146, des_pitch, hi
+    max      des_pitch:r123, t, lo
+    vsh      roll_prev_new:r146, des_roll, Q24_TO_Q31
+    vsh      pitch_prev_new:r112, des_pitch, Q24_TO_Q31
+
+; ---- CTRL 10. attitude loop rate_tgt = (est - tgt)*(-1/tau);  rate loop cmd = (gyro - rate_tgt)*(-1/tau_r)
+    sub      t:r120, EST_R1, des_roll
+    mul.24   rate_r:r128, NEG_INV_TR, t
+    sub      t:r120, EST_R2, des_pitch
+    mul.24   rate_p:r123, NEG_INV_TR, t
+    sub      t:r120, EST_R3, YAWT
+    mul.24   rate_y:r145, NEG_INV_TY, t
+    sub      t:r120, EST_WX, rate_r
+    mul.24   cmd_r:r128, NEG_INV_TRR, t
+    sub      t:r120, EST_WY, rate_p
+    mul.24   cmd_p:r123, NEG_INV_TRR, t
+    sub      t:r120, EST_WZ, rate_y
+    mul.24   cmd_y:r145, NEG_INV_TYR, t
+
+; ---- CTRL 11. u = [desNorm*MASS, cmd_r*J0, cmd_p*J1, cmd_y*J2];  ctrl = M u  (4x4 mixer)
+    mul.24   u_thr:r120, des_norm, MASS_K
+    mul.24   u_roll:r114, cmd_r, J0_K
+    mul.24   u_pitch:r128, cmd_p, J1_K
+    mul.24   u_yaw:r123, cmd_y, J2_K
+    neg      nmix_l:r145, MIX_L
+    neg      nmix_k:r119, MIX_K
+    mul.24   t3:r147, MIX_K, u_yaw
+    mul.24   t2:r148, nmix_l, u_pitch
+    add      s:r149, t2, t3
+    mul.24   t1:r148, MIX_L, u_roll
+    mul.24   t0:r147, MIX_T, u_thr
+    add      s2:r150, t0, t1
+    add      ctrl0:r148, s2, s
+    mul.24   t3:r150, nmix_k, u_yaw
+    mul.24   t2:r149, nmix_l, u_pitch
+    add      s:r147, t2, t3
+    mul.24   t1:r150, nmix_l, u_roll
+    mul.24   t0:r149, MIX_T, u_thr
+    add      s2:r151, t0, t1
+    add      ctrl1:r150, s2, s
+    mul.24   t3:r151, MIX_K, u_yaw
+    mul.24   t2:r147, MIX_L, u_pitch
+    add      s:r149, t2, t3
+    mul.24   t1:r151, nmix_l, u_roll
+    mul.24   t0:r145, MIX_T, u_thr
+    add      s2:r147, t0, t1
+    add      ctrl2:r151, s2, s
+    mul.24   t3:r149, nmix_k, u_yaw
+    mul.24   t2:r123, MIX_L, u_pitch
+    add      s:r128, t2, t3
+    mul.24   t1:r149, MIX_L, u_roll
+    mul.24   t0:r114, MIX_T, u_thr
+    add      s2:r120, t0, t1
+    add      ctrl3:r149, s2, s
+
+; ---- CTRL 12. motor 0 = force->duty(0.9*ctrl1):  t = max(f,0)*GPN*MOT/PROP;  disc = 4*TA*t + TB^2;  d = (sqrt(disc) - TB)/(2*TA), clamp [0,1]
+    mul.24   f:r128, MSCALE, ctrl1
+    max      fin:r150, f, ZERO
+    mul.24   t:r128, fin, GPN
+    mul.24   thr:r150, t, MOT_PROP
+    mul.24   t:r128, FOUR, TA                        ; 4*TA at run time (per motor)
+    mul.24   t:r120, t, thr
+    mul.24   tb2:r150, TB, TB                        ; TB^2 at run time (per motor)
+    add      t:r128, tb2, t
+    max      disc:r150, t, ZERO
+    msb      nr_m:r128, disc
+    sub      nr_e:r120, nr_m, I24
+    vsh      nr_h:r128, nr_e, SHR1
+    vsh      nr_e2:r120, nr_h, SHL1
+    sub      nr_sh:r114, I6, nr_e2
+    vsh      nr_x:r120, disc, nr_sh
+    mul.30   nr_t:r114, nr_x, RSQ_SEED_A
+    sub      nr_y:r123, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r114, nr_y, nr_y
+    mul.30   nr_t:r119, nr_x, nr_y2
+    mul.30   nr_t:r114, nr_t, HALF_Q30
+    sub      nr_c:r119, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r114, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r119, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r119, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r119, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r119, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r119, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r119, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    sub      nr_t:r119, I24, nr_h
+    sub      nr_sh:r128, nr_t, I30
+    vsh      rs:r119, nr_y, nr_sh
+    mul.24   sq:r128, disc, rs
+    sub      t:r150, sq, TB
+    mul.24   d:r128, t, INV_2TA
+    min      t:r150, d, DUTY_MAX
+    max      duty0:r128, t, ZERO
+
+; ---- CTRL 12. motor 1 = force->duty(0.9*ctrl2)
+    mul.24   f:r150, MSCALE, ctrl2
+    max      fin:r151, f, ZERO
+    mul.24   t:r150, fin, GPN
+    mul.24   thr:r151, t, MOT_PROP
+    mul.24   t:r150, FOUR, TA
+    mul.24   t:r119, t, thr
+    mul.24   tb2:r151, TB, TB
+    add      t:r150, tb2, t
+    max      disc:r151, t, ZERO
+    msb      nr_m:r150, disc
+    sub      nr_e:r119, nr_m, I24
+    vsh      nr_h:r150, nr_e, SHR1
+    vsh      nr_e2:r119, nr_h, SHL1
+    sub      nr_sh:r123, I6, nr_e2
+    vsh      nr_x:r119, disc, nr_sh
+    mul.30   nr_t:r123, nr_x, RSQ_SEED_A
+    sub      nr_y:r114, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r120, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r120, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r120, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r120, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r120, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    sub      nr_t:r123, I24, nr_h
+    sub      nr_sh:r150, nr_t, I30
+    vsh      rs:r123, nr_y, nr_sh
+    mul.24   sq:r150, disc, rs
+    sub      t:r151, sq, TB
+    mul.24   d:r150, t, INV_2TA
+    min      t:r151, d, DUTY_MAX
+    max      duty1:r150, t, ZERO
+
+; ---- CTRL 12. motor 2 = force->duty(0.9*ctrl3*TRIM_L)
+    mul.24   f:r151, MSCALE, ctrl3
+    mul.24   f:r149, f, TRIM_L
+    max      fin:r151, f, ZERO
+    mul.24   t:r149, fin, GPN
+    mul.24   thr:r151, t, MOT_PROP
+    mul.24   t:r149, FOUR, TA
+    mul.24   t:r123, t, thr
+    mul.24   tb2:r151, TB, TB
+    add      t:r149, tb2, t
+    max      disc:r151, t, ZERO
+    msb      nr_m:r149, disc
+    sub      nr_e:r123, nr_m, I24
+    vsh      nr_h:r149, nr_e, SHR1
+    vsh      nr_e2:r123, nr_h, SHL1
+    sub      nr_sh:r120, I6, nr_e2
+    vsh      nr_x:r123, disc, nr_sh
+    mul.30   nr_t:r120, nr_x, RSQ_SEED_A
+    sub      nr_y:r114, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r120, nr_y, nr_y
+    mul.30   nr_t:r119, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r119, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r119, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r119, nr_y, nr_c
+    mul.30   nr_y2:r120, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r119, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r119, nr_y, nr_c
+    mul.30   nr_y2:r120, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    sub      nr_t:r120, I24, nr_h
+    sub      nr_sh:r149, nr_t, I30
+    vsh      rs:r120, nr_y, nr_sh
+    mul.24   sq:r149, disc, rs
+    sub      t:r151, sq, TB
+    mul.24   d:r149, t, INV_2TA
+    min      t:r151, d, DUTY_MAX
+    max      duty2:r149, t, ZERO
+
+; ---- CTRL 12. motor 3 = force->duty(0.9*ctrl0*TRIM_L)
+    mul.24   f:r151, MSCALE, ctrl0
+    mul.24   f:r148, f, TRIM_L
+    max      fin:r151, f, ZERO
+    mul.24   t:r148, fin, GPN
+    mul.24   thr:r151, t, MOT_PROP
+    mul.24   t:r148, FOUR, TA
+    mul.24   t:r120, t, thr
+    mul.24   tb2:r151, TB, TB
+    add      t:r148, tb2, t
+    max      disc:r151, t, ZERO
+    msb      nr_m:r148, disc
+    sub      nr_e:r120, nr_m, I24
+    vsh      nr_h:r148, nr_e, SHR1
+    vsh      nr_e2:r120, nr_h, SHL1
+    sub      nr_sh:r123, I6, nr_e2
+    vsh      nr_x:r120, disc, nr_sh
+    mul.30   nr_t:r123, nr_x, RSQ_SEED_A
+    sub      nr_y:r114, RSQ_SEED_B, nr_t
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r119, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r119, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r119, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r119, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r119, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r119, nr_y, nr_c
+    mul.30   nr_y2:r123, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r123, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r123, nr_y, nr_c
+    mul.30   nr_y2:r119, nr_y, nr_y
+    mul.30   nr_t:r114, nr_x, nr_y2
+    mul.30   nr_t:r120, nr_t, HALF_Q30
+    sub      nr_c:r114, THREEHALF_Q30, nr_t
+    mul.30   nr_y:r120, nr_y, nr_c
+    sub      nr_t:r123, I24, nr_h
+    sub      nr_sh:r148, nr_t, I30
+    vsh      rs:r123, nr_y, nr_sh
+    mul.24   sq:r148, disc, rs
+    sub      t:r151, sq, TB
+    mul.24   d:r148, t, INV_2TA
+    min      t:r151, d, DUTY_MAX
+    max      duty3:r148, t, ZERO
+
+; ---- CTRL    u_out = duty - 0.583;  commit state + outputs
+    sub      out0:r151, duty0, DUTY_OFS
+    sub      out1:r128, duty1, DUTY_OFS
+    sub      out2:r150, duty2, DUTY_OFS
+    sub      out3:r149, duty3, DUTY_OFS
+    mov      ALT_INT, alt_int_new
+    mov      VEL_INT_1, vel_int1_new
+    mov      VEL_INT_2, vel_int2_new
+    mov      ROLL_PREV, roll_prev_new
+    mov      PITCH_PREV, pitch_prev_new
+    mov      U0, out0
+    mov      U1, out1
+    mov      U2, out2
+    mov      U3, out3
+    halt

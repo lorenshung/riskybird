@@ -21,13 +21,13 @@ remain in their upstream repositories.
   an unused path. Preserve existing local edits and reconcile remote conflicts.
 - Review `push PATH --dry-run --unconditional`, then publish the explicit path
   with `push PATH --unconditional`. Use the wrapper to preserve uploaded figures.
-  New figures need uploading and indexing first; see `.github/README.md`.
+  New figures need uploading and indexing first; see `tools/shynote.md`.
 - Keep notes within the appropriate directory subpages (`docs`, `workloads`,
   `hardware`, etc.). `push --all` is disabled because it would traverse submodules
   and caches. `pull --all` refreshes known mappings only, not all notes or assets.
 - Agents share remote pages. Read current content before changing it, coordinate
   edits to the same note, and reconcile conflicts instead of forcing overwrites.
 
-Keep this file, `CLAUDE.md`, `.github/README.md`, and the ShyNote configuration tracked as
+Keep this file, `CLAUDE.md`, `.github/README.md`, `tools/shynote.md`, and the ShyNote configuration tracked as
 bootstrap instructions. Migrated docs, `.rb/`, and `.shynote-local/` are ignored.
-See `.github/README.md` for setup, source archives, and sync limitations.
+See `tools/shynote.md` for setup, source archives, and sync limitations.

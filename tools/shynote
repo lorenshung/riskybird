@@ -8,7 +8,7 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-$repo_root/.rb/uv-cache}"
 
 if [[ "${1:-}" == "--install" ]]; then
     if ! command -v uv >/dev/null 2>&1; then
-        echo 'Install uv and Python 3.11+ first; see .github/README.md.' >&2
+        echo 'Install uv and Python 3.11+ first; see tools/shynote.md.' >&2
         exit 1
     fi
     if [[ ! -x "$runtime/bin/python" ]]; then
@@ -21,7 +21,7 @@ if [[ "${1:-}" == "--install" ]]; then
 fi
 
 if [[ ! -x "$runtime/bin/shynote" ]]; then
-    echo 'Run tools/shynote --install first; see .github/README.md.' >&2
+    echo 'Run tools/shynote --install first; see tools/shynote.md.' >&2
     exit 1
 fi
 

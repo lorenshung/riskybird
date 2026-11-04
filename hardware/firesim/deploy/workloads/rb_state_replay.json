@@ -1,0 +1,7 @@
+{
+    "_comment": "RiskyBird `state` workload (Madgwick estimator, deterministic replay) built for the chipyard_riscv64/rocketchip_virt_riscv64 Zephyr board and booted on the rb_u250_rocket FireSim bitstream. Absolute paths require the workload.py resolve_under_workload_input_base patch.",
+    "benchmark_name": "rb_state_replay",
+    "common_simulation_outputs": ["uartlog"],
+    "common_bootbinary": "/scratch2/loren/riskybird-dev/build/firesim/state-replay/zephyr/zephyr.elf",
+    "common_rootfs": "/scratch2/loren/riskybird-dev/backends/chipyard/software/firemarshal/boards/default/installers/firesim/dummy.rootfs"
+}

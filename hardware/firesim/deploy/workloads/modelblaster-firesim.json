@@ -1,0 +1,8 @@
+{
+  "benchmark_name": "modelblaster-firesim",
+  "common_simulation_outputs": [
+    "uartlog"
+  ],
+  "common_bootbinary": "zephyr0-zephyr.elf",
+  "common_rootfs": "../../../../../software/firemarshal/boards/default/installers/firesim/dummy.rootfs"
+}

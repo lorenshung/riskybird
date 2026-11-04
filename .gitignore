@@ -10,7 +10,7 @@ __pycache__/
 build/
 
 # mill build output for hardware/ospi
-hardware/ospi/out/
+hardware/rtl/ospi/out/
 
 # Published separately; see tools/collect-bitstreams.py
 bitstreams/
@@ -62,6 +62,26 @@ results/
 /integration/zephyr/tof/README.md
 /tools/flight/legacy/README.md
 /workloads/README.md
+/hardware/zephyr/targets/esp32c6/PROGRAMMING.md
+/workloads/actuator_bringup/README.rst
+/workloads/sensor_bringup/README.rst
+/workloads/flight_controller/README.rst
+/tools/bench/groundstation/README.md
+/tools/bench/groundstation/mobile/DESIGN.md
+/tools/flight/esp32c6/README.md
+/hardware/chipyard/OSPI_I2C_INTEGRATION.md
+/hardware/chipyard/fpga/scripts/floorplan/README.md
+/hardware/chipyard/riskybird/INTEGRATION.md
+/hardware/chipyard/riskybird/README.md
+/hardware/modelblaster/notes/DRONET_22FPS_REPRODUCTION.md
+/hardware/modelblaster/notes/DRONET_KU040_DUAL_REPRODUCTION.md
+/hardware/modelblaster/notes/conv0_loadonce/RESULTS.md
+/workloads/flight_controller/docs/FC_RAM_ANALYSIS.md
+/workloads/flight_controller/docs/FLIGHT_BUILD.md
+/workloads/flight_controller/docs/FLIGHT_TUNING_LOG.md
+/workloads/flight_controller/docs/MOTOR_MUSIC.md
+/workloads/flight_controller/docs/TELEMETRY_BRINGUP.md
+/workloads/flight_controller/docs/TELEMETRY_PLAN.md
 /workloads/ads7128_test/README.rst
 /workloads/bmi088_test/README.rst
 /workloads/i2c_scanner/README.rst
