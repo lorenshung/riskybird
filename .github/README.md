@@ -31,7 +31,7 @@ submodules under `backends/`.
 | `hardware/rtl/` | RiskyBird's own RTL: `fcrocc` (flight-control RoCC and its microcode assembler), `ospi`, `uartdma`, `esplink` |
 | `hardware/zephyr/` | devicetree overlays and Kconfig fragments per FPGA target |
 | `hardware/{gemmini,fpga-shells,firesim,modelblaster}/` | RiskyBird configs and files for those backends |
-| `hardware/pcb/` | the board design (a submodule on this branch) |
+| `hardware/pcb/` | the board designs (v2 boards and the v3 base), their docs and bring-up log, and riskybird-academy |
 | `hardware/{openocd,spioverjtag}/` | OpenOCD configs and the SPI-over-JTAG flash loader |
 | `hardware/{flight,bench}/` | GDB scripts for flight-bench and bench debugging |
 | `hardware/padtest/` | bare-metal FPGA pad tests |
