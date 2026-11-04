@@ -1,7 +1,7 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
  *
- * HM01B0 camera bring-up for the RiskyBird Arty100T/TE0712 CameraBringupConfig shell.
+ * HM01B0 camera bring-up for the RiskyBird TE0712-100T CameraBringupConfig shell (the arty100t sub-project).
  *
  * There is no ILA on this board, so UART is the only instrument. Every stage below prints what
  * it observed before it decides, and every wait is bounded, so a failure names the stage that

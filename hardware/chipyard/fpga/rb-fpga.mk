@@ -52,7 +52,7 @@ ifeq ($(SUB_PROJECT),ku040)
 	FPGA_BRAND        ?= xilinx
 endif
 ifeq ($(SUB_PROJECT),arty100t)
-	# The stock arty100t sub-project, on the TE0712-100T: its Scala (Arty100T
+	# The arty100t sub-project (Chipyard's upstream name) is the TE0712-100T board: its Scala (Arty100T
 	# harness, binders, configs and fpga-shells' Arty100TShell/MIG) is
 	# shadowed by hardware/, and its Vivado board files are the reworked
 	# arty_a7_100 directory, linked in as te0712_100t.
