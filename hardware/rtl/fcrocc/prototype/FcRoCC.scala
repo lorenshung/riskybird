@@ -31,7 +31,7 @@
 // file, shared multiplier, NR strategy, microword width and op-count match the
 // OOC synthesis witness fc_accel.sv one-for-one, so the Vivado OOC area number
 // characterises this module. The functional microprogram is validated against
-// the C golden (samples/rose_flight_controller/src/fp16_fc_kernels.c) by the
+// the C golden (workloads/flight_controller/src/fp16_fc_kernels.c) by the
 // same off-board harness; here the schedule is sketched with phase comments.
 // ===========================================================================
 package chipyard.fc

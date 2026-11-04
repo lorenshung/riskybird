@@ -22,12 +22,20 @@
 # All presets: ESP32-C6 hpcore, PID + EKF + optical flow + fast side-ToF readdress (no 12 s blob).
 # Flash any:   west flash -d <build_dir>    then power-cycle (d5:00 needs a POR to boot the app).
 #
+RB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# Toolchain environment (conda + Zephyr SDK + ESP32 env vars): ESP32_ENV names a shell file to
+# source, default $RB_ROOT/.rb/esp32env.sh. If that file is absent the current environment is
+# used as-is (west and the ESP32-C6 toolchain must already be on PATH).
+ESP32_ENV="${ESP32_ENV:-$RB_ROOT/.rb/esp32env.sh}"
 set +u   # source the env BEFORE `set -e` (activate_conda.sh returns nonzero during init -> 127)
-source /home/cobble/.claude/projects/-home-cobble-Tools-riskybird/esp32env.sh >/dev/null 2>&1
+if [ -f "$ESP32_ENV" ]; then
+  source "$ESP32_ENV" >/dev/null 2>&1
+else
+  echo "build.sh: $ESP32_ENV not found; using the current environment (set ESP32_ENV to override)" >&2
+fi
 set -e
 # west needs the Zephyr workspace as cwd; the application itself is this repository's
 # workloads/flight_controller, passed by absolute path.
-RB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "${ZCS:-$RB_ROOT/backends/zephyr-chipyard-sw}"
 
 # Build directories go under this repository's build/, not into the backend checkout.

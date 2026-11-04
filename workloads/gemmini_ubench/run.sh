@@ -9,7 +9,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RB_ROOT="$(cd "$HERE/../.." && pwd)"
 SECS="${1:-60}"
 ELF="$HERE/build_gemmini_ubench/zephyr/zephyr.elf"
-OCD_CFG="$RB_ROOT/hardware/pcb/scripts/openocd/arty200t_rocket.cfg"
+OCD_DIR="$RB_ROOT/hardware/openocd"   # ft-link.cfg (adapter) + arty200t.cfg (Rocket target)
 CON=/dev/ttyUSB1
 CONLOG="$HERE/con_ubench.log"
 echo "=== ELF: $ELF ==="; ls -la "$ELF"
@@ -19,7 +19,7 @@ timeout "$SECS" cat "$CON" > "$CONLOG" 2>/dev/null &
 CATPID=$!
 sleep 1
 echo "=== openocd load + resume (pinned FTDI 3-6) ==="
-FTDI_LOCATION=3-6 FTDI_SPEED=1000 timeout 120 openocd -f "$OCD_CFG" \
+RB_FTDI_LOCATION=3-6 timeout 120 openocd -f "$OCD_DIR/ft-link.cfg" -f "$OCD_DIR/arty200t.cfg" \
   -c "init; halt; reg mstatus 0x0; reg mie 0x0; load_image $ELF; resume 0x80000000; shutdown" 2>&1 \
   | grep -iE "halted|Examined|misa|hart|Error|Warn|Loading|wrote|shutdown|downloaded|Failed" | head -20
 echo "=== waiting for console ($SECS s) ==="
