@@ -20,14 +20,15 @@
  *   "RBPING1"            which bitstream is answering; touches nothing
  *   "RBFLASH1 [FAST]"    configuration-flash bridge (EspLinkFlash framing),
  *                        FAST = 921600 baud on the wire after the ack
- *   "RBBOOT1 <hex addr> [mode]" reconfigure the FPGA from that flash address
- *                       (IPROG). mode 1-3 are ICAP diagnostics (EspLinkIprog):
- *                       1 IPROG without writing WBSTAR, 2 write WBSTAR only
- *                       (the FPGA keeps running), 3 Vivado's packed layout.
- *                        Never run a FLASH session in the same breath first:
- *                        on 2026-11-01 an IPROG issued ~0.3 s after one was
- *                        ignored (the running program survived), while the
- *                        same IPROG seconds after a FLASH session worked.
+ *   "RBBOOT1 <hex addr> [mode]" reconfigure the FPGA (IPROG) from that flash
+ *                        BYTE address, sent as WBSTAR = addr >> 8 (wbstar_of).
+ *                        mode 1-3 are ICAP diagnostics (EspLinkIprog): 1 IPROG
+ *                        without writing WBSTAR, 2 write WBSTAR only (the FPGA
+ *                        keeps running), 3 Vivado's packed layout.
+ *                        On the bench an IPROG is silently ignored while JTAG
+ *                        holds the configuration port (e.g. after an OpenOCD
+ *                        CFG_IN/CFG_OUT register read); a JTAG TAP reset frees
+ *                        it. Nothing touches JTAG in the field.
  *   "RBSTAT1"            the ESP's RBLINK line (motor-frame flags, e.g.
  *                        COMMITTED); never touches the FPGA link
  *
@@ -125,7 +126,7 @@ BUILD_ASSERT(DT_SAME_NODE(DT_ALIAS(fpga_uart), DT_NODELABEL(uart0)),
 #define FALLBACK_DRAIN_MS (FPGA_IDLE_EXIT_MS + 500)
 #define STALL_ABORT_MS    5000  /* no traffic either way: the host is gone */
 #define HELLO_TIMEOUT_MS  2000
-#define HELLO_LINE_MAX          32
+#define HELLO_LINE_MAX          64   /* "RBPOLICY1 " + struct request.args */
 
 #define TSI_CMD_READ  0u
 #define TSI_CMD_WRITE 1u
@@ -163,6 +164,16 @@ static const struct kind_info KINDS[] = {
 #define FL_PROG  0x02
 #define FL_ERASE 0x03
 #define FL_CRC   0x04
+
+/* WBSTAR for a flash byte address. Every RiskyBird bitstream is built with
+ * BITSTREAM.CONFIG.SPI_32BIT_ADDR (fpga-shells arty-config.xdc), and in SPI
+ * 32-bit mode WBSTAR[23:0] holds address bits [31:8] -- Vivado itself writes
+ * 0x00008000 for NEXT_CONFIG_ADDR 0x800000. Sending the byte address instead
+ * made every IPROG wrap to address 0 (golden) on 2026-11-01/02. */
+static inline uint32_t wbstar_of(uint32_t byte_addr)
+{
+	return byte_addr >> 8;
+}
 #define FL_END   0xE5
 #define FL_MAX_WLEN 512
 #define POKE_MAX_PAYLOAD 1024
@@ -745,8 +756,10 @@ static void session(struct transport *t, const struct request *rq)
 		if (rq->kind == K_BOOT) {
 			uint8_t arg[8];
 
-			sys_put_le32(rq->addr, &arg[0]);
-			sys_put_le32(~rq->addr ^ (0x01010101u * rq->mode), &arg[4]);
+			uint32_t wb = wbstar_of(rq->addr);
+
+			sys_put_le32(wb, &arg[0]);
+			sys_put_le32(~wb ^ (0x01010101u * rq->mode), &arg[4]);
 			fpga_write(arg, sizeof(arg));
 		}
 		if (!wait_ack(k->ack, &id, &id_valid)) {
@@ -805,8 +818,8 @@ static void session(struct transport *t, const struct request *rq)
 			break;
 		case K_BOOT:
 			if (rq->mode == 2) {
-				say_kind(t, rq, "OK id=%s; WBSTAR <- 0x%08x (mode 2, no IPROG)\n",
-					 idtxt, rq->addr);
+				say_kind(t, rq, "OK id=%s; WBSTAR <- 0x%06x (0x%08x >> 8; mode 2, no IPROG)\n",
+					 idtxt, wbstar_of(rq->addr), rq->addr);
 			} else {
 				say_kind(t, rq, "OK id=%s; reconfiguring from 0x%08x (mode %u)\n",
 					 idtxt, rq->addr, rq->mode);
@@ -915,6 +928,7 @@ static bool tcp_hello(int sock, struct request *rq)
 {
 	char line[HELLO_LINE_MAX];
 	size_t n = 0;
+	bool overlong = false;
 	int64_t deadline = k_uptime_get() + HELLO_TIMEOUT_MS;
 
 	while (k_uptime_get() < deadline) {
@@ -929,10 +943,16 @@ static bool tcp_hello(int sock, struct request *rq)
 		}
 		if (c == '\n') {
 			line[n] = '\0';
-			return parse_hello(line, rq);
+			/* An overlong line is refused, never parsed truncated: on
+			 * 2026-11-02 a 32-byte cap turned "autoload=1" into "autoload=". */
+			return !overlong && parse_hello(line, rq);
 		}
-		if (c != '\r' && n < sizeof(line) - 1) {
-			line[n++] = c;
+		if (c != '\r') {
+			if (n < sizeof(line) - 1) {
+				line[n++] = c;
+			} else {
+				overlong = true;
+			}
 		}
 	}
 	return false;
@@ -1123,8 +1143,10 @@ bool ll_handshake(enum kind kind, uint32_t addr, uint32_t *id, bool *id_valid)
 	if (kind == K_BOOT) {
 		uint8_t arg[8];
 
-		sys_put_le32(addr, &arg[0]);
-		sys_put_le32(~addr, &arg[4]);
+		uint32_t wb = wbstar_of(addr);
+
+		sys_put_le32(wb, &arg[0]);
+		sys_put_le32(~wb, &arg[4]);
 		fpga_write(arg, sizeof(arg));
 	}
 	if (!wait_ack(k->ack, id, id_valid)) {

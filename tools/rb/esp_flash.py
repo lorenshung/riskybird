@@ -10,6 +10,9 @@ The flash (S25FL256S, 32 MiB) holds two images:
                      0x800000, so nothing here can damage it.
   0x800000  UPDATE   written by this script; entered with --boot update.
 
+Addresses here are flash byte addresses; the ESP sends WBSTAR = addr >> 8,
+which is what SPI 32-bit addressing (every build) expects.
+
 Both must be ESP-loader bitstreams (RocketArty200T*LoaderConfig), or the drone
 can only be reached again by power-cycling it into golden.
 
@@ -74,6 +77,15 @@ def bit_payload(path: str) -> bytes:
         n = struct.unpack(">H", b[i + 1:i + 3])[0]
         i += 3 + n
     raise LoadError(f"{path}: no configuration data")
+
+
+def spi_32bit(payload: bytes) -> bool:
+    """True if the image switches the configuration reads to 4-byte addressing
+    (BSPI = 0x0C, BITSTREAM.CONFIG.SPI_32BIT_ADDR YES) in its header. The ESP
+    turns a boot address into WBSTAR = addr >> 8, which is only right for such
+    images; every build from fpga-shells arty-config.xdc is one."""
+    sync = payload.find(bytes.fromhex("aa995566"))
+    return sync >= 0 and bytes.fromhex("3003e0010000000c") in payload[sync:sync + 64]
 
 
 def usr_access(payload: bytes) -> int | None:
@@ -245,6 +257,10 @@ def main() -> int:
                         raise LoadError(f"{args.write}: {len(data)} B does not fit the slot")
                     print(f"{args.write}: {len(data)} B, image id "
                           f"{describe_id(usr_access(data))}")
+                    if not spi_32bit(data):
+                        raise LoadError(f"{args.write} does not use SPI 32-bit addressing "
+                                        "(BITSTREAM.CONFIG.SPI_32BIT_ADDR): booting it, or "
+                                        "booting anything from it, would use the wrong WBSTAR")
                     t0 = time.monotonic()
                     end = UPDATE + len(data)
                     for a in range(UPDATE, end, SECTOR):
