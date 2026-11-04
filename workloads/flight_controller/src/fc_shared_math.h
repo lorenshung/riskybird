@@ -170,20 +170,26 @@ static inline void fc_flow_velocity(float ax, float ay, float height,
  * is R row 0/1 applied to (bx, by, bz), and the estimators used to drop the bz term, i.e. assumed the
  * body-z velocity is 0. Under tilt it is not: flying level-in-the-world at speed v with tilt theta,
  * bz ~ v*sin(theta) and the dropped term is ~v*sin^2(theta) (3% at 10 deg, 12% at 20 deg), in the same
- * direction as the cos(tilt) error fc_flow_velocity used to have. bz is taken from the estimator's own
- * world velocity (R^T v)_z; with -DFC_FLOW_WORLD_LEGACY=1 the term is dropped as before.
- * R is row-major body->world. */
-#ifndef FC_FLOW_WORLD_LEGACY
-#define FC_FLOW_WORLD_LEGACY 0
+ * direction as the cos(tilt) error fc_flow_velocity used to have. With -DFC_FLOW_BODYZ=1, bz is taken
+ * from the estimator's own world velocity (R^T v)_z.
+ *
+ * OPT-IN (default 0 = the term dropped, as flown). In the co-sim it removes most of the tilt-induced
+ * flow-velocity error on ideal sensors (complementary filter, 20 deg wind: error max 0.55 -> 0.36 m/s),
+ * but on the realistic sensor models it made the velocity estimate slightly WORSE on every seed,
+ * because it injects the vz estimate, which is vibration-noisy there (riskybird-sim results/). Whether
+ * that holds on the drone, where the vz estimate is ~4x quieter than in the 40 Hz co-sim, is not
+ * known; a low-passed bz is the obvious next step. R is row-major body->world. */
+#ifndef FC_FLOW_BODYZ
+#define FC_FLOW_BODYZ 0
 #endif
 static inline void fc_flow_to_world(const float R[9], const float flow[2],
                                     float vwx, float vwy, float vwz, float out[2])
 {
-#if FC_FLOW_WORLD_LEGACY
+#if FC_FLOW_BODYZ
+    const float bz = R[2]*vwx + R[5]*vwy + R[8]*vwz;   /* body-z velocity from the estimate */
+#else
     (void)vwx; (void)vwy; (void)vwz;
     const float bz = 0.0f;
-#else
-    const float bz = R[2]*vwx + R[5]*vwy + R[8]*vwz;   /* body-z velocity from the estimate */
 #endif
     out[0] = R[0]*flow[0] + R[1]*flow[1] + R[2]*bz;
     out[1] = R[3]*flow[0] + R[4]*flow[1] + R[5]*bz;
