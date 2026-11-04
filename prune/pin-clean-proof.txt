@@ -1,0 +1,361 @@
+pin-clean proof log (2026-11-04)
+================================
+
+Everything below ran in standalone scratch clones under /scratch2/loren/pin-clean-scratch
+(not in a riskybird-dev worktree), with one shared tool set: the Chipyard conda env of
+the main checkout (firtool-1.75.0, chisel 6.7.0, which bcb6129 and 157dd69 both pin),
+symlinked read-only, and the Zephyr SDK 1.0.0-beta1 / zephyr-new env likewise.
+
+  cy-old   plain clone of the RiskyBird Chipyard fork at 0c3a178 (integration's pin),
+           nested submodules at the fork's pins
+  rb-old   riskybird-dev 67dd859 (ucb-main-draft): zcs 35bf7c9, MB 80cec13
+  rb       riskybird-dev pin-clean: zcs 4ada80a, MB 5b78467, Chipyard bcb6129 then 157dd69,
+           Saturn e73d9bc via backends/saturn, queue + overlay applied
+  fresh    `git clone --branch pin-clean` of the tip, backends cloned from GitHub
+
+Comparison scripts (below, appendix): cmp-gen.py compares two generated-src config
+directories file by file after replacing the checkout's absolute path and dropping
+firtool source locators (// @[file:line]) -- the Scala moved to hardware/, so every
+locator changes. cmp-elf.sh compares the allocated sections of two ELFs byte for byte.
+
+1. Chipyard elaboration
+-----------------------
+  old:  make -C cy-old/fpga SUB_PROJECT=<board> CONFIG=<config> verilog
+  new:  ./rb chipyard elaborate --board <board> --config <config>
+        (= make -C backends/chipyard/fpga -f hardware/chipyard/fpga/rb-fpga.mk ... verilog)
+
+  Configs: arty200t RocketArty200TDroneFullDDRConfig (flight shell),
+           arty200t RocketArty200TDroneFullDDRLoaderConfig (ESP loader shell),
+           arty200t RocketArty200TDroneGemminiSaturnFp16At35Config (Gemmini+Saturn shell),
+           arty100t RocketArty100TOspiConfig (shadowed TE0712-100T board),
+           ku040    RocketKU040OspiDDRConfig.
+
+## Chipyard: fork 0c3a178 vs plain bcb6129 + overlay + queue (commit 890f058)
+chipyard.fpga.arty100t.Arty100THarness.RocketArty100TOspiConfig: 417 identical, 3 differ, 0 only-old, 0 only-new
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+chipyard.fpga.arty200t.Arty200THarness.RocketArty200TDroneFullDDRConfig: 441 identical, 3 differ, 0 only-old, 0 only-new
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+chipyard.fpga.arty200t.Arty200THarness.RocketArty200TDroneFullDDRLoaderConfig: 460 identical, 4 differ, 0 only-old, 0 only-new
+  DIFF <CFG>.chisel.log
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+chipyard.fpga.arty200t.Arty200THarness.RocketArty200TDroneGemminiSaturnFp16At35Config: 691 identical, 4 differ, 0 only-old, 0 only-new
+  DIFF <CFG>.chisel.log
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+chipyard.fpga.ku040.KU040Harness.RocketKU040OspiDDRConfig: 421 identical, 3 differ, 0 only-old, 0 only-new
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+
+## Chipyard: bcb6129 vs tip 157dd69 (commit e112f6d)
+chipyard.fpga.arty100t.Arty100THarness.RocketArty100TOspiConfig: 411 identical, 8 differ, 1 only-old, 1 only-new
+  only-old <CFG>.graphml
+  only-new <CFG>.chiptop0.graphml
+  DIFF <CFG>.d
+  DIFF <CFG>.fir
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+  DIFF gen-collateral/CSRFile.sv
+  DIFF gen-collateral/PTW.sv
+  DIFF gen-collateral/Rocket.sv
+chipyard.fpga.arty200t.Arty200THarness.RocketArty200TDroneFullDDRConfig: 435 identical, 8 differ, 1 only-old, 1 only-new
+  only-old <CFG>.graphml
+  only-new <CFG>.chiptop0.graphml
+  DIFF <CFG>.d
+  DIFF <CFG>.fir
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+  DIFF gen-collateral/CSRFile.sv
+  DIFF gen-collateral/PTW.sv
+  DIFF gen-collateral/Rocket.sv
+chipyard.fpga.arty200t.Arty200THarness.RocketArty200TDroneFullDDRLoaderConfig: 455 identical, 8 differ, 1 only-old, 1 only-new
+  only-old <CFG>.graphml
+  only-new <CFG>.chiptop0.graphml
+  DIFF <CFG>.d
+  DIFF <CFG>.fir
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+  DIFF gen-collateral/CSRFile.sv
+  DIFF gen-collateral/PTW.sv
+  DIFF gen-collateral/Rocket.sv
+chipyard.fpga.arty200t.Arty200THarness.RocketArty200TDroneGemminiSaturnFp16At35Config: 680 identical, 14 differ, 1 only-old, 1 only-new
+  only-old <CFG>.graphml
+  only-new <CFG>.chiptop0.graphml
+  DIFF <CFG>.d
+  DIFF <CFG>.fir
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+  DIFF gen-collateral/CSRFile.sv
+  DIFF gen-collateral/DTLB_2.sv
+  DIFF gen-collateral/IterativeFaultCheck.sv
+  DIFF gen-collateral/PTW.sv
+  DIFF gen-collateral/PipelinedFaultCheck.sv
+  DIFF gen-collateral/Rocket.sv
+  DIFF gen-collateral/RocketTile.sv
+  DIFF gen-collateral/SaturnRocketFrontend.sv
+  DIFF gen-collateral/SaturnRocketUnit.sv
+chipyard.fpga.ku040.KU040Harness.RocketKU040OspiDDRConfig: 415 identical, 8 differ, 1 only-old, 1 only-new
+  only-old <CFG>.graphml
+  only-new <CFG>.chiptop0.graphml
+  DIFF <CFG>.d
+  DIFF <CFG>.fir
+  DIFF <CFG>.firtool.log
+  DIFF <CFG>.model.f
+  DIFF <CFG>.top.f
+  DIFF gen-collateral/CSRFile.sv
+  DIFF gen-collateral/PTW.sv
+  DIFF gen-collateral/Rocket.sv
+
+  1a. fork 0c3a178 vs bcb6129 + overlay: every gen-collateral .sv, the .dts, .fir, every
+      .json and the regmaps are identical. The remaining files are logs and file lists:
+      *.model.f / *.top.f list the same files in another order (sorted they are equal);
+      *.chisel.log / *.firtool.log differ in pass timings, warning order and the Scala
+      paths in warnings (hardware/rtl/esplink/... instead of generators/chipyard/...).
+      An earlier RbDigitalTop that extended DigitalTop (traits appended last) was NOT
+      identical: same hardware, but ClockSinkDomain_6 became _7, DigitalTop's port order
+      and DTS labels L33..L35 changed. Hence RbDigitalTop restates DigitalTop's trait list
+      in the fork's order (tests/test_chipyard_overlay.py keeps it in step).
+
+  1b. bcb6129 vs 157dd69: .dts identical for all five. Verilog differs only in
+      CSRFile/PTW/Rocket (all configs) and, on the Saturn shell, DTLB_2, RocketTile,
+      SaturnRocketUnit, SaturnRocketFrontend, Iterative/PipelinedFaultCheck:
+      - assertion $error strings carry new rocket-chip source line numbers;
+      - PTW/DTLB temporaries renamed (ae -> _ae_T, _T_14 -> _T_13): rocket-chip c1dda58 and
+        118ba74 change only guest (hypervisor) translation, absent here. With those two
+        renames and the $error text normalised, CSRFile/PTW/Rocket of the non-vector
+        shells are identical (0 lines);
+      - Saturn shell: rocket-chip 42b7698 "Vector CSR altfmt" splits vtype.reserved[54:0]
+        into reserved[53:0] + altfmt (vtype bit 8), threaded through RocketTile and
+        Saturn's ports; a vsetvl with vtype[8] = 1 no longer sets vill. GCC never sets it.
+      - *.graphml is renamed *.chiptop0.graphml by upstream; *.fir and *.d follow source.
+      Saturn e73d9bc compiles unchanged against rocket-chip ece7b9a and shuttle 622f08b.
+
+2. Zephyr
+---------
+  2a. Flight controller (arty200t, RocketArty200TDroneFullDDRConfig, --mode esp-motors):
+        rb-old: ./rb build flight_controller --target arty200t --mode esp-motors
+                (source: zcs 35bf7c9 samples/rose_flight_controller)
+        rb:     RB_EXTRA_CFLAGS="-DFC_FLOW_LEGACY_VERTICAL_H=1 -DPID_GIBBS_LEGACY=1" \
+                ./rb build flight_controller --target arty200t --mode esp-motors
+                (source: workloads/flight_controller; both defines reach all 115 C/C++
+                 compile commands in compile_commands.json)
+      Not identical: text 0x12904 -> 0x129ec, rodata 0x3610 -> 0x3608. Per symbol:
+        HierarchicalPidController::compute 0x7da -> 0x8a6, ComplementaryEstimator::update
+        0x37c -> 0x384, main +10, flow_thread_fn +2, new 2-byte flow_rose_request/collect,
+        and +2 in bmi08x_attr_set / sys_heap_init (alignment after the shift).
+      Isolation build: the OLD source (zcs 35bf7c9 sample + the top-level CMakeLists'
+      TINYMPC override) built by the NEW rb against the new pins, same flags, gives
+      allocated sections byte-identical to the old ELF. So the re-pin and rewiring change
+      nothing; the difference is the workloads/flight_controller source itself (its own
+      commits: PID in angles with a legacy define, flow slant range, body-z opt-in,
+      RoSE PMW3901 co-sim path, DroNet nav), which the defines do not fully undo.
+      Rebuilt after the Chipyard tip move: identical to the bcb6129-era build.
+  2b. Bring-up workloads, rb-old vs rb (allocated sections):
+        bootup_check arty200t, camera_photo arty200t: identical except the
+          __DATE__/__TIME__ banner string;
+        esp_bridge esp32c6 --mode motors, i2c_scanner esp32c6: identical.
+      Also built on rb (exit 0): hello_world arty200t (DroneFullDDR), motor_duty arty200t,
+      esp_uart arty200t, pmw3901_test esp32c6, esp_bridge esp32c6, flight_controller
+      arty200t default, flight_estimator arty200t, and the ESP32-C6 flight controller via
+      the tools/flight/esp32c6/build.sh arguments (viz preset flags).
+
+3. ModelBlaster
+---------------
+  ./rb modelblaster build --gen-dir artifacts/modelblaster/dronet/int8/gemmini_q31_softfp \
+      --board arty200t --config RocketArty200TDroneGemminiSaturnFp16At35Config
+    rb-old vs rb: allocated sections identical.
+  ./rb modelblaster generate --model dronet --target gemmini_q31   (both trees)
+    rb-old regenerates artifacts/modelblaster/dronet/int8/gemmini_q31 byte for byte
+    (kernels.c, model.c, weights.c, test_golden.bin). rb (MB 5b78467) succeeds and its
+    spike verification passes ("verified": true), but emits different kernels/weights:
+    rb-clean merged ModelBlaster's newer pipeline (extract_graph, reference_kernels,
+    generate_skeleton, kernel cache). The committed artifact is unaffected and builds.
+  hardware/modelblaster/riskybird/tests (python -m unittest discover -s riskybird/tests):
+    4 tests OK against backends/modelblaster.
+
+4. Tests and rb doctor
+----------------------
+  PYTHONPATH=. python3 -m unittest discover -s tests -t tests
+    67dd859 (rb-old): Ran 339, FAILED (failures=4, errors=3, skipped=76) --
+      test_dronet_nav x4, test_fc_merge x2 (zcs paths), test_rb target overlay (i2c0_default)
+    pin-clean:        Ran 345, OK (skipped=63). Skips: configs not elaborated in this tree,
+      dse/experiments/XPU-RT that live on main.
+  ./rb doctor: every tool ok; "backend overlays" section all ok (queue, links, redirects).
+
+5. Fresh clone
+--------------
+$ git clone --branch pin-clean /scratch2/loren/riskybird-dev fresh
+e112f6d Move Chipyard to upstream main (157dd69)
+$ git submodule update --init backends/zephyr-chipyard-sw backends/chipyard backends/modelblaster backends/saturn backends/RoSE
+Submodule 'backends/RoSE' (https://github.com/ucb-bar/RoSE.git) registered for path 'backends/RoSE'
+Submodule 'backends/chipyard' (https://github.com/ucb-bar/chipyard.git) registered for path 'backends/chipyard'
+Submodule 'backends/modelblaster' (https://github.com/ucb-bar/ModelBlaster.git) registered for path 'backends/modelblaster'
+Submodule 'backends/saturn' (https://github.com/CobbledSteel/saturn-vectors.git) registered for path 'backends/saturn'
+Submodule 'backends/zephyr-chipyard-sw' (https://github.com/ucb-bar/zephyr-chipyard-sw.git) registered for path 'backends/zephyr-chipyard-sw'
+Submodule path 'backends/RoSE': checked out 'b6ac3e4342adbc68d1f6aefd09931a8906317614'
+Submodule path 'backends/chipyard': checked out '157dd69e49b9866be2bf8db390ee78bc38cd4438'
+Submodule path 'backends/modelblaster': checked out '5b78467f5b93f41cb702b8e694b147d40d40a01c'
+Submodule path 'backends/saturn': checked out 'e73d9bcc479eec4064ced555956da766781e06ef'
+Submodule path 'backends/zephyr-chipyard-sw': checked out '4ada80a3996707b9df37cac49c188372f22ed97a'
+$ git submodule status
+ b6ac3e4342adbc68d1f6aefd09931a8906317614 backends/RoSE (1.1.0-291-gb6ac3e4)
+ 157dd69e49b9866be2bf8db390ee78bc38cd4438 backends/chipyard (1.14.0-48-g157dd69e)
+ 5b78467f5b93f41cb702b8e694b147d40d40a01c backends/modelblaster (iiswc-tutorial-pin-weight-grid-51-g5b78467)
+ e73d9bcc479eec4064ced555956da766781e06ef backends/saturn (remotes/origin/saturn-vmem-be-gate)
+ 4ada80a3996707b9df37cac49c188372f22ed97a backends/zephyr-chipyard-sw (remotes/origin/rb-clean)
+-a9d4b0633aaa67941600ddadebb18ef16e46db8b hardware/pcb/riskybird-academy/sim/gym-pybullet-drones
+$ tools/submodule-redirects apply
+  link backends/RoSE/soc/sim/chipyard -> ../../../chipyard
+  init backends/RoSE/soc/sw/xpu-rt (no nested submodules)
+  link backends/RoSE/soc/sw/xpu-rt/hw/chipyard -> ../../../../../chipyard
+  link backends/RoSE/soc/sw/xpu-rt/zephyr-chipyard-sw -> ../../../../zephyr-chipyard-sw
+  link backends/zephyr-chipyard-sw/modelblaster -> ../modelblaster
+  link backends/chipyard/generators/saturn -> ../../saturn
+applied; run `tools/submodule-redirects check`
+ok   backends/RoSE/soc/sim/chipyard  (pin 0acc1e1de2) -> backends/chipyard @ 157dd69e49  origin https://github.com/ucb-bar/chipyard.git
+ok   backends/RoSE/soc/sw/xpu-rt/hw/chipyard  (pin f69af12a8f) -> backends/chipyard @ 157dd69e49  origin https://github.com/ucb-bar/chipyard.git
+ok   backends/RoSE/soc/sw/xpu-rt/zephyr-chipyard-sw  (pin cc6cb50484) -> backends/zephyr-chipyard-sw @ 4ada80a399  origin https://github.com/ucb-bar/zephyr-chipyard-sw.git
+ok   backends/zephyr-chipyard-sw/modelblaster  (pin 80cec13979) -> backends/modelblaster @ 5b78467f5b  origin https://github.com/ucb-bar/ModelBlaster.git
+ok   backends/chipyard/generators/saturn  (pin 8c5115c190) -> backends/saturn @ e73d9bcc47  origin https://github.com/CobbledSteel/saturn-vectors.git
+ok   backends/chipyard/software/zephyrproject/zephyr  (pin cd45a528d3) disabled
+$ git -C backends/chipyard submodule update --init generators/rocket-chip generators/gemmini generators/tacit fpga/fpga-shells sims/firesim generators/saturn
+Submodule 'fpga/fpga-shells' (https://github.com/chipsalliance/rocket-chip-fpga-shells.git) registered for path 'fpga/fpga-shells'
+Submodule 'generators/gemmini' (https://github.com/ucb-bar/gemmini.git) registered for path 'generators/gemmini'
+Submodule 'generators/rocket-chip' (https://github.com/chipsalliance/rocket-chip.git) registered for path 'generators/rocket-chip'
+Submodule 'generators/tacit' (https://github.com/riscv-tacit/tacit.git) registered for path 'generators/tacit'
+Submodule 'sims/firesim' (https://github.com/firesim/firesim.git) registered for path 'sims/firesim'
+Skipping submodule 'generators/saturn'
+Submodule path 'fpga/fpga-shells': checked out 'a4823d360d9c736173ff75e7a5c643a7258cda08'
+Submodule path 'generators/gemmini': checked out '8c3f9923a44a2fe2c7930587be297d6d4f8c09ca'
+Submodule path 'generators/rocket-chip': checked out 'ece7b9ad544b07df39cd13b6fd7236562a26355d'
+Submodule path 'generators/tacit': checked out 'fe61365292ef1fa60410a2a91c48a3e3d22b1a75'
+Submodule path 'sims/firesim': checked out 'e1bdea8bb042b900995436ecc3d7c44100eb9da0'
+$ tools/submodule-redirects apply   # Chipyard init re-activates generators/saturn
+applied; run `tools/submodule-redirects check`
+ok   backends/RoSE/soc/sim/chipyard  (pin 0acc1e1de2) -> backends/chipyard @ 157dd69e49  origin https://github.com/ucb-bar/chipyard.git
+ok   backends/RoSE/soc/sw/xpu-rt/hw/chipyard  (pin f69af12a8f) -> backends/chipyard @ 157dd69e49  origin https://github.com/ucb-bar/chipyard.git
+ok   backends/RoSE/soc/sw/xpu-rt/zephyr-chipyard-sw  (pin cc6cb50484) -> backends/zephyr-chipyard-sw @ 4ada80a399  origin https://github.com/ucb-bar/zephyr-chipyard-sw.git
+ok   backends/zephyr-chipyard-sw/modelblaster  (pin 80cec13979) -> backends/modelblaster @ 5b78467f5b  origin https://github.com/ucb-bar/ModelBlaster.git
+ok   backends/chipyard/generators/saturn  (pin 8c5115c190) -> backends/saturn @ e73d9bcc47  origin https://github.com/CobbledSteel/saturn-vectors.git
+ok   backends/chipyard/software/zephyrproject/zephyr  (pin cd45a528d3) disabled
+$ tools/backend-patches apply
+  backends/chipyard: applied 4 patch(es)
+  backends/chipyard/fpga/fpga-shells: applied 1 patch(es)
+  backends/chipyard/generators/gemmini: applied 1 patch(es)
+  backends/chipyard/generators/rocket-chip: applied 5 patch(es)
+  backends/chipyard/generators/tacit: applied 3 patch(es)
+  backends/chipyard/sims/firesim: applied 3 patch(es)
+  link backends/chipyard/project/RiskyBird.scala -> ../../../hardware/chipyard/project/RiskyBird.scala
+  link backends/chipyard/fpga/fpga-shells/xilinx/arty_a7_200 -> ../../../../../hardware/fpga-shells/xilinx/arty_a7_200
+  link backends/chipyard/fpga/fpga-shells/xilinx/ku040 -> ../../../../../hardware/fpga-shells/xilinx/ku040
+  link backends/chipyard/fpga/fpga-shells/xilinx/te0712_100t -> ../../../../../hardware/fpga-shells/xilinx/arty_a7_100
+ok   backends/chipyard @ 157dd69e49 + 4 patch(es)
+ok   backends/chipyard/fpga/fpga-shells @ a4823d360d + 1 patch(es)
+ok   backends/chipyard/generators/gemmini @ 8c3f9923a4 + 1 patch(es)
+ok   backends/chipyard/generators/rocket-chip @ ece7b9ad54 + 5 patch(es)
+ok   backends/chipyard/generators/tacit @ fe61365292 + 3 patch(es)
+ok   backends/chipyard/sims/firesim @ e1bdea8bb0 + 3 patch(es)
+ok   link backends/chipyard/project/RiskyBird.scala -> hardware/chipyard/project/RiskyBird.scala
+ok   link backends/chipyard/fpga/fpga-shells/xilinx/arty_a7_200 -> hardware/fpga-shells/xilinx/arty_a7_200
+ok   link backends/chipyard/fpga/fpga-shells/xilinx/ku040 -> hardware/fpga-shells/xilinx/ku040
+ok   link backends/chipyard/fpga/fpga-shells/xilinx/te0712_100t -> hardware/fpga-shells/xilinx/arty_a7_100
+exit 0
+$ tools/backend-patches check
+ok   backends/chipyard @ 157dd69e49 + 4 patch(es)
+ok   backends/chipyard/fpga/fpga-shells @ a4823d360d + 1 patch(es)
+ok   backends/chipyard/generators/gemmini @ 8c3f9923a4 + 1 patch(es)
+ok   backends/chipyard/generators/rocket-chip @ ece7b9ad54 + 5 patch(es)
+ok   backends/chipyard/generators/tacit @ fe61365292 + 3 patch(es)
+ok   backends/chipyard/sims/firesim @ e1bdea8bb0 + 3 patch(es)
+ok   link backends/chipyard/project/RiskyBird.scala -> hardware/chipyard/project/RiskyBird.scala
+ok   link backends/chipyard/fpga/fpga-shells/xilinx/arty_a7_200 -> hardware/fpga-shells/xilinx/arty_a7_200
+ok   link backends/chipyard/fpga/fpga-shells/xilinx/ku040 -> hardware/fpga-shells/xilinx/ku040
+ok   link backends/chipyard/fpga/fpga-shells/xilinx/te0712_100t -> hardware/fpga-shells/xilinx/arty_a7_100
+exit 0
+$ tools/submodule-redirects check
+ok   backends/RoSE/soc/sim/chipyard  (pin 0acc1e1de2) -> backends/chipyard @ 157dd69e49  origin https://github.com/ucb-bar/chipyard.git
+ok   backends/RoSE/soc/sw/xpu-rt/hw/chipyard  (pin f69af12a8f) -> backends/chipyard @ 157dd69e49  origin https://github.com/ucb-bar/chipyard.git
+ok   backends/RoSE/soc/sw/xpu-rt/zephyr-chipyard-sw  (pin cc6cb50484) -> backends/zephyr-chipyard-sw @ 4ada80a399  origin https://github.com/ucb-bar/zephyr-chipyard-sw.git
+ok   backends/zephyr-chipyard-sw/modelblaster  (pin 80cec13979) -> backends/modelblaster @ 5b78467f5b  origin https://github.com/ucb-bar/ModelBlaster.git
+ok   backends/chipyard/generators/saturn  (pin 8c5115c190) -> backends/saturn @ e73d9bcc47  origin https://github.com/CobbledSteel/saturn-vectors.git
+ok   backends/chipyard/software/zephyrproject/zephyr  (pin cd45a528d3) disabled
+exit 0
+$ find -L backends -maxdepth 5 -name build-setup.sh -path "*chipyard*" | dirname | realpath | sort -u   # one Chipyard: the redirected copies resolve to it
+/scratch2/loren/pin-clean-scratch/fresh/backends/chipyard
+/scratch2/loren/pin-clean-scratch/fresh/backends/chipyard/scripts
+/scratch2/loren/pin-clean-scratch/fresh/backends/chipyard/sims/firesim
+$ git status --short
+
+Appendix: comparison scripts
+--- cmp-gen.py
+#!/usr/bin/env python3
+"""cmp-gen.py OLD_GEN_DIR NEW_GEN_DIR : compare two Chipyard generated-src config dirs.
+
+Normalises what legitimately differs between two checkouts: absolute paths of
+the checkout, and firtool source locators (// @[file:line:col]) and
+`// file:line` comments, which name Scala files that moved. Everything else
+must match byte for byte."""
+import re, sys, hashlib
+from pathlib import Path
+
+old, new = Path(sys.argv[1]), Path(sys.argv[2])
+roots = [str(p) for p in sys.argv[3:]]
+LOC = re.compile(r"\s*// @\[[^\]]*\]")
+LOC2 = re.compile(r"@\[[^\]]*\]")
+
+def norm(path: Path, other_roots):
+    try:
+        t = path.read_text(errors="replace")
+    except Exception:
+        return path.read_bytes()
+    for r in other_roots:
+        t = t.replace(r, "<ROOT>")
+    t = LOC.sub("", t)
+    t = LOC2.sub("@[]", t)
+    return t
+
+def files(d):
+    return {str(p.relative_to(d)).replace(d.name, "<CFG>"): p for p in d.rglob("*") if p.is_file()}
+
+fo, fn = files(old), files(new)
+only_o = sorted(set(fo) - set(fn)); only_n = sorted(set(fn) - set(fo))
+same = diff = 0
+diffs = []
+for k in sorted(set(fo) & set(fn)):
+    a, b = norm(fo[k], roots), norm(fn[k], roots)
+    if a == b:
+        same += 1
+    else:
+        diff += 1; diffs.append(k)
+print(f"{old.name}: {same} identical, {diff} differ, {len(only_o)} only-old, {len(only_n)} only-new")
+for k in only_o: print("  only-old", k)
+for k in only_n: print("  only-new", k)
+for k in diffs: print("  DIFF", k)
+--- cmp-elf.sh
+#!/bin/bash
+# cmp-elf.sh OLD.elf NEW.elf : compare the allocated sections of two ELFs.
+SDK=/scratch2/loren/riskybird-dev/backends/zephyr-chipyard-sw/tools-manual/zephyr-sdk-1.0.0-beta1/gnu/riscv64-zephyr-elf/bin/riscv64-zephyr-elf
+T=$(mktemp -d)
+for w in old new; do
+  e=$1; [ $w = new ] && e=$2
+  $SDK-readelf -SW $e | awk '/^ *\[/ && $0 ~ / A/ {gsub(/^ *\[ *[0-9]+\] /,""); print $1, $3, $5}' | grep -v "^NULL" > $T/$w.sec
+  $SDK-objcopy -O binary --only-section='*' $e $T/$w.bin 2>/dev/null
+done
+echo "sections (name addr size):"; diff $T/old.sec $T/new.sec && echo "  identical layout"
+for s in $(awk '{print $1}' $T/old.sec); do
+  for w in old new; do e=$1; [ $w = new ] && e=$2; $SDK-objcopy -O binary -j $s $e $T/$w.$s 2>/dev/null; done
+  cmp -s $T/old.$s $T/new.$s && r=same || r=DIFF
+  echo "  $s $r $(stat -c %s $T/old.$s 2>/dev/null) $(stat -c %s $T/new.$s 2>/dev/null)"
+done
+rm -rf $T
