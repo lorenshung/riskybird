@@ -91,11 +91,28 @@ static inline void fc_flow_counts(struct fc_flow_filter *f, int dx, int dy, floa
     float ky = tau_y > 0.0f ? 1.0f-expf(-dt/tau_y) : 1.0f;
     f->x += kx*(ax-f->x); f->y += ky*(ay-f->y);
 }
+/* Body velocity (m/s) from gyro-compensated angular flow (rad/s) and the down-ToF reading.
+ *
+ * `height` is the RAW down-ToF range, measured along the sensor axis (body -z), which is also the
+ * flow camera's optical axis. A ground feature on that axis is at distance d = height, and the flow
+ * it makes is the body velocity across the axis divided by d [Crazyflie mm_flow.c: flow =
+ * v * R22 / z - omega with z/R22 = d]. So v = flow * d: the slant range itself. Multiplying by the
+ * VERTICAL height d*cos(tilt), as this did until 2026-11, read every velocity low by cos(tilt)
+ * (1.5% at 10 deg, 6% at 20 deg); -DFC_FLOW_LEGACY_VERTICAL_H=1 restores that for A/B runs.
+ * ga/gb/gc is the Gibbs attitude; it only gates the upside-down case now (cos(tilt) <= 0: the
+ * sensor is not looking at the floor), where the old code also returned 0. */
+#ifndef FC_FLOW_LEGACY_VERTICAL_H
+#define FC_FLOW_LEGACY_VERTICAL_H 0
+#endif
 static inline void fc_flow_velocity(float ax, float ay, float height,
                                     float ga, float gb, float gc, float velocity[2])
 {
     float ct = (1.0f-ga*ga-gb*gb+gc*gc)/(1.0f+ga*ga+gb*gb+gc*gc);
+#if FC_FLOW_LEGACY_VERTICAL_H
     float h = height * (ct > 0.0f ? ct : 0.0f);
+#else
+    float h = ct > 0.0f ? height : 0.0f;
+#endif
     float vx=ax*h, vy=ay*h;
     velocity[0] = vx > 3.0f ? 3.0f : (vx < -3.0f ? -3.0f : vx);
     velocity[1] = vy > 3.0f ? 3.0f : (vy < -3.0f ? -3.0f : vy);

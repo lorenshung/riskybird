@@ -2991,8 +2991,9 @@ static bool read_sensor_frame(struct sensor_frame *f)
 			ay -= FLOW_GYRO_ROLL_SIGN  * g_roll;    /* roll rate  -> left flow */
 #endif
 			/* f->height is the RAW slant (the estimator tilt-corrects for altitude on its own fresh
-			 * R[8]); the flow needs VERTICAL height too, so correct a local copy on the cached attitude.
-			 * cos(tilt) = R_zz = (1 - qx^2 - qy^2 + qz^2)/(1 + qx^2 + qy^2 + qz^2) from the Gibbs state. */
+			 * R[8]). The flow wants exactly that range: it is the distance along the camera axis, so
+			 * velocity = angular flow * slant (see fc_flow_velocity). The cached Gibbs attitude only
+			 * gates the upside-down case. */
             fc_flow_velocity(ax, ay, f->height, g_att_roll, g_att_pitch, g_att_yaw, f->flow);
 			f->flow_valid = true;
 		} else {
