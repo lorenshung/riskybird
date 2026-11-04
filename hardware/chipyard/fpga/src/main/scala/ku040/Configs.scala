@@ -79,6 +79,11 @@ class WithKU040Tweaks(freqMHz: Double = 50, uartRxdPin: String = "D3", ddr: Bool
   new chipyard.harness.WithAllClocksFromHarnessClockInstantiator ++
   new chipyard.clocking.WithPassthroughClockGenerator ++
   (if (ddr) new WithKU040DDRMem(ddrControllers) else new WithKU040ScratchpadMem(scratchpadBytes)) ++
+  // Defines the inputs of any SPI port no board binder above connects (e.g. the
+  // drone periphery's flow SPI on a shell without WithArty200TSPI). The fork put
+  // this in Chipyard's AbstractConfig; here it is innermost of the board's
+  // binders, so every board SPI binder (always outer to the tweaks) still wins.
+  new chipyard.harness.WithSPITiedOff ++
   new freechips.rocketchip.subsystem.WithoutTLMonitors)
 
 /** Opt-in HM01B0 capture, including the I2C controller used to configure the sensor. */
@@ -338,7 +343,7 @@ class WithFP32OnlyFPUOnTiles(ids: Int*) extends Config(
  *     FPU restricted to FP32-only (no FP64).
  *   - hart 1 ("Gemmini core"): Rocket + Q0.31 32x32 Gemmini (RoCC custom3). No Saturn/FcRoCC.
  *   - TACIT instruction-trace encoder + DDR trace sink, with TACIT's OWN internal DSC branch
- *     predictor OFF (useBP=false, the default -- saves ~3,045 LUT + 2,048 FF per encoder).
+ *     predictor OFF (WithTacitEncoderBP(useBP = false) -- saves ~3,045 LUT + 2,048 FF per encoder).
  *     Rocket's own BTB/BHT/RAS are left ENABLED at spec default.
  *   - All riskybird carrier peripherals on the correct TE0841 balls (i2c/spi/gpio/pwm Bank64/65
  *     LVCMOS33, HM01B0 camera Bank66 LVCMOS18) + console uart0/debug jtag on Bank64, same as
@@ -381,7 +386,7 @@ class RocketKU040DroneDualConfig extends Config(
   new tacit.WithTraceSinkDMA(1) ++
   new tacit.WithTraceSinkAlways(0) ++
   new chipyard.config.WithTraceArbiterMonitor ++
-  new chipyard.WithTacitEncoder(useBP = false) ++
+  new chipyard.fpga.arty200t.WithTacitEncoderBP(useBP = false) ++
   // ---- FP32-only scalar FPU on both tiles (LEFT of Saturn so it wins over minFLen=16) ----
   new WithFP32OnlyFPUOnTiles(0, 1) ++
   // ---- per-hart RoCC: FcRoCC (custom0) -> hart 0, Gemmini 32x32 (custom3) -> hart 1 ----
@@ -426,7 +431,7 @@ class RocketKU040DroneDual16Config extends Config(
   new tacit.WithTraceSinkDMA(1) ++
   new tacit.WithTraceSinkAlways(0) ++
   new chipyard.config.WithTraceArbiterMonitor ++
-  new chipyard.WithTacitEncoder(useBP = false) ++
+  new chipyard.fpga.arty200t.WithTacitEncoderBP(useBP = false) ++
   new WithFP32OnlyFPUOnTiles(0, 1) ++
   new chipyard.config.WithMultiRoCC ++
   new chipyard.config.WithMultiRoCCFromBuildRoCC(0) ++
@@ -1112,7 +1117,7 @@ class RocketKU040DroneDualFp16Config extends Config(
   new tacit.WithTraceSinkDMA(1) ++
   new tacit.WithTraceSinkAlways(0) ++
   new chipyard.config.WithTraceArbiterMonitor ++
-  new chipyard.WithTacitEncoder(useBP = false) ++
+  new chipyard.fpga.arty200t.WithTacitEncoderBP(useBP = false) ++
   // ---- scalar FPU: hart1 FP32-only (LEFT so it wins); hart0 scalar FP16-only ----
   new WithFP32OnlyFPUOnTiles(1) ++
   new freechips.rocketchip.rocket.WithRocketFPU16 ++
@@ -1160,7 +1165,7 @@ class RocketKU040DroneDual16Fp16Config extends Config(
   new tacit.WithTraceSinkDMA(1) ++
   new tacit.WithTraceSinkAlways(0) ++
   new chipyard.config.WithTraceArbiterMonitor ++
-  new chipyard.WithTacitEncoder(useBP = false) ++
+  new chipyard.fpga.arty200t.WithTacitEncoderBP(useBP = false) ++
   new WithFP32OnlyFPUOnTiles(1) ++
   new freechips.rocketchip.rocket.WithRocketFPU16 ++
   new chipyard.config.WithMultiRoCC ++
@@ -1206,7 +1211,7 @@ class RocketKU040DroneDualFp16D64Config extends Config(
   new tacit.WithTraceSinkDMA(1) ++
   new tacit.WithTraceSinkAlways(0) ++
   new chipyard.config.WithTraceArbiterMonitor ++
-  new chipyard.WithTacitEncoder(useBP = false) ++
+  new chipyard.fpga.arty200t.WithTacitEncoderBP(useBP = false) ++
   new WithFP32OnlyFPUOnTiles(1) ++
   new freechips.rocketchip.rocket.WithRocketFPU16 ++
   new chipyard.config.WithMultiRoCC ++

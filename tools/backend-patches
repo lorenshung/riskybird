@@ -203,11 +203,16 @@ def apply() -> None:
         if not queue_diff(repo, patches):
             print(f"  {rel(repo)}: already applied")
             continue
-        if local_edits(repo):
+        # Already carrying the first k patches (a patch was appended to the
+        # queue since the last apply): apply the rest.
+        done = next((k for k in range(len(patches))
+                     if (not local_edits(repo) if k == 0 else not queue_diff(repo, patches[:k]))),
+                    None)
+        if done is None:
             raise SystemExit(f"{rel(repo)}: has edits that are not the queue; "
                              "revert or commit them first")
-        git(repo, "apply", *map(str, patches))
-        print(f"  {rel(repo)}: applied {len(patches)} patch(es)")
+        git(repo, "apply", *map(str, patches[done:]))
+        print(f"  {rel(repo)}: applied {len(patches) - done} patch(es)")
     for link, target in overlays():
         if not link.parent.is_dir():
             raise SystemExit(f"{rel(link)}: its backend is not checked out")

@@ -10,7 +10,7 @@
 //                          buildSinks, and installs TraceSinkDMAInjector, which
 //                          gives the sink a TL master into the SBUS (-> DDR) plus
 //                          a TL-slave regnode for the software DMA descriptor.
-//   WithTacitEncoder(BP)-- sets traceParams=Some(TacitEncoder(...)) on the tile
+//   WithTacitEncoderBP  -- sets traceParams=Some(TacitEncoder(...)) on the tile
 //                          and enableTraceCoreIngress on the Rocket core.
 //
 // READBACK / trace-buffer DDR region (per tile, tileId 0):
@@ -38,7 +38,13 @@ import tacit.{TacitEncoder, TacitBPParams}
 // tunable branch-predictor entry count and buffer depth, so the combined
 // (LUT-critical) config can shrink the 1024-entry DSC counter table (a big NxM
 // read/update mux) when synth pushes past 100%.
-class WithTacitEncoderBP(nEntries: Int = 1024, bufferDepth: Int = 16) extends Config((site, here, up) => {
+//
+// `useBP = false` leaves the DSC branch predictor out of the elaboration. The
+// encoder only uses it in BrPredict mode (bp_mode === 2), which nothing here
+// selects, and it costs ~3k LUT / 2k FF per encoder. Stock WithTacitEncoder
+// always builds it; RiskyBird's TACIT shells that want it off use this fragment
+// with useBP = false (decode their traces without --br-mode 2).
+class WithTacitEncoderBP(nEntries: Int = 1024, bufferDepth: Int = 16, useBP: Boolean = true) extends Config((site, here, up) => {
   case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
     case tp: freechips.rocketchip.subsystem.RocketTileAttachParams => tp.copy(tileParams = tp.tileParams.copy(
       traceParams = Some(TraceEncoderParams(
@@ -50,7 +56,7 @@ class WithTacitEncoderBP(nEntries: Int = 1024, bufferDepth: Int = 16) extends Co
         ),
         bufferDepth = bufferDepth,
         coreStages = 5,
-        bpParams = TacitBPParams(xlen = tp.tileParams.core.xLen, n_entries = nEntries))(p)),
+        bpParams = TacitBPParams(xlen = tp.tileParams.core.xLen, n_entries = nEntries, enable = useBP))(p)),
         useArbiterMonitor = false
       )),
       core = tp.tileParams.core.copy(enableTraceCoreIngress = true)))
@@ -61,7 +67,7 @@ class WithTacitEncoderBP(nEntries: Int = 1024, bufferDepth: Int = 16) extends Co
 // Full-strength TACIT (1024-entry BP): DMA sink (target id 1) + encoder.
 class WithTacitDmaTrace extends Config(
   new tacit.WithTraceSinkDMA(1) ++
-  new chipyard.WithTacitEncoder)
+  new WithTacitEncoderBP(useBP = false))
 
 // Reduced-BP TACIT (256-entry BP): for the LUT-critical combined config.
 class WithTacitDmaTrace256 extends Config(

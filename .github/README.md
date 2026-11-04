@@ -37,15 +37,17 @@ submodules under `backends/`.
 | `hardware/padtest/` | bare-metal FPGA pad tests |
 | `tools/flight/`, `tools/bench/` | flight recording, ESP32-C6 link firmware, ground station |
 | `integration/zephyr/` | shared Zephyr modules: camera, ToF, motor link, motor guard |
-| `backends/` | submodules: chipyard, zephyr-chipyard-sw, modelblaster |
+| `backends/` | submodules: chipyard, zephyr-chipyard-sw, modelblaster and RoSE at plain upstream pins; saturn at the Saturn commit RiskyBird's accelerator shells need |
+| `patches/`, `.backend-overlays`, `.submodule-redirects` | what `tools/backend-patches` and `tools/submodule-redirects` put into the backends |
 | `prune/moved-to-top.tsv` | where each file copied out of a backend came from |
 | `tests/` | repository tests |
 
 ## Getting started
 
 ```sh
-git submodule update --init backends/zephyr-chipyard-sw backends/chipyard
+git submodule update --init backends/zephyr-chipyard-sw backends/chipyard backends/saturn
 source ./rb-env.sh
+rb env setup zephyr && rb env setup chipyard   # also applies the redirects, overlay and patch queue
 rb doctor          # tools, environments and attached hardware
 rb targets         # FPGA and Zephyr targets
 rb workloads       # workloads and which targets they support
