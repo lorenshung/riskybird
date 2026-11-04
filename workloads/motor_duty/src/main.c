@@ -75,6 +75,11 @@
  *   t         run the scripted step sweep (g = next step early, x = abort)
  *   ?         reprint this
  *
+ * The same keys arrive over WiFi with no programmer board attached: send a UDP
+ * datagram "MD <keys>" to the ESP's port 14551 (e.g. "MD n1]]" then "MD g") and
+ * the bridge writes it into uart1 -- see poll_uplink(). "ESTOP" there cuts the
+ * ESP's gates and also disarms this image.
+ *
  * Duties are shown and entered in hundredths of a percent, the wire's own unit,
  * so nothing is rounded between the key press and the frame.
  */
@@ -88,6 +93,7 @@
 #include <stdbool.h>
 
 #include <riskybird/motor_link.h>
+#include <string.h>
 
 #if !DT_NODE_EXISTS(DT_ALIAS(esp_uart))
 #error "motor_duty needs the esp-uart alias: build against a shell that elaborates \
@@ -386,6 +392,120 @@ static void sweep_advance(void)
 	g_sweep_duty = (uint16_t)(g_sweep_duty + MOTOR_DUTY_SWEEP_STEP);
 }
 
+/* One operator key, from the console or from an "MD " line on the ESP link. */
+static void handle_key(uint8_t key)
+{
+	switch (key) {
+	case '1': case '2': case '3': case '4':
+		g_sel ^= (uint8_t)(1u << (key - '1'));
+		printf("MOTORDUTY sel=%c%c%c%c\n",
+		       (g_sel & 1u) ? '1' : '-', (g_sel & 2u) ? '2' : '-',
+		       (g_sel & 4u) ? '3' : '-', (g_sel & 8u) ? '4' : '-');
+		break;
+	case 'a': case 'A':
+		g_sel = 0x0Fu;
+		printf("MOTORDUTY sel=1234 (all)\n");
+		break;
+	case 'n': case 'N':
+		g_sel = 0u;
+		printf("MOTORDUTY sel=---- (none)\n");
+		break;
+	case '+': case '=':
+		adjust(+100);
+		break;
+	case '-': case '_':
+		adjust(-100);
+		break;
+	case ']': case '}':
+		adjust(+500);
+		break;
+	case '[': case '{':
+		adjust(-500);
+		break;
+	case 'g': case 'G':
+		if (g_sweeping) {
+			disarm("sweep step advanced early");
+			sweep_advance();
+		} else {
+			arm();
+		}
+		break;
+	case 't': case 'T':
+		if (g_sweeping) {
+			sweep_stop("restarted");
+		}
+		g_sweep_duty = (uint16_t)MOTOR_DUTY_SWEEP_START;
+		g_sweep_drift_check = false;
+		g_sweeping = true;
+		printf("MOTORDUTY SWEEP START -- read the scale on each STEP "
+		       "line; g = next step early, x = abort\n");
+		sweep_advance();
+		break;
+	case 'x': case 'X': case 'q': case 'Q': case ' ':
+		sweep_stop("operator stop");
+		disarm("operator stop");
+		break;
+	case '?':
+		print_keys();
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * Keys over WiFi, for a drone with no programmer board attached.
+ *
+ * The ESP bridge writes every UDP :14551 datagram into this uart1 receiver as
+ * one '\n'-terminated line. Only lines that start with "MD " are keys here:
+ * the bridge also forwards panel commands such as "ESTOP" and "RESET", and
+ * their letters (the T in both) would otherwise be read as keys -- 't' starts
+ * the sweep. So:
+ *
+ *   "MD <keys>"  each character after "MD " is handled exactly as a console key
+ *   "ESTOP"      stop the sweep and disarm here too (the ESP has already cut
+ *                its gates and latched; this keeps the two ends in agreement)
+ *
+ * Anything else, including a line longer than the buffer, is dropped whole.
+ */
+#define UPLINK_LINE_MAX 32
+
+static void poll_uplink(void)
+{
+	static char line[UPLINK_LINE_MAX];
+	static size_t len;
+	static bool overflow;
+	uint8_t c;
+
+	while (uart_poll_in(esp_link, &c) == 0) {
+		if (c == '\r') {
+			continue;
+		}
+		if (c != '\n') {
+			if (len < sizeof(line)) {
+				line[len++] = (char)c;
+			} else {
+				overflow = true;
+			}
+			continue;
+		}
+		if (!overflow) {
+			if (len == 5 && memcmp(line, "ESTOP", 5) == 0) {
+				printf("MOTORDUTY uplink: ESTOP\n");
+				sweep_stop("ESTOP over the ESP link");
+				disarm("ESTOP over the ESP link");
+			} else if (len > 3 && memcmp(line, "MD ", 3) == 0) {
+				printf("MOTORDUTY uplink: %.*s\n", (int)(len - 3), &line[3]);
+				for (size_t i = 3; i < len; i++) {
+					handle_key((uint8_t)line[i]);
+				}
+			}
+		}
+		len = 0;
+		overflow = false;
+	}
+}
+
 int main(void)
 {
 	int64_t next_frame;
@@ -437,63 +557,9 @@ int main(void)
 		uint8_t key;
 
 		while (uart_poll_in(console, &key) == 0) {
-			switch (key) {
-			case '1': case '2': case '3': case '4':
-				g_sel ^= (uint8_t)(1u << (key - '1'));
-				printf("MOTORDUTY sel=%c%c%c%c\n",
-				       (g_sel & 1u) ? '1' : '-', (g_sel & 2u) ? '2' : '-',
-				       (g_sel & 4u) ? '3' : '-', (g_sel & 8u) ? '4' : '-');
-				break;
-			case 'a': case 'A':
-				g_sel = 0x0Fu;
-				printf("MOTORDUTY sel=1234 (all)\n");
-				break;
-			case 'n': case 'N':
-				g_sel = 0u;
-				printf("MOTORDUTY sel=---- (none)\n");
-				break;
-			case '+': case '=':
-				adjust(+100);
-				break;
-			case '-': case '_':
-				adjust(-100);
-				break;
-			case ']': case '}':
-				adjust(+500);
-				break;
-			case '[': case '{':
-				adjust(-500);
-				break;
-			case 'g': case 'G':
-				if (g_sweeping) {
-					disarm("sweep step advanced early");
-					sweep_advance();
-				} else {
-					arm();
-				}
-				break;
-			case 't': case 'T':
-				if (g_sweeping) {
-					sweep_stop("restarted");
-				}
-				g_sweep_duty = (uint16_t)MOTOR_DUTY_SWEEP_START;
-				g_sweep_drift_check = false;
-				g_sweeping = true;
-				printf("MOTORDUTY SWEEP START -- read the scale on each STEP "
-				       "line; g = next step early, x = abort\n");
-				sweep_advance();
-				break;
-			case 'x': case 'X': case 'q': case 'Q': case ' ':
-				sweep_stop("operator stop");
-				disarm("operator stop");
-				break;
-			case '?':
-				print_keys();
-				break;
-			default:
-				break;
-			}
+			handle_key(key);
 		}
+		poll_uplink();
 
 		/* 1 Hz while armed. `frames` is the count since this step armed,
 		 * so it doubles as a live check that the link is still being fed:
