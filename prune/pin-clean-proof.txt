@@ -9,7 +9,7 @@ symlinked read-only, and the Zephyr SDK 1.0.0-beta1 / zephyr-new env likewise.
   cy-old   plain clone of the RiskyBird Chipyard fork at 0c3a178 (integration's pin),
            nested submodules at the fork's pins
   rb-old   riskybird-dev 67dd859 (ucb-main-draft): zcs 35bf7c9, MB 80cec13
-  rb       riskybird-dev pin-clean: zcs 4ada80a, MB 5b78467, Chipyard bcb6129 then 157dd69,
+  rb       riskybird-dev pin-clean: zcs 4ada80a (ba4045f from 6c), MB 5b78467, Chipyard bcb6129 then 157dd69,
            Saturn e73d9bc via backends/saturn, queue + overlay applied
   fresh    `git clone --branch pin-clean` of the tip, backends cloned from GitHub
 
@@ -296,6 +296,36 @@ $ find -L backends -maxdepth 5 -name build-setup.sh -path "*chipyard*" | dirname
 /scratch2/loren/pin-clean-scratch/fresh/backends/chipyard/scripts
 /scratch2/loren/pin-clean-scratch/fresh/backends/chipyard/sims/firesim
 $ git status --short
+
+6. Follow-up checks (after the review of the first pass)
+--------------------------------------------------------
+  6a. Overlay paths the first five configs do not exercise, fork 0c3a178 vs tip 157dd69:
+      arty200t RocketArty200TDroneFullDDRDmaUartConfig (uartdma + RbDigitalTop via
+        WithUartTxDma): only the upstream CSRFile/PTW/Rocket differences of 1b.
+      ku040 RocketKU040DroneDualConfig (FcRoCC: fc_rocc_core.sv, fc_rocc_rom.hex and
+        fc_rocc_init.hex are emitted from the overlay resources, identical) and
+      arty200t RocketArty200TDroneGemminiSaturnFp16At35TacitConfig (tacit queue): besides
+        1b, the trace path follows upstream rocket-chip f82a9d4/46343c8/8efb6c1/bff9532:
+        DTS node trace-encoder-controller@3000000 "ucbbar,trace0" becomes
+        trace-encoder-controller0@3000000 "ucbbar,trace" (so TLROM/DTB, memmap/regmap
+        json change), the sink-target register widens from 1 to 8 bits, and the
+        ingress bundle gains context fields. Nothing in riskybird-dev reads those names
+        or that register; TACIT host software built against the old layout would.
+      sbt firechip/compile (needs generators/nvdla, cva6, radiance initialised, as stock
+        Chipyard does): compiles, including the overlay's FireSimRiskyBird*Config.
+  6b. Chipyard's own setup vs the Saturn redirect, in the fresh clone:
+      `git config --unset submodule.generators/saturn.update` (what
+      init-submodules-no-riscv-tools-nolog.sh's exit trap does) followed by
+      `git submodule update --init --recursive generators/saturn` (what --full does)
+      moved backends/saturn to 8c5115c through the symlink. Hence rb env setup now runs
+        scripts/init-submodules-no-riscv-tools.sh --gemmini --tacit
+      (no --saturn), which in the fresh clone left backends/saturn at e73d9bc, after
+      which `tools/submodule-redirects apply` and both checks pass. build-setup.sh
+      itself (conda env, toolchain, precompile at 157dd69: gcc 15, new lock files, stock
+      libgemmini) was not run: the proofs above use the fork-built environment.
+  6c. zephyr-chipyard-sw rb-clean moved 4ada80a -> ba4045f (rose_nav_controller only;
+      zephyr, ModelBlaster and TinyMPC gitlinks unchanged). flight_controller esp-motors
+      and bootup_check rebuild on it.
 
 Appendix: comparison scripts
 --- cmp-gen.py
