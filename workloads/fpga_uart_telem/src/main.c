@@ -7,7 +7,7 @@
  * The DroneFullDDR shell exposes a 2nd SiFive UART at 0x1002_1000 wired to the ESP:
  *   FPGA uart1 TXD = F14 -> ESP U0RXD (GPIO17)
  *   FPGA uart1 RXD = E13 <- ESP U0TXD (GPIO16)
- * The ESP runs samples/riskybird/fpga_telem_bridge, which forwards whatever it reads
+ * The ESP runs workloads/fpga_telem_bridge, which forwards whatever it reads
  * on its UART0 out over the SoftAP as UDP broadcast to 192.168.4.255:14550 (framed on
  * newlines). So anything this app writes to uart1 should surface at the ground station.
  *
@@ -18,7 +18,7 @@
  * the ESP attached.
  *
  * Build (scratchpad or DDR shell both have uart1 on DroneFullDDR):
- *   west build -b chipyard_riscv64 -d build_uarttelem samples/riskybird/fpga_uart_telem -- \
+ *   west build -b chipyard_riscv64 -d build_uarttelem workloads/fpga_uart_telem -- \
  *     -DDTC_OVERLAY_FILE="<elf>/overlays/fpga-common.overlay;<elf>/overlays/arty200t.overlay" \
  *     -DCONFIG_UART_HTIF=n -DCONFIG_UART_SIFIVE=y -DCONFIG_UART_SIFIVE_PORT_0=y \
  *     -DCONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC=50000

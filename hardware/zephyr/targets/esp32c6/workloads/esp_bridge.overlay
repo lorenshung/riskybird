@@ -24,7 +24,7 @@
  * there and every printk is transmitted into the flight controller's receiver,
  * which at best corrupts the command channel and at worst is parsed as one.
  * The C6 has a native USB Serial/JTAG unit on the USB-C port (it is what
- * esptool already talks to, see samples/riskybird/PROGRAMMING.md: it enumerates
+ * esptool already talks to, see hardware/zephyr/targets/esp32c6/PROGRAMMING.md: it enumerates
  * as 303a:1001 -> /dev/ttyACM*), so the console moves there and costs nothing.
  */
 

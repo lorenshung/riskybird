@@ -2,7 +2,7 @@
  * Copyright (c) 2026 UC Berkeley
  * SPDX-License-Identifier: Apache-2.0
  *
- * Side wall sensors (see side_tof.h). Bring-up mirrors the validated samples/riskybird/vl35l5cx_test
+ * Side wall sensors (see side_tof.h). Bring-up mirrors the validated workloads/vl35l5cx_test
  * flow (enable one via ADS7128 GPIO, readdress off 0x29, persistence-aware), but:
  *   - preserves ADS7128 GPIO6 (the down VL53L1X) via read-modify-write, and
  *   - after readdressing, enables ALL four (LPn retains state) so they coexist at 0x31-0x34, then

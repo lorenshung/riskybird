@@ -614,7 +614,7 @@ static const struct device *baro_dev = DEVICE_DT_GET(DT_ALIAS(baro));
  * the down ToF and still carry their protective film, so if left enabled they contend on 0x29 and
  * dominate it with a 0mm / ~87 Mcps crosstalk return (the down sensor's real reads only occasionally
  * win the bus). The flight controller uses ONLY the down ToF, so hold the sides in reset. See
- * samples/riskybird/sensor_bringup for the full multi-sensor readdressing scheme (down -> 0x30). */
+ * workloads/sensor_bringup for the full multi-sensor readdressing scheme (down -> 0x30). */
 static const uint8_t VL53L1X_SIDE_CH[4] = { 1, 2, 3, 4 };
 
 static int ads7128_rd(const struct device *bus, uint8_t reg, uint8_t *v)
@@ -741,7 +741,7 @@ SYS_INIT(board_sensor_init, POST_KERNEL, 80);   /* before CONFIG_SENSOR_INIT_PRI
  * sides as they power up + pass through it during readdress, and gets intermittently clobbered (stuck
  * 0mm / crosstalk return). The VL53L1X address is volatile -- a power cycle (XSHUT low->high) resets it
  * to 0x29 -- so board_sensor_init()/side_tof_init() always leave it freshly at 0x29, and we move it
- * here ONCE, right before vl53l1x_reinit(). Mechanism (ST UM2356 / samples/riskybird/sensor_bringup):
+ * here ONCE, right before vl53l1x_reinit(). Mechanism (ST UM2356 / workloads/sensor_bringup):
  * write the new 7-bit address to 16-bit register 0x0001 (VL53L1_I2C_SLAVE__DEVICE_ADDRESS) at the
  * sensor's current address. VL53L1X_DOWN_ADDR MUST equal the vl53l1x@30 DT node reg so the driver then
  * talks to it there. */
@@ -2225,7 +2225,7 @@ so the envelope guard would be absent while motors are commanded. Build the sing
  * on non-autoflight builds it stays at TARGET_Z. */
 static float g_setpoint[NSTATES] = {0.0f, 0.0f, TARGET_Z, 0,0,0, 0,0,0, 0,0,0};
 
-/* ---- DroNet navigation (ROSE_DRONET_NAV; samples/rose_fc_dronet only) -------------------------
+/* ---- DroNet navigation (ROSE_DRONET_NAV; workloads/fc_dronet only) -------------------------
  * The DroNet thread publishes (steer, collision) per camera frame (dronet_cmd.h). Every control tick
  * turns the latest one into the forward-velocity setpoint g_setpoint[6] and the yaw setpoint
  * g_setpoint[5] (fc_dronet_nav.h); g_setpoint[7] stays 0. In autoflight it is engaged only in the
@@ -2246,7 +2246,7 @@ static float g_setpoint[NSTATES] = {0.0f, 0.0f, TARGET_Z, 0,0,0, 0,0,0, 0,0,0};
 #endif
 #if ROSE_DRONET_NAV
 #if !(defined(ROSE_HAVE_DRONET) && ROSE_HAVE_DRONET)
-#error "ROSE_DRONET_NAV needs the DroNet inference thread: build samples/rose_fc_dronet"
+#error "ROSE_DRONET_NAV needs the DroNet inference thread: build workloads/fc_dronet"
 #endif
 #if !(defined(ROSE_FLOW) && ROSE_FLOW)
 #error "ROSE_DRONET_NAV commands a velocity; without ROSE_FLOW=1 that velocity is dead-reckoned and drifts"
@@ -3169,7 +3169,7 @@ static void keepalive_block(void *a, void *b, void *c)
  * GPIO7 via the ADS7128 set/clear-bit RMW, which never disturbs GPIO6 (ToF XSHUT) or AIN5 (batt).
  * The bus is shared with the control loop, but writes happen only on a pattern EDGE (a few per
  * second) and this thread sits below PRIO_IO, so the worst case is the control loop waiting one
- * ~150 us I2C transfer. Patterns match samples/riskybird/status_led (the bench demo). */
+ * ~150 us I2C transfer. Patterns match workloads/status_led (the bench demo). */
 enum led_pattern { LEDP_CAL, LEDP_READY, LEDP_ARMING, LEDP_ARMED, LEDP_FAULT, LEDP_LOWBATT, LEDP_LOCKED };
 
 static inline void status_led_write(bool on)
@@ -3936,7 +3936,7 @@ int main(void)
 
 #if ROSE_UART_TELEM
 	/* FPGA target: emit telemetry over uart1 (E13/F14) to the ESP wireless bridge, which relays it
-	 * over its SoftAP (UDP :14550). The ESP runs samples/riskybird/fpga_telem_bridge. */
+	 * over its SoftAP (UDP :14550). The ESP runs workloads/fpga_telem_bridge. */
 	telem_uart_init();
 	printk("flight_controller: UART telemetry on uart1 -> ESP bridge (every %d ticks)\n",
 	       ROSE_UART_TELEM_DIV);

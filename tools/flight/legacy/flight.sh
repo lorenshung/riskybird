@@ -5,8 +5,8 @@
 #   flight.sh dryrun   PACK OUT: enable arming over JTAG, let the profile run on the wire, report
 #   flight.sh commit   load fresh again, then write the commit key -> ready for the dashboard
 set -u
-SP=/tmp/claude-2629/-scratch2-loren-riskybird-dev/f44ab62f-6a4c-49ac-99d7-4370b563a1bb/scratchpad
-R=/scratch2/loren/riskybird-dev-setup
+SP="${SP:-${TMPDIR:-/tmp}/rb-flight}"; mkdir -p "$SP"   # console logs
+R="${R:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"   # this checkout
 PY=$R/backends/zephyr-chipyard-sw/tools/miniforge3/envs/zephyr/bin/python3
 DBG=7-1.1.4.3
 FC=$SP/fpga-console.log
