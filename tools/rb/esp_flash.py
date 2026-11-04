@@ -88,6 +88,18 @@ def spi_32bit(payload: bytes) -> bool:
     return sync >= 0 and bytes.fromhex("3003e0010000000c") in payload[sync:sync + 64]
 
 
+def watchdog(payload: bytes) -> int:
+    """The TIMER value the image's header arms (BITSTREAM.CONFIG.TIMER_CFG), 0 if
+    none. Without it, a slot cut short by a power loss mid-write leaves the FPGA
+    scanning the flash forever after --boot update instead of falling back."""
+    sync = payload.find(bytes.fromhex("aa995566"))
+    head = payload[sync:sync + 128] if sync >= 0 else b""
+    k = head.find(bytes.fromhex("30022001"))
+    while k >= 0 and k % 4:
+        k = head.find(bytes.fromhex("30022001"), k + 1)
+    return struct.unpack(">I", head[k + 4:k + 8])[0] if k >= 0 else 0
+
+
 def usr_access(payload: bytes) -> int | None:
     """USR_ACCESS (AXSS, register 0x0D) as written by the bitstream: a type-1
     write packet 0x3001A001 followed by the value."""
@@ -261,6 +273,10 @@ def main() -> int:
                         raise LoadError(f"{args.write} does not use SPI 32-bit addressing "
                                         "(BITSTREAM.CONFIG.SPI_32BIT_ADDR): booting it, or "
                                         "booting anything from it, would use the wrong WBSTAR")
+                    if not watchdog(data) & 0x3FFFFFFF:
+                        raise LoadError(f"{args.write} does not arm the configuration watchdog "
+                                        "(BITSTREAM.CONFIG.TIMER_CFG): a write cut short by a "
+                                        "power loss would hang the FPGA at --boot update")
                     t0 = time.monotonic()
                     end = UPDATE + len(data)
                     for a in range(UPDATE, end, SECTOR):
