@@ -366,6 +366,43 @@ $ git status --short
           bench-only clone: rows for uninstalled backends skipped, exit 0.
       Test suite after both commits: Ran 345, OK (skipped=62).
 
+8. Merge of wip/sim-fc (a5c349b, e33fad9) and the bench image (2026-11-04)
+--------------------------------------------------------------------------
+  Merge commit 75f5393 (git merge --no-ff wip/sim-fc into 991e283; no conflicts). Builds and
+  tests ran in the standalone scratch clone /scratch2/loren/pin-clean-scratch/rb (same method
+  as sections 1-7: fetch the worktree's pin-clean, ff to the tip; the worktree and the main
+  checkout were not built in and no submodule config was touched). Logs and ELFs:
+  /scratch2/loren/pin-clean-scratch/logs/merge/.
+  8a. Drone (non-RoSE) flight_controller, arty200t RocketArty200TDroneFullDDRConfig,
+      before = 991e283, after = 75f5393, same flags:
+        rb build flight_controller --target arty200t --mode esp-motors
+        rb build flight_controller --target arty200t --mode t33-hover-1.5m
+      Both modes: allocated sections and the flat objcopy -O binary image are byte-identical
+      (0 differing bytes; text 76268 / 75496, rodata 13832 / 14416). The .elf files differ
+      only in .debug_info and .debug_line (main.cpp gained lines under the RoSE-only guard).
+      So e33fad9 leaves the drone target identical in everything that is loaded.
+  8b. Default FcRoCC (hardware/rtl/fcrocc/vsrc/fc_rocc_rom.hex, fc_rocc_init.hex,
+      sim/fc_rocc_map.svh, workloads/flight_controller/src/fc_rocc_fw.h, and the recovery
+      copies): sha256 byte-identical at 991e283 and 75f5393. The merge only adds
+      variants/flow_bodyz1/ (fw.h, init.hex, map.svh, rom.hex), asm and sim sources.
+  8c. Tests, PYTHONPATH=. python3 -m unittest discover -s tests -t tests:
+      991e283: Ran 345, OK (skipped=59); 75f5393: Ran 345, OK (skipped=59), in the scratch
+      clone. The 62 of section 7d counts three more skips; the same 991e283 gives 59 here,
+      so the difference is the environment (built artifacts present), not the merge.
+  8d. Bench image: workloads/flight_controller, --mode t33-hover-1.5m (a flight preset from
+      tools/flight/presets/, base esp-motors; RB_CMAKE_ARGS and RB_EXTRA_CPPFLAGS inside the
+      preset file are applied by rb itself), arty200t, RocketArty200TDroneFullDDRConfig (the
+      tools/rb/fly.py defaults). No PID_TILT_TIGHT, PID_GIBBS_LEGACY, FC_FLOW_BODYZ or
+      FC_FLOW_LEGACY_VERTICAL_H anywhere in the 13 app compile commands. Verified in the
+      build: HOVER_Z_M=1.50f, PID_MASS_KG=0.050f, ROSE_AUTOFLIGHT/ROSE_FLIGHT_COMMIT, T_CLIMB_MS
+      and 8 other defines present in all 13 app TUs; in the ELF, gdb prints
+      g_hover_z_m = 1.5, g_t_climb_ms = 5000, g_t_hover_ms = 1000, g_t_descend_ms = 5000,
+      g_flight_max_ms = 20000 (symbols that the esp-motors build does not have), and the
+      banner strings "COMMIT GATE -- build is COMMIT-CAPABLE" are present.
+        /scratch2/loren/pin-clean-scratch/bench-image/flight_controller-t33-hover-1.5m-75f5393.elf
+        sha256 5cf73861b7300dda471a15a8530d8f3eb30b562537f9a85a55d7ca085da102e0, 1411360 bytes
+      Not flashed or run.
+
 Appendix: comparison scripts
 --- cmp-gen.py
 #!/usr/bin/env python3
