@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "fc_shared_math.h"
 #include "estimator_ekf.hpp"
 
 #define GRAVITY 9.81f
@@ -138,8 +139,10 @@ void EkfEstimator::update(const float accel[3], const float gyro[3],
 	 *     genuinely be translating, so run velocity predict-only (covariance grows -> the next
 	 *     valid flow sample is weighted more). We must NOT force zero here. */
 	if (flow_valid && ROSE_FLOW_FUSE) {   /* ROSE_FLOW_FUSE=0 -> skip flow, dead-reckon + on-ground ZUPT */
-		float vfx = R[0]*flow[0] + R[1]*flow[1];
-		float vfy = R[3]*flow[0] + R[4]*flow[1];
+		float vfw[2];
+		fc_flow_to_world(R, flow, kx.v, ky.v, kz.v, vfw);   /* includes the body-z term, see fc_shared_math.h */
+		float vfx = vfw[0];
+		float vfy = vfw[1];
 		/* Height-scale the measurement variance (v = flow*height -> noise variance ~ height^2), and
 		 * trust the noisier y axis less. This is the KF's proper smoothing knob (no separate LPF). */
 		float hs = 1.0f + (h_vert * h_vert) / (flow_href * flow_href);

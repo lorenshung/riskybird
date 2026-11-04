@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "fc_shared_math.h"
 #include "estimator_complementary.hpp"
 
 #define GRAVITY 9.81f
@@ -148,8 +149,10 @@ void ComplementaryEstimator::update(const float accel[3], const float gyro[3],
 	 * dropout the flow is stale, so keep the accel dead-reckoned velocity (predict-only)
 	 * rather than snapping to a stale measurement. */
 	if (flow_valid && ROSE_FLOW_FUSE) {   /* ROSE_FLOW_FUSE=0 -> skip flow, dead-reckon + on-ground ZUPT */
-		float vfx = R[0]*flow[0] + R[1]*flow[1];
-		float vfy = R[3]*flow[0] + R[4]*flow[1];
+		float vfw[2];
+		fc_flow_to_world(R, flow, vx, vy, vz, vfw);   /* includes the body-z term, see fc_shared_math.h */
+		float vfx = vfw[0];
+		float vfy = vfw[1];
 		vx = (1.0f - FLOW_GAIN_X)*vx + FLOW_GAIN_X*vfx;
 		vy = (1.0f - FLOW_GAIN_Y)*vy + FLOW_GAIN_Y*vfy;   /* y de-trusted (noisy PMW3901 left axis) */
 	} else if (tof_vert && h_vert < ZUPT_HEIGHT_M) {

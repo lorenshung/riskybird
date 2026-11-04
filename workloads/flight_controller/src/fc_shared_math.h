@@ -164,6 +164,30 @@ static inline void fc_flow_velocity(float ax, float ay, float height,
     velocity[0] = vx > 3.0f ? 3.0f : (vx < -3.0f ? -3.0f : vx);
     velocity[1] = vy > 3.0f ? 3.0f : (vy < -3.0f ? -3.0f : vy);
 }
+/* Flow body velocity -> world horizontal velocity, for the estimators' flow update.
+ *
+ * Flow measures the body x/y velocity (bx, by); it cannot see body z. The world horizontal velocity
+ * is R row 0/1 applied to (bx, by, bz), and the estimators used to drop the bz term, i.e. assumed the
+ * body-z velocity is 0. Under tilt it is not: flying level-in-the-world at speed v with tilt theta,
+ * bz ~ v*sin(theta) and the dropped term is ~v*sin^2(theta) (3% at 10 deg, 12% at 20 deg), in the same
+ * direction as the cos(tilt) error fc_flow_velocity used to have. bz is taken from the estimator's own
+ * world velocity (R^T v)_z; with -DFC_FLOW_WORLD_LEGACY=1 the term is dropped as before.
+ * R is row-major body->world. */
+#ifndef FC_FLOW_WORLD_LEGACY
+#define FC_FLOW_WORLD_LEGACY 0
+#endif
+static inline void fc_flow_to_world(const float R[9], const float flow[2],
+                                    float vwx, float vwy, float vwz, float out[2])
+{
+#if FC_FLOW_WORLD_LEGACY
+    (void)vwx; (void)vwy; (void)vwz;
+    const float bz = 0.0f;
+#else
+    const float bz = R[2]*vwx + R[5]*vwy + R[8]*vwz;   /* body-z velocity from the estimate */
+#endif
+    out[0] = R[0]*flow[0] + R[1]*flow[1] + R[2]*bz;
+    out[1] = R[3]*flow[0] + R[4]*flow[1] + R[5]*bz;
+}
 /* These helpers preserve main.cpp's timestamp sentinel and dwell semantics. */
 static inline bool fc_arm_dwell(bool ready, int64_t now_ms, int64_t hold_ms, int64_t *since)
 {
