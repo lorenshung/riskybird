@@ -1,0 +1,96 @@
+FireSim manager: use ~/firesim.pem only if it exists; accept absolute workload paths.
+
+Lets a workload JSON live outside deploy/workloads (RiskyBird keeps its
+FireSim workloads in hardware/firesim/deploy/workloads) and lets the manager
+run on a host without the AWS key. Generic; upstream candidate.
+
+diff --git a/deploy/firesim b/deploy/firesim
+index f4a5f5c4fd2d3f710b59bf458af5b38414236794..aea912be1706ebfad919080ec107e8efede9c546 100755
+--- a/deploy/firesim
++++ b/deploy/firesim
+@@ -463,7 +463,9 @@ def main(args: argparse.Namespace) -> None:
+     # Send SSH keepalives so long silent remote phases (e.g. Vivado synthesis)
+     # do not leave the manager blocked on a half-open connection.
+     env.keepalive = 30
+-    env.key_filename = os.path.expanduser("~/firesim.pem") #rh: okay so /firesim.pem does work for infrasetup, need to bump paramiko though to support rsa2
++    _pem = os.path.expanduser("~/firesim.pem")
++    if os.path.exists(_pem):
++        env.key_filename = _pem #rh: okay so /firesim.pem does work for infrasetup, need to bump paramiko though to support rsa2
+ 
+ 
+     rootLogger.info("FireSim Manager. Docs: https://docs.fires.im\nRunning: %s\n", str(args.task))
+diff --git a/deploy/runtools/workload.py b/deploy/runtools/workload.py
+index 954e16b0c595693089d603044c2e7d4eb55107b6..dde6a54db03c8b98db4c47716de2cababd033582 100644
+--- a/deploy/runtools/workload.py
++++ b/deploy/runtools/workload.py
+@@ -8,6 +8,13 @@ import os
+ from typing import List, Optional, Dict, Any, Tuple
+ 
+ 
++def resolve_under_workload_input_base(workload_input_base_dir: str, path: str) -> str:
++    """Prepend workload_input_base_dir unless path is already absolute."""
++    if os.path.isabs(path):
++        return path
++    return workload_input_base_dir + path
++
++
+ class JobConfig:
+     """A single job that runs on a simulation.
+     E.g. one spec benchmark, one of the risc-v tests, etc.
+@@ -57,9 +64,9 @@ class JobConfig:
+                 self.rootfs = None
+             else:
+                 # Explicit per-job rootfs
+-                self.rootfs = (
+-                    self.parent_workload.workload_input_base_dir
+-                    + singlejob_dict["rootfs"]
++                self.rootfs = resolve_under_workload_input_base(
++                    self.parent_workload.workload_input_base_dir,
++                    singlejob_dict["rootfs"],
+                 )
+         else:
+             # No explicit per-job rootfs, inherit from workload
+@@ -75,25 +82,30 @@ class JobConfig:
+                 self.rootfs = None
+             else:
+                 # Explicit rootfs path from workload
+-                self.rootfs = (
+-                    self.parent_workload.workload_input_base_dir
+-                    + self.parent_workload.common_rootfs
++                self.rootfs = resolve_under_workload_input_base(
++                    self.parent_workload.workload_input_base_dir,
++                    self.parent_workload.common_rootfs,
+                 )
+ 
+     def bootbinary_path(self) -> str:
+-        return self.parent_workload.workload_input_base_dir + self.bootbinary
++        return resolve_under_workload_input_base(
++            self.parent_workload.workload_input_base_dir, self.bootbinary
++        )
+ 
+     def get_siminputs(self) -> List[Tuple[str, str]]:
+         # remote filename for a siminput gets prefixed with the job's name
+-        return list(
+-            map(
+-                lambda x: (
+-                    self.parent_workload.workload_input_base_dir + "/" + x,
+-                    self.jobname + "-" + x,
+-                ),
+-                self.siminputs,
+-            )
+-        )
++        out: List[Tuple[str, str]] = []
++        for x in self.siminputs:
++            if os.path.isabs(x):
++                out.append((x, self.jobname + "-" + os.path.basename(x)))
++            else:
++                out.append(
++                    (
++                        self.parent_workload.workload_input_base_dir + "/" + x,
++                        self.jobname + "-" + x,
++                    )
++                )
++        return out
+ 
+     def rootfs_path(self) -> Optional[str]:
+         return self.rootfs

@@ -7,8 +7,9 @@
 #   TARGET  checkout to point PATH at, relative to this checkout,
 #           or "-" to leave PATH uninitialised and empty
 #
-# OWNER must be checked out; `apply` initialises a missing OWNER without its
-# own submodules (the redirects below are what replace them).
+# A row whose top-level backend is not checked out is skipped (that tier is
+# not installed). `apply` initialises a missing nested OWNER without its own
+# submodules (the redirects below are what replace them).
 
 backends/RoSE                   soc/sim/chipyard              backends/chipyard
 backends/RoSE/soc/sw/xpu-rt     hw/chipyard                   backends/chipyard

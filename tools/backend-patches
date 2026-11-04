@@ -94,11 +94,12 @@ def owner_of(path: Path) -> Path:
 
 
 def pinned(repo: Path) -> str:
+    """The commit the owner's index records for repo: HEAD's, or a staged bump."""
     owner = owner_of(repo)
-    entry = git(owner, "ls-tree", "HEAD", os.path.relpath(repo, owner))
-    if not entry:
+    entry = git(owner, "ls-files", "-s", "--", os.path.relpath(repo, owner))
+    if not entry.startswith("160000 "):
         raise SystemExit(f"{repo}: not a submodule of {owner}")
-    return entry.split()[2]
+    return entry.split()[1]
 
 
 def submodule_name(owner: Path, path: str) -> str:

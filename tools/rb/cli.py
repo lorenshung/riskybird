@@ -483,6 +483,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             f"{_probe([str(VIVADO_BIN / 'vivado'), '-version'], 'host')}"
         )
 
+    # The overlay links, patch queue and nested-submodule redirects are what
+    # turn the plain upstream backends into RiskyBird's. Reported, not gated:
+    # on the bench tier the backends they target are legitimately absent.
+    print("backend overlays (tools/backend-patches, tools/submodule-redirects)")
+    for tool in ("backend-patches", "submodule-redirects"):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / tool), "check"],
+            capture_output=True, text=True,
+        )
+        for line in (result.stdout + result.stderr).strip().splitlines():
+            print(f"  {line}")
+
     print("hardware contracts")
     for board in BOARDS.values():
         try:
@@ -554,6 +566,9 @@ def cmd_env(args: argparse.Namespace) -> int:
             )
             if status:
                 return status
+            # install_submodules.sh re-activates the redirected nested
+            # ModelBlaster; put the redirect back.
+            _backend_tool("submodule-redirects", "apply")
             installed_prefix = select_zephyr_prefix()
             if not installed_prefix.is_dir():
                 raise RbError(
@@ -566,11 +581,28 @@ def cmd_env(args: argparse.Namespace) -> int:
             print(f"Chipyard environment already exists: {CHIPYARD_PREFIX}")
             return 0
         require_chipyard("rb env setup chipyard")
+        # Saturn must already be redirected to backends/saturn when Chipyard's
+        # own setup initialises its submodules; that setup re-activates the
+        # redirected paths, so the redirects are applied again after it, and
+        # only then the overlay links and patch queue.
+        _backend_tool("submodule-redirects", "apply")
         print("Bootstrapping Chipyard's own lean, locked environment.", flush=True)
-        return subprocess.call(
+        status = subprocess.call(
             ["/bin/bash", "build-setup.sh", "--use-lean-conda"], cwd=CHIPYARD
         )
+        if status:
+            return status
+        _backend_tool("submodule-redirects", "apply")
+        _backend_tool("backend-patches", "apply")
+        return 0
     raise RbError(f"unsupported env action: {args.env_action}")
+
+
+def _backend_tool(tool: str, action: str) -> None:
+    """Run tools/submodule-redirects or tools/backend-patches, failing loudly."""
+    status = subprocess.call([sys.executable, str(ROOT / "tools" / tool), action])
+    if status:
+        raise RbError(f"tools/{tool} {action} failed (exit {status})")
 
 
 def chipyard_build(board: Board, target: str) -> None:

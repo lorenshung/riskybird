@@ -1,0 +1,25 @@
+FireSim: ignore manager scratch output; sourceme-manager.sh executable (644 -> 755).
+
+Generic; upstream candidate.
+
+diff --git a/.gitignore b/.gitignore
+index a5f18388c92c7f6491f6d4f36fed52709f97cc1d..59b8b241b7202655793c32cb81870a10b4a23965 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -15,4 +15,11 @@ scala-doc-env.sh
+ .metals
+ vivado*.log
+ vivado*.jou
+-__pycache__
+\ No newline at end of file
++__pycache__
++# FireSim manager scratch: build/run trees and the local env.sh variants.
++build-rundir/
++sim-rundir/
++env.sh.*
++
++# fireperf expects a local clone of brendangregg/FlameGraph here.
++utils/fireperf/FlameGraph/
+diff --git a/sourceme-manager.sh b/sourceme-manager.sh
+old mode 100644
+new mode 100755

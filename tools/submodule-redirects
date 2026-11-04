@@ -87,6 +87,12 @@ def submodule_name(owner: Path, path: str) -> str:
     raise SystemExit(f"{owner}: no submodule at {path} in .gitmodules")
 
 
+def tier_installed(owner_rel: str) -> bool:
+    """Whether the top-level backend that contains OWNER is checked out."""
+    top = Path(*Path(owner_rel).parts[:2])
+    return is_repo(ROOT / top)
+
+
 def ensure_owner(owner_rel: str) -> Path:
     """Initialise OWNER (non-recursively) from the nearest repo above it."""
     owner = ROOT / owner_rel
@@ -107,6 +113,9 @@ def link_text(full: Path, target: Path) -> str:
 
 def apply(force: bool) -> None:
     for owner_rel, path, target_rel in read_table():
+        if not tier_installed(owner_rel):
+            print(f"  skip {owner_rel}/{path} ({Path(*Path(owner_rel).parts[:2])} not checked out)")
+            continue
         owner = ensure_owner(owner_rel)
         full = owner / path
         name = submodule_name(owner, path)
@@ -161,16 +170,19 @@ def undo() -> None:
 
 def check() -> int:
     bad = 0
-    owners = set()
+    owners: dict[Path, list[str]] = {}
     for owner_rel, path, target_rel in read_table():
         owner = ROOT / owner_rel
         label = f"{owner_rel}/{path}"
         problems = []
+        if not tier_installed(owner_rel):
+            print(f"skip {label}  ({Path(*Path(owner_rel).parts[:2])} not checked out)")
+            continue
         if not is_repo(owner):
             print(f"FAIL {label}: owner not checked out")
             bad += 1
             continue
-        owners.add(owner)
+        owners.setdefault(owner, []).append(path)
         full = owner / path
         name = submodule_name(owner, path)
         pin = git(owner, "ls-tree", "HEAD", path).split()[2][:10]
@@ -197,11 +209,13 @@ def check() -> int:
         bad += bool(problems)
         print(f"{status} {label}  (pin {pin}) {where}"
               + (f"  [{'; '.join(problems)}]" if problems else ""))
-    for owner in sorted(owners):
-        dirty = git(owner, "status", "--porcelain", "--untracked-files=no")
+    # Only the redirected paths: an owner may legitimately carry other edits
+    # (tools/backend-patches applies its queue to the same working tree).
+    for owner, paths in sorted(owners.items()):
+        dirty = git(owner, "status", "--porcelain", "--untracked-files=no", "--", *paths)
         if dirty:
             bad += 1
-            print(f"FAIL {os.path.relpath(owner, ROOT)}: status not clean:\n{dirty}")
+            print(f"FAIL {os.path.relpath(owner, ROOT)}: redirected paths not clean:\n{dirty}")
     return 1 if bad else 0
 
 

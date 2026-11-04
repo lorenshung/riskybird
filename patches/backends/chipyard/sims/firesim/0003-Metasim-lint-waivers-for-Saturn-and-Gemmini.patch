@@ -1,0 +1,22 @@
+Verilator metasim: lint_off WIDTHEXPAND/UNSIGNED.
+
+Saturn and Gemmini RTL trips these warnings, which the metasim build treats as
+errors. Generic, though upstream may prefer narrower waivers.
+
+diff --git a/sim/midas/src/main/cc/rtlsim/ml-verilator-conf.vlt b/sim/midas/src/main/cc/rtlsim/ml-verilator-conf.vlt
+index 1e240378429713ef2ae7c2e142f5623570936717..9a858b026e389f9e62e6d4de3cf56b60a6610517 100644
+--- a/sim/midas/src/main/cc/rtlsim/ml-verilator-conf.vlt
++++ b/sim/midas/src/main/cc/rtlsim/ml-verilator-conf.vlt
+@@ -3,3 +3,12 @@
+ // driven by separate ports.
+ `verilator_config
+ lint_off -rule MULTIDRIVEN
++
++// Metasimulating the RiskyBird Saturn+Gemmini target trips three lint warnings
++// in generated RTL which -Wall promotes to fatal errors, so the build cannot
++// even start. Neither is a real defect: a DIV whose RHS constant is narrower
++// than the expression, and two comparisons that are constant under unsigned
++// arithmetic. Suppressed by rule rather than with -Wno-fatal so genuine
++// warnings still fail the build.
++lint_off -rule WIDTHEXPAND
++lint_off -rule UNSIGNED
