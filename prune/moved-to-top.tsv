@@ -156,7 +156,7 @@ zephyr-chipyard-sw	35bf7c9	samples/rvv_vstart_probe/boards/chipyard_riscv64.conf
 zephyr-chipyard-sw	35bf7c9	samples/rvv_vstart_probe/boards/chipyard_riscv64.overlay	workloads/rvv_vstart_probe/boards/chipyard_riscv64.overlay	ca932eda5f5f2d4ab46bac5bce0e88f2ae45ec1b
 zephyr-chipyard-sw	35bf7c9	samples/rvv_vstart_probe/prj.conf	workloads/rvv_vstart_probe/prj.conf	bd32de1dafe8d0fcda6f8396fce52958963c4ec1
 zephyr-chipyard-sw	35bf7c9	samples/rvv_vstart_probe/src/main.c	workloads/rvv_vstart_probe/src/main.c	b8d26925b32b4aeedcd352eba953b72ba42f3e52
-zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/CMakeLists.txt	workloads/fc_dronet/CMakeLists.txt	af89a82011c38ce73977d4069e251450bc5881b4
+zephyr-chipyard-sw	b81ca7fe	samples/rose_fc_dronet/CMakeLists.txt	workloads/fc_dronet/CMakeLists.txt	746fdc0c1826ef7094a1cbdc098e9e9033789957
 zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/Kconfig	workloads/fc_dronet/Kconfig	731fb6b6155d85af0ca8299c229b0a85d3bf8249
 zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/boards/chipyard_riscv64.conf	workloads/fc_dronet/boards/chipyard_riscv64.conf	b27cc340a01c1987b9a16ebceeefe80b5c0f5f56
 zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/boards/chipyard_riscv64.overlay	workloads/fc_dronet/boards/chipyard_riscv64.overlay	fd49d08cbd83fd458cae890df38ce988476b2886
@@ -169,7 +169,7 @@ zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/patches/zephyr_v_strong_drain.
 zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/patches/zephyr_v_vstart_robust_clear.patch	workloads/fc_dronet/patches/zephyr_v_vstart_robust_clear.patch	0315f5908a0d65dbe8bbb59216d0edd35963ced7
 zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/patches/zephyr_v_wildthread_guard.patch	workloads/fc_dronet/patches/zephyr_v_wildthread_guard.patch	343b8342c8feafdd0193af8b8c1ced6143358109
 zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/prj.conf	workloads/fc_dronet/prj.conf	a857d4ae409bf6acb1a2f6104ce281706d9241dd
-zephyr-chipyard-sw	35bf7c9	samples/rose_fc_dronet/src/dronet_thread.c	workloads/fc_dronet/src/dronet_thread.c	4cc6f26902ec3b52160b94842355ea5db105b6f7
+zephyr-chipyard-sw	b81ca7fe	samples/rose_fc_dronet/src/dronet_thread.c	workloads/fc_dronet/src/dronet_thread.c	43e126c163d99cfeb79b5ade756efa02d5b273a9
 zephyr-chipyard-sw	35bf7c9	scripts/build_fc_dronet.sh	workloads/fc_dronet/scripts/build_fc_dronet.sh	ac48af1a1a1c8ef3b78a3e3af245212f6aa7de3e
 zephyr-chipyard-sw	35bf7c9	scripts/gen_dronet_model.sh	workloads/fc_dronet/scripts/gen_dronet_model.sh	690c9e69472ac3721f69d0e2a62e9c241d5281eb
 zephyr-chipyard-sw	35bf7c9	scripts/run_fc_dronet.sh	workloads/fc_dronet/scripts/run_fc_dronet.sh	8a1638c1e919f5918764f37c28e6ed10cfc12687
@@ -315,3 +315,4 @@ zephyr-chipyard-sw	40079130	gemmini_ubench/prj.conf	workloads/gemmini_ubench/prj
 zephyr-chipyard-sw	40079130	gemmini_ubench/run.sh	workloads/gemmini_ubench/run.sh	048d5ba84c835a693fe799404699c5acf4174bae
 zephyr-chipyard-sw	40079130	gemmini_ubench/src/bench.c	workloads/gemmini_ubench/src/bench.c	1347b8e1876089204552940fa34475ff03f42028
 zephyr-chipyard-sw	40079130	gemmini_ubench/src/main.c	workloads/gemmini_ubench/src/main.c	6c122bf1b993612e24c9de6f962c96f7d6583ca1
+zephyr-chipyard-sw	b81ca7fe	tests/test_dronet_nav.py	tests/test_dronet_nav.py	e825830b93814f5af76281539919f7b68a3e39b2
