@@ -1,6 +1,6 @@
 """The accelerator-shell contracts: the post-link ISA scan, the published
-DroNet codegen for the Gemmini+Saturn shells, and where `rb modelblaster
-generate` writes.
+DroNet codegen for the Gemmini+Saturn shells, where `rb modelblaster generate`
+writes, and the shells' Gemmini header layout.
 
 Pure host tests. Nothing here needs Chipyard, a toolchain or a board.
 """
@@ -236,6 +236,26 @@ class CodegenRootTests(unittest.TestCase):
         with self.assertRaises(mb.ModelBlasterError):
             mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
         self.assertEqual((self.root / "examples/dronet/run.sh").read_text(), "mine\n")
+
+
+class PerConfigHeaderTests(unittest.TestCase):
+    """The shells' Gemmini headers use ModelBlaster's per_config/<name>/ layout.
+
+    gemmini.h includes "include/gemmini_params.h" and the kernels include
+    <gemmini_params.h>; with -isystem per_config/<name> first, both must find
+    this shell's header. A directory with only the second spelling sends
+    gemmini.h to ModelBlaster's default16x16 header without a word.
+    """
+
+    def test_both_spellings_name_the_same_header(self) -> None:
+        base = ROOT / "hardware/modelblaster/cores/gemmini/include/per_config"
+        configs = sorted(p for p in base.iterdir() if p.is_dir())
+        self.assertTrue(configs)
+        for config in configs:
+            with self.subTest(config=config.name):
+                header = config / "gemmini_params.h"
+                self.assertTrue(header.is_file())
+                self.assertTrue((config / "include" / "gemmini_params.h").samefile(header))
 
 
 if __name__ == "__main__":

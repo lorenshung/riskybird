@@ -33,9 +33,9 @@ source "${MAIN}/scripts/set_envvars_sdk.sh"
 export PATH="/usr/bin:${PATH}"   # avoid stale Vitis cmake
 
 KCFLAGS="-march=rv64imac_zve64x;-mabi=lp64"
-# The shell's Gemmini parameters, force-included (see GEMMINI_PARAMS_DIR in ../CMakeLists.txt).
+# The shell's Gemmini parameters, first on the include path (see GEMMINI_PARAMS_DIR in ../CMakeLists.txt).
 GPARAMS="${GEMMINI_PARAMS_DIR:-${RB_ROOT}/hardware/modelblaster/cores/gemmini/include/per_config/RocketArty200TDroneGemminiSaturnFp16At35Config}"
-KCFLAGS="${KCFLAGS};-include;${GPARAMS}/gemmini_params.h;-isystem${GPARAMS}"
+KCFLAGS="${KCFLAGS};-isystem${GPARAMS}"
 KCFLAGS="${KCFLAGS};-isystem${MB_REPO}/cores/gemmini/include"
 KCFLAGS="${KCFLAGS};-isystem${MB_REPO}/cores/gemmini"
 KCFLAGS="${KCFLAGS};-DGEMMINI_ROCC;-DBAREMETAL"

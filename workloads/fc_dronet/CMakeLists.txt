@@ -138,18 +138,21 @@ zephyr_link_libraries(-Wl,--no-relax)
 
 # The generated DroNet kernels.c is the ONLY V (Saturn RVV) translation unit:
 # give it the Gemmini+RVV march + include/-D set. Everything else builds no-V.
-# The Gemmini parameters of the shell this runs on. ModelBlaster's own fallback
-# header (cores/gemmini/include/gemmini_params.h) used to be a symlink to this
-# config and now points at default16x16, and gemmini.h includes it by a quoted
-# path that no -isystem order overrides, so the header is force-included: its
-# include guard then makes every later include of either path a no-op.
+# GEMMINI_PARAMS_DIR is the shell's per_config directory, ahead of ModelBlaster's
+# own include paths. It serves both spellings of the header the way ModelBlaster's
+# per_config/ layout does: gemmini.h's "include/gemmini_params.h" (from
+# include/gemmini_params.h there) and the kernels' <gemmini_params.h>. Without
+# it, gemmini.h falls through to ModelBlaster's default16x16 header.
 if(NOT DEFINED GEMMINI_PARAMS_DIR)
   set(GEMMINI_PARAMS_DIR ${RB_ROOT}/hardware/modelblaster/cores/gemmini/include/per_config/RocketArty200TDroneGemminiSaturnFp16At35Config)
 endif()
 if(NOT DEFINED MODELBLASTER_KERNEL_CFLAGS OR "${MODELBLASTER_KERNEL_CFLAGS}" STREQUAL "")
+  if(NOT EXISTS "${GEMMINI_PARAMS_DIR}/include/gemmini_params.h")
+    message(FATAL_ERROR "GEMMINI_PARAMS_DIR='${GEMMINI_PARAMS_DIR}' has no include/gemmini_params.h; "
+                        "gemmini.h would silently take ModelBlaster's default16x16 header.")
+  endif()
   set(MODELBLASTER_KERNEL_CFLAGS
     "-march=rv64imac_zve64x;-mabi=lp64;\
--include;${GEMMINI_PARAMS_DIR}/gemmini_params.h;\
 -isystem${GEMMINI_PARAMS_DIR};\
 -isystem${MB_REPO}/cores/gemmini/include;\
 -isystem${MB_REPO}/cores/gemmini;\
