@@ -581,20 +581,30 @@ def cmd_env(args: argparse.Namespace) -> int:
             print(f"Chipyard environment already exists: {CHIPYARD_PREFIX}")
             return 0
         require_chipyard("rb env setup chipyard")
-        # Saturn must already be redirected to backends/saturn when Chipyard's
-        # own setup initialises its submodules; that setup re-activates the
-        # redirected paths, so the redirects are applied again after it, and
-        # only then the overlay links and patch queue.
+        # Chipyard's submodules are initialised here rather than by
+        # build-setup.sh, whose step 2 (--full) must not run: its exit trap
+        # clears the update=none that keeps generators/saturn redirected to
+        # backends/saturn, and it then updates generators/saturn recursively,
+        # which checks Saturn's upstream pin out THROUGH the redirect symlink
+        # (seen: backends/saturn moved to 8c5115c). Without --saturn the script
+        # leaves that path alone. Gemmini and Tacit are the optional
+        # generators RiskyBird's configs use. Then the redirects are applied
+        # again (the script re-activates the paths) and the overlay links and
+        # patch queue go in before build-setup precompiles the Scala.
         _backend_tool("submodule-redirects", "apply")
-        print("Bootstrapping Chipyard's own lean, locked environment.", flush=True)
         status = subprocess.call(
-            ["/bin/bash", "build-setup.sh", "--use-lean-conda"], cwd=CHIPYARD
+            ["/bin/bash", "scripts/init-submodules-no-riscv-tools.sh", "--gemmini", "--tacit"],
+            cwd=CHIPYARD,
         )
         if status:
             return status
         _backend_tool("submodule-redirects", "apply")
         _backend_tool("backend-patches", "apply")
-        return 0
+        print("Bootstrapping Chipyard's own lean, locked environment.", flush=True)
+        return subprocess.call(
+            ["/bin/bash", "build-setup.sh", "--use-lean-conda", "--skip-submodules"],
+            cwd=CHIPYARD,
+        )
     raise RbError(f"unsupported env action: {args.env_action}")
 
 

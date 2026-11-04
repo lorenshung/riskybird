@@ -34,13 +34,14 @@ cd "${ZCS:-$RB_ROOT/backends/zephyr-chipyard-sw}"
 OUT="${OUT:-$RB_ROOT/build/flight/esp32c6}"
 B="esp32c6_devkitc/esp32c6/hpcore"
 A="$RB_ROOT/workloads/flight_controller"
-# The board files the sample used to carry in boards/ (which west picked up by name) live in
-# hardware/zephyr/targets/esp32c6/workloads/ now, so name them explicitly. This overlay is
-# complete on its own: it is not combined with targets/esp32c6/target.overlay.
-ESP="$RB_ROOT/hardware/zephyr/targets/esp32c6/workloads"
+# The sample's own ESP32-C6 board files, beside this script: west only picks up boards/ next
+# to the application, so name them explicitly. They are complete on their own and are not
+# combined with rb's hardware/zephyr/targets/esp32c6 target files (rb does not build the
+# flight controller for the ESP32-C6).
+ESP="$RB_ROOT/tools/flight/esp32c6/boards"
 # TINYMPC and DTS_ROOT: the app no longer sits beside samples/drone_control, and the
 # riskybird,pwm-motors binding is in hardware/zephyr/dts/bindings.
-BOARD_ARGS="-DDTC_OVERLAY_FILE=$ESP/flight_controller.overlay -DEXTRA_CONF_FILE=$ESP/flight_controller.conf
+BOARD_ARGS="-DDTC_OVERLAY_FILE=$ESP/esp32c6_devkitc_hpcore.overlay -DEXTRA_CONF_FILE=$ESP/esp32c6_devkitc_hpcore.conf
   -DTINYMPC=$PWD/samples/drone_control/tinympc -DDTS_ROOT=$RB_ROOT/hardware/zephyr"
 # common to the flight-controller presets (dump is minimal and sets its own):
 C="-DROSE_USE_PID=1 -DROSE_USE_EKF=1 -DROSE_FLOW=1 -DROSE_BUMPER=1 -DROSE_BUMPER_READDRESS_ONLY=1 -DROSE_ACTUATE_TIMEOUT_MS=0"

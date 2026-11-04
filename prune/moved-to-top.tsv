@@ -219,8 +219,8 @@ zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/src/side_tof.c	workloa
 zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/src/side_tof.h	workloads/flight_controller/src/side_tof.h	9db30c0ed991c5d5b885873c32bc26699cb51cec
 zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/src/telem_uart.c	workloads/flight_controller/src/telem_uart.c	bd4f15a0a32bc2e311e9adfbb8a2b334f88d5aea
 zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/src/telem_uart.h	workloads/flight_controller/src/telem_uart.h	b3c637f0c453a8de2c4c7d71df5ee48f8416b699
-zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/boards/esp32c6_devkitc_hpcore.conf	hardware/zephyr/targets/esp32c6/workloads/flight_controller.conf	601f7cf79464f11b83d12384d4d0a3e5a0e00f15
-zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/boards/esp32c6_devkitc_hpcore.overlay	hardware/zephyr/targets/esp32c6/workloads/flight_controller.overlay	78f9023f2527ed1faedc36743f1eafd9224c1c50
+zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/boards/esp32c6_devkitc_hpcore.conf	tools/flight/esp32c6/boards/esp32c6_devkitc_hpcore.conf	601f7cf79464f11b83d12384d4d0a3e5a0e00f15
+zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/boards/esp32c6_devkitc_hpcore.overlay	tools/flight/esp32c6/boards/esp32c6_devkitc_hpcore.overlay	78f9023f2527ed1faedc36743f1eafd9224c1c50
 zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/dts/bindings/riskybird,pwm-motors.yaml	hardware/zephyr/dts/bindings/riskybird,pwm-motors.yaml	f74a66b21aef4769618117a11469a3ea6e6d3709
 zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/tools/groundstation/README.md	tools/bench/groundstation/README.md	29b6f9258b52ea5107f9131368d2d2f7c24f0cd4
 zephyr-chipyard-sw	35bf7c9	samples/rose_flight_controller/tools/groundstation/mobile/DESIGN.md	tools/bench/groundstation/mobile/DESIGN.md	4ce8fc04bf7740ff03dc09e2f0418981aa16a977
