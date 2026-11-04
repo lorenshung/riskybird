@@ -121,7 +121,7 @@ class HierarchicalNotionStore(NotionStore):
             return self._image_body(acknowledged, note_id)
 
         def attach(parent):
-            for block in self._children(parent):
+            for block in self._child_blocks(parent):
                 kind = block["type"]
                 if kind == "image" and block[kind]["type"] == "external":
                     target = block[kind]["external"]["url"]
@@ -159,7 +159,18 @@ class HierarchicalNotionStore(NotionStore):
             if self._archived(ancestor):
                 raise NotFound("A parent folder is archived.")
 
-    def _children(self, parent):
+    def _children(self, parent_id):
+        # Upstream's (id, title) listing, used when a new note or directory is
+        # created: skip the asset gallery, which carries no path metadata.
+        excluded = set(self.index.get("asset_pages", []))
+        for page_id, title in super()._children(parent_id):
+            if page_id not in excluded:
+                yield page_id, title
+
+    def _child_blocks(self, parent):
+        # Raw blocks. Not named _children: upstream NotionStore._children
+        # yields (id, title) pairs for its own _entries, which creating a new
+        # note goes through ("too many values to unpack" when shadowed).
         cursor = None
         seen = set()
         while True:
@@ -187,7 +198,7 @@ class HierarchicalNotionStore(NotionStore):
             if parent in visited:
                 raise ProviderError("Repeated Notion page in notebook hierarchy.")
             visited.add(parent)
-            for block in self._children(parent):
+            for block in self._child_blocks(parent):
                 if block["type"] != "child_page" or self._archived(block):
                     continue
                 note_id = self._id(block["id"])
