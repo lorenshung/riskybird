@@ -14,6 +14,7 @@
  */
 #include "fp16_fc_kernels.h"
 #include "fp16_fc_vec.h"
+#include "fc_shared_math.h"   /* fc_pid_attitude */
 #include <math.h>
 #include <stdint.h>
 
@@ -177,11 +178,19 @@ static inline float clampf(float x,float lo,float hi){ return x<lo?lo:(x>hi?hi:x
 
 void kfc_control(kfc_state *s, const float state[KEST_NSTATES],
                  const float setpoint[KEST_NSTATES], float u_out[KCTRL_NACTIONS], float dt){
-    const float estRoll=state[3],estPitch=state[4],estYaw=state[5];
+    float att[3], yaw_tgt;   /* Gibbs -> angles, as the float PID (fc_pid_attitude) */
+    fc_pid_attitude(state, setpoint, att, &yaw_tgt);
+#if !PID_GIBBS_LEGACY && !PID_TILT_TIGHT
+    /* Default = flown-equivalent. This kernel's constants (VTM, SLEW, the attitude taus inside
+     * vc_attitude) are tuned on tan(theta/2) ~ theta/2, so it is fed honest half-angles, which matches
+     * the flown behaviour up to the same near-cap nonlinearity as the float PID's PID_ANGLE. */
+    att[0] *= 0.5f; att[1] *= 0.5f; att[2] *= 0.5f; yaw_tgt *= 0.5f;
+#endif
+    const float estRoll=att[0],estPitch=att[1],estYaw=att[2];
     const float estVel_1=state[6],estVel_2=state[7],estVel_3=state[8];
     const float gyroX=state[9],gyroY=state[10],gyroZ=state[11];
     const float estHeight=state[2];
-    const float desHeight=setpoint[2]; float desVel_1=setpoint[6],desVel_2=setpoint[7]; const float yaw_tgt=setpoint[5];
+    const float desHeight=setpoint[2]; float desVel_1=setpoint[6],desVel_2=setpoint[7];
     int grounded=(estHeight<AGND);
 
     /* altitude integrator: int Q29 (fp16 increment) */

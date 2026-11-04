@@ -14,6 +14,31 @@
  *   original firmware (and TinyMPC here) we regulate horizontal VELOCITY to the setpoint.
  */
 #include "controller_pid.hpp"
+#include "fc_shared_math.h"
+
+/* Units. The loops below work in honest radians (fc_pid_attitude converts the Gibbs state). Every
+ * build that has flown fed the Gibbs parameters tan(theta/2) ~ theta/2 straight in, and its constants
+ * were tuned in those units. So by default the knobs keep their FLOWN values and meanings -- a preset
+ * passing -DVEL_TILT_MAX=0.26 or -DPITCH_TRIM_RAD=0.045 gets exactly the bank it got in flight -- and
+ * are converted here:
+ *   PID_ANGLE(x)      a flown command/limit/trim x (Gibbs units) -> the true angle 2*atan(x) (rad)
+ *   PID_FLOWN_SCALE   2: the angle-domain factor on the velocity->bank gain, the tilt slew rate and
+ *                     the attitude/yaw time constants, so loop gains match what flew.
+ * -DPID_TILT_TIGHT=1 reads the same numbers as radians instead (half the caps and trims, 2x attitude
+ * P, half the velocity gain); -DPID_GIBBS_LEGACY=1 is the raw Gibbs controller. See fc_shared_math.h. */
+#if PID_GIBBS_LEGACY || PID_TILT_TIGHT
+#define PID_FLOWN_SCALE 1.0f
+#define PID_ANGLE(x) (x)
+#else
+#define PID_FLOWN_SCALE 2.0f
+#define PID_ANGLE(x) (2.0f * atanf(x))
+#endif
+/* Thrust tilt compensation 1/(cos roll cos pitch). Exact in angles; the flown code took cos of the
+ * Gibbs parameters (~half the angle), which under-compensates by ~1.5% at 20 deg. -DPID_THRUST_COMP_FLOWN=1
+ * reproduces that, for checking the conversion against the flown behaviour. */
+#ifndef PID_THRUST_COMP_FLOWN
+#define PID_THRUST_COMP_FLOWN 0
+#endif
 
 #include <math.h>
 #include <stdint.h>
@@ -51,7 +76,8 @@ static const float dampingRatio_height = 0.7f;
 #define KI_VEL      0.8f          /* velocity integral gain (m/s^2 per (m/s)*s) */
 #endif
 #ifndef VEL_INT_MAX
-#define VEL_INT_MAX 2.0f          /* anti-windup clamp: max |vel integral| accel (m/s^2 ~ 12 deg bank) */
+#define VEL_INT_MAX 2.0f          /* anti-windup clamp: max |vel integral| accel (m/s^2); in the flown
+                                     * units that is a ~23 deg true bank (2*atan(2.0/g)), see PID_ANGLE */
 #endif
 
 /* horizontal velocity loop. Gain = 1/VEL_TC: smaller VEL_TC -> stronger velocity correction (bigger
@@ -66,7 +92,8 @@ static const float timeConst_horizVel = VEL_TC;
  * commanded ~44 deg), which the attitude loop chases -> violent thrash. Cap it so the velocity loop
  * can never ask for more than a sane bank; residual authority is bounded, oscillation can't build. */
 #ifndef VEL_TILT_MAX
-#define VEL_TILT_MAX 0.26f   /* ~15 deg */
+#define VEL_TILT_MAX 0.26f   /* flown units (Gibbs): a TRUE cap of 2*atan(0.26) = 29.2 deg per axis
+                              * (the old "~15 deg" was wrong); PID_TILT_TIGHT reads it as 14.9 deg */
 #endif
 /* Slew-rate limit on the velocity-loop tilt command (rad/s). Caps how FAST the loop can change the
  * commanded bank, which caps the body roll/pitch RATE it induces -- and body rate is exactly what
@@ -74,16 +101,16 @@ static const float timeConst_horizVel = VEL_TC;
  * "Gentler corrections" in the literal rate sense: a vy spike now ramps the bank instead of snapping
  * it, so the drone never rotates fast enough to corrupt its own flow. 0 or large = no slew limit. */
 #ifndef TILT_SLEW_RADPS
-#define TILT_SLEW_RADPS 1.0f
+#define TILT_SLEW_RADPS 1.0f   /* flown units: ~2.0 rad/s of true commanded bank (PID_FLOWN_SCALE) */
 #endif
 
 /* attitude (angle) loop -- larger tau = softer/slower (override via -DTAU_ROLL=<s>) */
 #ifndef TAU_ROLL
-#define TAU_ROLL 0.10f
+#define TAU_ROLL 0.10f    /* flown units: ~0.20 s in true angle (PID_FLOWN_SCALE) */
 #endif
 static const float tau_roll           = TAU_ROLL;
 static const float tau_pitch          = TAU_ROLL;   /* = tau_roll */
-static const float tau_yaw            = 0.25f;
+static const float tau_yaw            = 0.25f;   /* flown units: ~0.50 s in true angle */
 
 /* body-rate (inner) loop -- larger tau = softer, less oscillation (override via -DTAU_ROLLRATE=<s>) */
 #ifndef TAU_ROLLRATE
@@ -184,7 +211,9 @@ static float forceToVoltage(float forceNewtons)
  * the controller CANNOT observe: with no optical flow there is no horizontal-velocity feedback, so a
  * small attitude/thrust bias makes the drone hover tilted and drift at a fixed rate. +ROLL_TRIM_RAD
  * banks right (-y) to cancel a LEFT (+y) drift; +PITCH_TRIM_RAD noses forward (+x). Flip the sign if
- * the drift grows. Tune per airframe via -DROLL_TRIM_RAD=<rad>. */
+ * the drift grows. Tune per airframe via -DROLL_TRIM_RAD=<rad>. FLOWN units (Gibbs): a trim t banks the
+ * vehicle by 2*atan(t) true radians (PID_ANGLE), so flight-logs T23+'s PITCH_TRIM_RAD 0.045 is 5.2 deg,
+ * as it was in flight. Under PID_TILT_TIGHT it is read as radians (2.6 deg). */
 #ifndef ROLL_TRIM_RAD
 #define ROLL_TRIM_RAD 0.0f
 #endif
@@ -282,10 +311,13 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 {
 	/* dt now matters: the altitude loop carries an integral term (below). */
 
-	/* unpack state (our layout) */
-	const float estRoll   = state[3];
-	const float estPitch  = state[4];
-	const float estYaw    = state[5];
+	/* unpack state (our layout). state[3..5] is the Gibbs attitude tan(theta/2); the loops below are
+	 * written in angles, so convert (fc_pid_attitude, which also explains what that changed). */
+	float att[3], yaw_tgt;
+	fc_pid_attitude(state, setpoint, att, &yaw_tgt);
+	const float estRoll   = att[0];
+	const float estPitch  = att[1];
+	const float estYaw    = att[2];
 	const float estVel_1  = state[6];   /* vx */
 	const float estVel_2  = state[7];   /* vy */
 	const float estVel_3  = state[8];   /* vz */
@@ -299,7 +331,6 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 	const float desHeight = setpoint[2];
 	float desVel_1        = setpoint[6];
 	float desVel_2        = setpoint[7];
-	const float yaw_tgt   = setpoint[5];
 
 	/* Wall repulsion: bias the horizontal-velocity setpoint away from any close wall. Body frame
 	 * is FLU (+x fwd, +y left): a front (+x) wall pushes -x, back (-x) pushes +x; a left (+y) wall
@@ -354,7 +385,11 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 			      - natFreq_height * natFreq_height * (estHeight - desHeight)
 			      + alt_int;
 	const float desNormalizedAcceleration =
+#if PID_THRUST_COMP_FLOWN && !PID_GIBBS_LEGACY
+		(gravity + desAcc3) / (cosf(tanf(0.5f * estRoll)) * cosf(tanf(0.5f * estPitch)));
+#else
 		(gravity + desAcc3) / (cosf(estRoll) * cosf(estPitch));
+#endif
 
 	/* (2) horizontal velocity loop -> desired accelerations -> desired tilt (ROSE_VEL_LOOP=0 holds
 	 * LEVEL instead: no velocity/position hold, so it can't chase a bad dead-reckoned velocity). */
@@ -373,15 +408,16 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 	}
 	const float desAcc1 = (1.0f / timeConst_horizVel) * verr1 + vel_int_1;
 	const float desAcc2 = (1.0f / timeConst_horizVel) * verr2 + vel_int_2;
-	float desRoll  = -desAcc2 / gravity;
-	float desPitch =  desAcc1 / gravity;
+	float desRoll  = -PID_FLOWN_SCALE * desAcc2 / gravity;   /* true bank (rad) */
+	float desPitch =  PID_FLOWN_SCALE * desAcc1 / gravity;
 	/* Cap the commanded bank so a velocity spike can't demand a violent tilt (see VEL_TILT_MAX). */
-	if (desRoll  >  VEL_TILT_MAX) { desRoll  =  VEL_TILT_MAX; } else if (desRoll  < -VEL_TILT_MAX) { desRoll  = -VEL_TILT_MAX; }
-	if (desPitch >  VEL_TILT_MAX) { desPitch =  VEL_TILT_MAX; } else if (desPitch < -VEL_TILT_MAX) { desPitch = -VEL_TILT_MAX; }
+	const float tilt_cap = PID_ANGLE(VEL_TILT_MAX);
+	if (desRoll  >  tilt_cap) { desRoll  =  tilt_cap; } else if (desRoll  < -tilt_cap) { desRoll  = -tilt_cap; }
+	if (desPitch >  tilt_cap) { desPitch =  tilt_cap; } else if (desPitch < -tilt_cap) { desPitch = -tilt_cap; }
 	/* Slew-limit the tilt command: cap its rate of change so the induced body rate stays low (keeps
 	 * rotation from corrupting the flow -> breaks the roll<->flow oscillation). See TILT_SLEW_RADPS. */
 	if (TILT_SLEW_RADPS > 0.0f) {
-		const float dmax = TILT_SLEW_RADPS * dt;
+		const float dmax = PID_FLOWN_SCALE * TILT_SLEW_RADPS * dt;
 		if (estHeight < ALT_INT_GROUND_M) { desRoll_prev = 0.0f; desPitch_prev = 0.0f; }  /* reset on ground */
 		if (desRoll  > desRoll_prev  + dmax) { desRoll  = desRoll_prev  + dmax; }
 		else if (desRoll  < desRoll_prev  - dmax) { desRoll  = desRoll_prev  - dmax; }
@@ -396,11 +432,11 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 #endif
 
 	/* (3) attitude loop -> desired body rates (+ static trim to cancel unobservable hover drift) */
-	const float roll_tgt  = desRoll  + ROLL_TRIM_RAD;
-	const float pitch_tgt = desPitch + PITCH_TRIM_RAD;
-	const float rollRate_tgt  = (-1.0f / tau_roll)  * (estRoll  - roll_tgt);
-	const float pitchRate_tgt = (-1.0f / tau_pitch) * (estPitch - pitch_tgt);
-	const float yawRate_tgt   = (-1.0f / tau_yaw)   * (estYaw   - yaw_tgt);
+	const float roll_tgt  = desRoll  + PID_ANGLE(ROLL_TRIM_RAD);
+	const float pitch_tgt = desPitch + PID_ANGLE(PITCH_TRIM_RAD);
+	const float rollRate_tgt  = (-1.0f / (PID_FLOWN_SCALE * tau_roll))  * (estRoll  - roll_tgt);
+	const float pitchRate_tgt = (-1.0f / (PID_FLOWN_SCALE * tau_pitch)) * (estPitch - pitch_tgt);
+	const float yawRate_tgt   = (-1.0f / (PID_FLOWN_SCALE * tau_yaw))   * (estYaw   - yaw_tgt);
 
 	/* (4) body-rate loop -> angular-acceleration commands */
 	const float rollRate_cmd  = (-1.0f / tau_rollRate)  * (gyroX - rollRate_tgt);

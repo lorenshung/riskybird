@@ -35,7 +35,36 @@
  * node. The ESP flies with ROSE_FLOW=1 and no `flow` alias at all, so guarding this file on that
  * alias would silently disable optical flow on the configuration that actually flew.
  */
-#if DT_NODE_EXISTS(DT_ALIAS(flow_spi))
+/*
+ * RoSE co-sim transport (spike_riscv64 + ROSE_FLOW=1). There is no SPI bus in the co-sim, so the
+ * motion burst comes from the RoSE bridge instead: the env models the PMW3901 itself
+ * (riskybird-sim riskybird_sim/sensors/pmw3901.py) and serves its burst registers on command
+ * ROSE_FLOW_BURST_CMD. Everything from motionBurst_t on -- the count scaling, the low-pass, the
+ * SQUAL gate, the staleness window, and main.cpp's gyro compensation and fc_flow_velocity -- is the
+ * code the drone runs. Only the bytes' origin differs.
+ *
+ * The env cannot know when the firmware reads, so it serves the counts as RUNNING TOTALS and the
+ * read below differences them: the delta since this read's predecessor, which is exactly the
+ * sensor's accumulate-and-clear-on-read register behaviour. Words (float32): cumulative dX,
+ * cumulative dY, SQUAL, Shutter_Upper, spare.
+ *
+ * The request is issued with the IMU's (flow_rose_request) and collected in the same grant
+ * (flow_rose_collect), on reqrsp channel ROSE_FLOW_BURST_CH, BEFORE the down-ToF request goes out
+ * on that channel, so the two responses can never interleave. No thread.
+ */
+#if DT_HAS_COMPAT_STATUS_OKAY(ucbbar_roseadapter) && !DT_NODE_EXISTS(DT_ALIAS(flow_spi))
+#define FLOW_ROSE       1
+#define HAVE_FLOW_HW    1
+#include <rose/rose_proto.h>
+#include <string.h>
+#ifndef ROSE_FLOW_BURST_CMD
+#define ROSE_FLOW_BURST_CMD 0x16u
+#endif
+#ifndef ROSE_FLOW_BURST_CH
+#define ROSE_FLOW_BURST_CH 1u
+#endif
+#define ROSE_FLOW_BURST_WORDS 5
+#elif DT_NODE_EXISTS(DT_ALIAS(flow_spi))
 #define FLOW_SPI_NODE   DT_ALIAS(flow_spi)
 #define HAVE_FLOW_HW    1
 #elif DT_NODE_EXISTS(DT_NODELABEL(spi2))
@@ -43,6 +72,9 @@
 #define HAVE_FLOW_HW    1
 #else
 #define HAVE_FLOW_HW    0
+#endif
+#ifndef FLOW_ROSE
+#define FLOW_ROSE 0
 #endif
 
 #if !HAVE_FLOW_HW
@@ -60,6 +92,14 @@ void flow_get(float *ang_x, float *ang_y, int *squal, bool *valid)
 	if (squal) { *squal = 0; }
 	if (valid) { *valid = false; }
 }
+
+int64_t flow_sample_ms(void)
+{
+	return INT64_MIN / 2;
+}
+
+void flow_rose_request(void) { }
+void flow_rose_collect(void) { }
 
 #else
 
@@ -120,6 +160,7 @@ void flow_get(float *ang_x, float *ang_y, int *squal, bool *valid)
 #endif
 #endif
 
+#if !FLOW_ROSE
 /* Manually-constructed pmw3901 device (the driver takes cfg/data via a struct device, same as the
  * pmw3901_test bring-up sample). */
 static struct pmw3901_config pmw3901_cfg;
@@ -128,6 +169,7 @@ static const struct device   pmw3901_device = {
 	.name = "FLOW", .config = &pmw3901_cfg, .data = &pmw3901_data,
 };
 #define PMW3901_DEV (&pmw3901_device)
+#endif
 
 /* --- cached flow snapshot --- */
 static K_MUTEX_DEFINE(flow_mtx);
@@ -137,6 +179,82 @@ static bool    g_squal_ok;
 static uint32_t g_seq;
 static int64_t g_last_ms = -100000;
 
+/* One motion burst -> the cached angular flow. Shared by the SPI thread and the RoSE transport, so
+ * both run the same conversion, filter and gate. dt = time since the previous burst read. */
+static void flow_ingest(const motionBurst_t *m, float dt)
+{
+	if (dt > 1e-4f && dt < 0.5f) {
+		static struct fc_flow_filter filtered;
+		fc_flow_counts(&filtered, m->deltaX, m->deltaY, dt, FLOW_RAD_PER_COUNT,
+			       FLOW_LP_TAU_X, FLOW_LP_TAU_Y);
+		k_mutex_lock(&flow_mtx, K_FOREVER);
+		g_ax = filtered.x; g_ay = filtered.y;
+		g_squal = m->squal; g_squal_ok = (m->squal >= FLOW_MIN_SQUAL);
+		g_last_ms = k_uptime_get();
+		g_seq++;
+		k_mutex_unlock(&flow_mtx);
+	}
+}
+
+#if FLOW_ROSE
+static const struct device *flow_rose = DEVICE_DT_GET_ONE(ucbbar_roseadapter);
+static bool     flow_rose_pending;
+static bool     flow_rose_seeded;
+static float    flow_rose_cum[2];
+static uint32_t flow_rose_t_prev;
+
+void flow_rose_request(void)
+{
+	rose_request(flow_rose, ROSE_FLOW_BURST_CMD, 0U);
+	flow_rose_pending = true;
+}
+
+void flow_rose_collect(void)
+{
+	if (!flow_rose_pending) {
+		return;
+	}
+	flow_rose_pending = false;
+	uint32_t raw[ROSE_FLOW_BURST_WORDS];
+	float w[ROSE_FLOW_BURST_WORDS];
+	int n = rose_recv_reqrsp(flow_rose, ROSE_FLOW_BURST_CH, raw, ROSE_FLOW_BURST_WORDS);
+	const uint32_t t_now = k_cycle_get_32();
+	if (n < ROSE_FLOW_BURST_WORDS) {
+		printk("flow: short RoSE burst (%d/%d words)\n", n, ROSE_FLOW_BURST_WORDS);
+		return;
+	}
+	memcpy(w, raw, sizeof(w));
+	if (!flow_rose_seeded) {   /* first read only establishes the counters' origin */
+		flow_rose_cum[0] = w[0]; flow_rose_cum[1] = w[1];
+		flow_rose_t_prev = t_now; flow_rose_seeded = true;
+		return;
+	}
+	motionBurst_t m;
+	memset(&m, 0, sizeof(m));
+	const float dx = w[0] - flow_rose_cum[0], dy = w[1] - flow_rose_cum[1];
+	flow_rose_cum[0] = w[0]; flow_rose_cum[1] = w[1];
+	m.deltaX = (int16_t)(dx > 32767.0f ? 32767.0f : (dx < -32768.0f ? -32768.0f : dx));
+	m.deltaY = (int16_t)(dy > 32767.0f ? 32767.0f : (dy < -32768.0f ? -32768.0f : dy));
+	m.squal = (uint8_t)w[2];
+	m.shutter = (uint16_t)((uint16_t)w[3] << 8);
+	m.motionOccured = (m.deltaX != 0 || m.deltaY != 0);
+	const float dt = (float)k_cyc_to_us_floor32(t_now - flow_rose_t_prev) * 1e-6f;
+	flow_rose_t_prev = t_now;
+	flow_ingest(&m, dt);
+}
+
+int flow_init(void)
+{
+	if (!device_is_ready(flow_rose)) {
+		printk("flow: RoSE adapter not ready -- flow disabled\n");
+		return -ENODEV;
+	}
+	printk("flow: PMW3901 via RoSE burst cmd 0x%x ch%u (counts path; remap +x=-dX +y=+dY)\n",
+	       (unsigned)ROSE_FLOW_BURST_CMD, (unsigned)ROSE_FLOW_BURST_CH);
+	return 0;
+}
+
+#else /* SPI */
 K_THREAD_STACK_DEFINE(flow_stack, 2048);
 static struct k_thread flow_thread;
 
@@ -151,20 +269,15 @@ static void flow_thread_fn(void *a, void *b, void *c)
 		float dt = (float)k_cyc_to_us_floor32(t_now - t_prev) * 1e-6f;
 		t_prev = t_now;
 
-		if (rc == 0 && dt > 1e-4f && dt < 0.5f) {
-            static struct fc_flow_filter filtered;
-            fc_flow_counts(&filtered, m.deltaX, m.deltaY, dt, FLOW_RAD_PER_COUNT,
-                           FLOW_LP_TAU_X, FLOW_LP_TAU_Y);
-            k_mutex_lock(&flow_mtx, K_FOREVER);
-            g_ax = filtered.x; g_ay = filtered.y;
-			g_squal = m.squal; g_squal_ok = (m.squal >= FLOW_MIN_SQUAL);
-			g_last_ms = k_uptime_get();
-			g_seq++;
-			k_mutex_unlock(&flow_mtx);
+		if (rc == 0) {
+			flow_ingest(&m, dt);
 		}
 		k_msleep(FLOW_PERIOD_MS);
 	}
 }
+
+void flow_rose_request(void) { }
+void flow_rose_collect(void) { }
 
 int flow_init(void)
 {
@@ -205,6 +318,7 @@ int flow_init(void)
 	printk("flow: PMW3901 up -- background read ~%d Hz (remap +x=-dX +y=+dY)\n", 1000 / FLOW_PERIOD_MS);
 	return 0;
 }
+#endif /* FLOW_ROSE */
 
 void flow_get(float *ang_x, float *ang_y, int *squal, bool *valid)
 {
@@ -213,6 +327,14 @@ void flow_get(float *ang_x, float *ang_y, int *squal, bool *valid)
 	bool fresh = (k_uptime_get() - g_last_ms) < FLOW_STALE_MS;
 	*valid = g_squal_ok && fresh && (g_seq != 0);
 	k_mutex_unlock(&flow_mtx);
+}
+
+int64_t flow_sample_ms(void)
+{
+	k_mutex_lock(&flow_mtx, K_FOREVER);
+	const int64_t t = g_last_ms;
+	k_mutex_unlock(&flow_mtx);
+	return t;
 }
 
 #endif /* HAVE_FLOW_HW */

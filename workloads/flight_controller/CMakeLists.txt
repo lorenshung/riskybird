@@ -18,7 +18,12 @@ project(rose_flight_controller)
 # Reuse the TinyMPC controller from samples/drone_control (requires:
 #   git -C soc/sw/xpu-rt/zephyr-chipyard-sw submodule update --init
 #   samples/drone_control/tinympc  -- see README.rst).
-set(TINYMPC ${CMAKE_CURRENT_SOURCE_DIR}/../drone_control/tinympc)
+# -DTINYMPC=<dir> points elsewhere: this top-level copy has no ../drone_control beside it, so a
+# build from riskybird-dev passes the zephyr-chipyard-sw checkout's tinympc. The default is the
+# old relative path, so a build from inside zephyr-chipyard-sw is unchanged.
+if(NOT DEFINED TINYMPC)
+  set(TINYMPC ${CMAKE_CURRENT_SOURCE_DIR}/../drone_control/tinympc)
+endif()
 
 if(RISCV_VECTOR)
   set(USE_CPU OFF CACHE BOOL "Enable RISCV Scalar support")

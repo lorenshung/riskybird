@@ -45,7 +45,11 @@
 		rose = <&rose0>;
 		rose-cmd = <0x14>;      /* tof packet: 1 word [height], low-rate */
 		rose-channel = <1>;
-		decimation = <6>;       /* 200 Hz / 6 ~= 33 Hz ToF */
+		/* 1: main.cpp already rate-limits ToF fetches to TOF_FETCH_PERIOD_MS (33 ms, the VL53L1X
+		 * budget), and the env models the sensor's own ranging cadence. The old 6 decimated those
+		 * already-33 ms fetches again, so the estimator saw a fresh height every ~200 ms (32 ToF
+		 * requests in an 8 s run) against ~30 Hz on the drone. */
+		decimation = <1>;
 		status = "okay";
 	};
 
