@@ -1,0 +1,21 @@
+{
+  "name": "first_hold_250",
+  "comment": "First powered roll-harness run (approved by Loren 2026-11-04): flown default gains, 250 permille collective, lift off the stop, hold level, one 3 deg attitude step, STOP. 11-04 PM: max_run_ms 7000 -> 10000 because the runner now waits out the FC lift-off window (RIG_LIFTOFF_TIMEOUT_MS + 0.3 s after RUN) before the first EXC; the plan needs 9.1 s armed. RUNMS above the approved 7 s needs Loren's OK.",
+  "collective_permille": 250,
+  "roll_sp_mdeg": 0,
+  "mass_kg": 0.050,
+  "base_gains": {"ATT_P": 5.0, "RATE_P": 40.0, "ATT_GAIN": 0.85, "ATT_I": 0.0, "RATE_I": 0.0, "RATE_D": 0.0, "MOTOR_TRIM_LEFT": 1.0},
+  "grid": [{"gains": {}}],
+  "excitations": [
+    {"type": "step", "target": "att", "amp": 52, "dur_ms": 1000}
+  ],
+  "repeats": 1,
+  "arrangement": {"per_spin": 1},
+  "limits": {
+    "max_trials": 1,
+    "max_coll_permille": 300,
+    "max_run_ms": 10000,
+    "motor_budget_s": 15,
+    "settle_ms": 500
+  }
+}

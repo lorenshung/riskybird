@@ -1,0 +1,16 @@
+# The pitch rig's first hold (tools/rig/campaigns/first_hold_pitch_600.json) on the twin: run with
+# axis=1 (rig_sim.py run --axis pitch --scenario this). Arm level, ramp to COLL 600, hold 1.5 s
+# (settle_ms), a 3 deg (52 mrad) attitude step on PITCH for 1.5 s, hold, stop. ext_mNm stays 0: the
+# USB cable runs along the pitch pivot.
+0        RESET
+0        HBON
+0        RUNMS 12000
+0        RSP 0
+0        GAIN ATT_P 5
+0        GAIN RATE_P 40
+0        GAIN RATE_D 1
+0        GAIN ATT_I 1
+0        GAIN ATT_GAIN 0.85
+0        COLL 600
+run+1500 EXC step att 52 1500
+run+5000 STOP

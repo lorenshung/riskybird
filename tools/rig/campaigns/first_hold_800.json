@@ -1,0 +1,21 @@
+{
+  "name": "first_hold_800",
+  "comment": "First powered roll-harness hold, sim-twin recommended set (re-run at the measured 355 Hz loop: PM 40 deg, all 65 box points stable). v2 stand, ~15 deg blockers; tilt estop 13 deg, target clamp 8 deg.",
+  "collective_permille": 800,
+  "roll_sp_mdeg": 0,
+  "mass_kg": 0.050,
+  "base_gains": {"ATT_P": 5.0, "RATE_P": 40.0, "RATE_D": 1.0, "ATT_I": 1.0, "RATE_I": 0.0, "ATT_GAIN": 0.85, "MOTOR_TRIM_LEFT": 1.0, "D_LPF_HZ": 30.0},
+  "grid": [{"gains": {}}],
+  "excitations": [
+    {"type": "step", "target": "att", "amp": 52, "dur_ms": 1500}
+  ],
+  "repeats": 1,
+  "arrangement": {"per_spin": 1},
+  "limits": {
+    "max_trials": 1,
+    "max_coll_permille": 850,
+    "max_run_ms": 12000,
+    "motor_budget_s": 20,
+    "settle_ms": 1500
+  }
+}

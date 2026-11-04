@@ -1,0 +1,9 @@
+# Arm resting on a stop and lift off with the default ramp (RIG_RAMP_MS) and setpoint slew
+# (RIG_SP_SLEW_RADPS), hold 4 s, stop. Run with e.g. theta0_deg=-30 h_mm=-1 (a CoM above the axis
+# or a lateral offset cg_y_mm is what keeps it on the stop; with h_mm > 0 it swings off first).
+0        RESET
+0        HBON
+0        RUNMS 30000
+0        RSP 0
+0        COLL 800
+run+4000 STOP

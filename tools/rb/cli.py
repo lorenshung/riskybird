@@ -3039,10 +3039,71 @@ def cmd_ground(args: argparse.Namespace) -> int:
         if args.ground_action == "gonogo":
             return ground.gonogo(watch=args.watch)
         if args.ground_action == "monitor":
-            return ground.monitor(args.extra)
+            extra = args.extra[1:] if args.extra[:1] == ["--"] else args.extra
+            return ground.monitor((["--pcap", args.pcap] if args.pcap else []) + extra)
     except ground.GroundError as exc:
         raise RbError(str(exc)) from exc
     raise RbError(f"unsupported ground action: {args.ground_action}")
+
+
+def _rig_default_mode(action: str, extra: list[str]) -> str:
+    """rig-roll or rig-pitch for `rb rig run SPEC.json` / `rb rig fetch BATCH` without --mode."""
+    from . import rig_axis
+
+    axis = None
+    for a in extra:
+        p = Path(a)
+        try:
+            if action == "run" and a.endswith(".json") and p.is_file():
+                axis = rig_axis.parse_axis(json.loads(p.read_text(encoding="utf-8")).get("axis", "roll"))
+            elif action == "fetch" and (p / "batch.json").is_file():
+                meta = json.loads((p / "batch.json").read_text(encoding="utf-8"))
+                if isinstance(meta.get("mode"), str) and meta["mode"]:
+                    return meta["mode"]          # the mode the batch ran with
+                axis = rig_axis.parse_axis(meta.get("axis", "roll"))
+        except (OSError, ValueError, AttributeError):
+            continue
+        if axis is not None:
+            break
+    return rig_axis.AXIS_MODES[axis if axis is not None else rig_axis.ROLL]
+
+
+def cmd_rig(args: argparse.Namespace) -> int:
+    """Roll-harness tuning: `tui` (viewer), `run` / `fetch` (tools/rb/rig_run.py) and `analyze`
+    (tools/rb/rig_analyze.py), the last three in the zephyr env (pyserial, numpy, scipy)."""
+    from . import rig_tui
+
+    if args.rig_action == "tui":
+        return rig_tui.run_from_args(args)
+    if args.rig_action not in ("run", "fetch", "analyze"):
+        raise RbError(f"unsupported rig action: {args.rig_action}")
+    script = ROOT / "tools" / "rb" / ("rig_analyze.py" if args.rig_action == "analyze" else "rig_run.py")
+    extra = list(args.rig_args)
+    argv = [] if args.rig_action == "analyze" else [args.rig_action]
+    no_elf = any(a in extra for a in ("--dry-run", "--check", "-h", "--help"))
+    mode = extra[extra.index("--mode") + 1] if "--mode" in extra[:-1] else None
+    if args.rig_action != "analyze" and mode is None:
+        # The ELF and the recorded mode follow the batch's axis: rig-pitch for a spec with
+        # "axis": "pitch" (run) or a batch recorded as rig-pitch (fetch), else rig-roll.
+        mode = _rig_default_mode(args.rig_action, extra)
+        extra += ["--mode", mode]
+    if args.rig_action != "analyze" and "--elf" not in extra and not no_elf:
+        elf = zephyr_elf(get_target("arty200t"), get_workload("flight_controller"), mode)
+        if not Path(elf).is_file():
+            raise RbError(f"rig ELF is missing: {elf}\n"
+                          f"Run: rb build flight_controller --target arty200t --mode {mode}")
+        argv += ["--elf", str(elf)]
+    argv += extra
+    cmd = [str(ZEPHYR_PREFIX / "bin" / "python"), str(script), *argv]
+    print("+", " ".join(shlex.quote(c) for c in cmd), flush=True)
+    # The runner owns Ctrl-C (ESTOP x3, then STOP and the journal); this parent must not kill
+    # it 0.25 s later the way subprocess.run would, so it only waits.
+    proc = subprocess.Popen(cmd, cwd=ROOT, env=zephyr_env())
+    while True:
+        try:
+            return proc.wait()
+        except KeyboardInterrupt:
+            continue
 
 
 def _flightlog_build_text(args: argparse.Namespace) -> str:
@@ -3073,9 +3134,37 @@ def cmd_flightlog(args: argparse.Namespace) -> int:
         if args.flightlog_action == "compare":
             print(flightlog.compare([flightlog.resolve_trial(repo, t) for t in args.trials]))
             return 0
+        if args.flightlog_action == "fetch":
+            return _flightlog_fetch(args)
     except flightlog.FlightLogError as exc:
         raise RbError(str(exc)) from exc
     raise RbError(f"unsupported flightlog action: {args.flightlog_action}")
+
+
+def _flightlog_fetch(args: argparse.Namespace) -> int:
+    """Read the DRAM flight recorder of the running flight controller over the ESP."""
+    port = args.port or os.environ.get("RB_TSI_PORT")
+    if not port or "://" not in port:
+        raise RbError("rb flightlog fetch needs --port socket://192.168.4.1:14552 "
+                      "(or esp-usb:///dev/ttyACM0): it reads through the ESP")
+    if args.elf:
+        elf = args.elf
+    else:
+        elf = zephyr_elf(get_target("arty200t"), get_workload("flight_controller"), args.mode)
+    if not Path(elf).is_file():
+        raise RbError(f"flight controller ELF is missing: {elf}\n"
+                      f"Run: rb build flight_controller --target arty200t --mode {args.mode}")
+    if args.out:
+        prefix = args.out
+    else:
+        log_dir = ROOT / "results" / "riskybird-logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        prefix = log_dir / ("rec_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+    link = (["--usb", port[len("esp-usb://"):]] if port.startswith("esp-usb://")
+            else ["--url", port])
+    run([ZEPHYR_PREFIX / "bin" / "python", ROOT / "tools" / "rb" / "flightrec_fetch.py",
+         *link, "--elf", elf, "--out", prefix], environment="zephyr", cwd=ROOT)
+    return 0
 
 
 def cmd_fly(args: argparse.Namespace) -> int:
@@ -4192,9 +4281,37 @@ def build_parser() -> argparse.ArgumentParser:
     gnd_go.add_argument("--watch", action="store_true", help="print once a second until Ctrl-C")
     gnd_go.set_defaults(func=cmd_ground)
     gnd_mon = gnd_sub.add_parser("monitor", help="run only the monitor (no panel, no Wi-Fi changes)")
+    gnd_mon.add_argument("--pcap", metavar="IFACE",
+                         help="capture the drone's datagrams on IFACE with tcpdump (sudo -n) "
+                         "instead of binding :14550 -- for a host whose firewall rejects them")
     gnd_mon.add_argument("extra", nargs=argparse.REMAINDER,
                          help="passed to riskybird-flightready.py (e.g. --relay 0)")
     gnd_mon.set_defaults(func=cmd_ground)
+
+    rig_p = sub.add_parser("rig", help="roll-harness tuning: live TUI over a rig batch")
+    rig_sub = rig_p.add_subparsers(dest="rig_action", required=True)
+    from . import rig_tui
+
+    rig_tui_p = rig_sub.add_parser(
+        "tui", help="curses viewer: live roll plot, gains, batch progress, results; E/space = ESTOP"
+    )
+    rig_tui.add_arguments(rig_tui_p)
+    rig_tui_p.set_defaults(func=cmd_rig)
+    for action, text in (
+        ("run", "run a batch spec (JSON) on the roll harness; --dry-run uses a fake drone; "
+                "hardware needs --i-have-approval TEXT"),
+        ("fetch", "re-fetch a spin's recorder segment into a batch (or --out PREFIX)"),
+        ("analyze", "metrics, ranking, summary.md and the next grid of a batch"),
+    ):
+        rp = rig_sub.add_parser(action, help=text,
+                                description=text + ". Every argument goes to tools/rb/%s (its "
+                                "own options: `./rb rig %s ARG --help`); the running ELF defaults "
+                                "to the --mode build (default rig-pitch for an \"axis\": \"pitch\" spec or batch, "
+                                "else rig-roll)."
+                                % ("rig_analyze.py" if action == "analyze" else "rig_run.py " + action,
+                                   action))
+        rp.add_argument("rig_args", nargs=argparse.REMAINDER)
+        rp.set_defaults(func=cmd_rig)
 
     fly_p = sub.add_parser(
         "fly",
@@ -4281,6 +4398,17 @@ def build_parser() -> argparse.ArgumentParser:
     flog_cmp = flog_sub.add_parser("compare", help="side-by-side flight numbers for several trials")
     flog_cmp.add_argument("trials", nargs="+")
     flog_cmp.set_defaults(func=cmd_flightlog)
+    flog_fetch = flog_sub.add_parser(
+        "fetch",
+        help="read the DRAM flight recorder (ROSE_FLIGHTREC builds) over the ESP after "
+        "landing -> results/riskybird-logs/rec_<stamp>.csv",
+    )
+    flog_fetch.add_argument("--port", help="socket://192.168.4.1:14552 (WiFi) or esp-usb:///dev/ttyACM0")
+    flog_fetch.add_argument("--mode", default="t21-hover-1.0m",
+                            help="flight_controller mode whose ELF is running (default t21-hover-1.0m)")
+    flog_fetch.add_argument("--elf", type=Path, help="the running ELF, instead of --mode")
+    flog_fetch.add_argument("--out", type=Path, help="output prefix (default results/riskybird-logs/rec_<stamp>)")
+    flog_fetch.set_defaults(func=cmd_flightlog)
 
     xp = sub.add_parser(
         "xpurt",

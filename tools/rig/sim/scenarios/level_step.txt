@@ -1,0 +1,9 @@
+# Arm level, ramp to COLL, hold 2.5 s, a 5 deg attitude step (1.5 s, back to 0 when it ends),
+# hold 2.5 s, stop. Times after "run+" are from the first RUN tick (rig_run.py sends after RUN too).
+0        RESET
+0        HBON
+0        RUNMS 30000
+0        RSP 0
+0        COLL 1000
+run+2500 EXC step att 87 1500
+run+6500 STOP

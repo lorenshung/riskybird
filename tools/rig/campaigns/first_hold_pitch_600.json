@@ -1,0 +1,22 @@
+{
+  "name": "first_hold_pitch_600",
+  "axis": "pitch",
+  "comment": "First powered PITCH hold: the drone turned 90 deg in the cradle, so the pivot is the pitch axis; USB cable routed along the pivot. rig-pitch build (RIG_AXIS=1); roll_sp_mdeg, ROLL_TRIM and the step act on PITCH, RIG_PITCH_MAX_RAD guards the locked roll. Gains = the roll first-hold set (controller_pid.cpp flies pitch with the roll constants and J[1] = J[0]). Limits sized like first_hold_800.",
+  "collective_permille": 600,
+  "roll_sp_mdeg": 0,
+  "mass_kg": 0.050,
+  "base_gains": {"ATT_P": 5.0, "RATE_P": 40.0, "RATE_D": 1.0, "ATT_I": 1.0, "RATE_I": 0.0, "ATT_GAIN": 0.85, "MOTOR_TRIM_LEFT": 1.0, "D_LPF_HZ": 30.0},
+  "grid": [{"gains": {}}],
+  "excitations": [
+    {"type": "step", "target": "att", "amp": 52, "dur_ms": 1500}
+  ],
+  "repeats": 1,
+  "arrangement": {"per_spin": 1},
+  "limits": {
+    "max_trials": 1,
+    "max_coll_permille": 650,
+    "max_run_ms": 20000,
+    "motor_budget_s": 20,
+    "settle_ms": 1500
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "rate_p_sweep",
+  "comment": "RATE_P sweep at the flown ATT_P, two gain points per armed run; 5 deg att steps and doublets, plus one att chirp per point for the FRF/margins.",
+  "collective_permille": 1000,
+  "roll_sp_mdeg": 0,
+  "mass_kg": 0.050,
+  "base_gains": {"ATT_P": 5.0, "ATT_I": 0.0, "RATE_I": 0.0, "RATE_D": 0.0},
+  "grid_product": {"RATE_P": [25, 40, 60]},
+  "excitations": [
+    {"type": "step", "target": "att", "amp": 87, "dur_ms": 1500},
+    {"type": "doublet", "target": "att", "amp": 87, "dur_ms": 1200},
+    {"type": "chirp", "target": "att", "amp": 52, "dur_ms": 8000, "f0_mHz": 300, "f1_mHz": 8000}
+  ],
+  "repeats": 1,
+  "arrangement": {"per_spin": 2},
+  "limits": {
+    "max_trials": 12,
+    "max_coll_permille": 1100,
+    "max_run_ms": 45000,
+    "motor_budget_s": 180,
+    "settle_ms": 1500
+  }
+}

@@ -1,0 +1,11 @@
+# Lift-off assist (fc_rig.cpp LIFT_I / LIFT_I_LIM): arm resting on the +30 deg stop (right wing
+# down) against a steady torque toward it, as hardware on 2026-11-04 (results/rig/manual/
+# 20261104-144131-hold600long: P-only never left the stop at COLL 600). Run with e.g.
+#   theta0_deg=30 cg_y_mm=-5 ext_mNm=0.8 lipo=1 ocv=4.15     (2.7 + 0.8 = 3.5 mN m toward +roll)
+# rig_sim.py liftoff-assist runs it with and without the assist and sweeps LIFT_I / LIFT_I_LIM.
+0         RESET
+0         HBON
+0         RUNMS 25000
+0         RSP 0
+0         COLL 600
+run+15000 STOP
