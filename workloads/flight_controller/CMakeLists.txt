@@ -249,6 +249,20 @@ set(ROSE_CAMERA 0 CACHE STRING "1=capture one camera frame mid-hover (autoflight
 set(ROSE_CAMERA_DIR "" CACHE STRING
   "riskybird integration/zephyr/camera directory (default: RB_ROOT/integration/zephyr/camera)")
 
+# Roll-harness ("rig") tuning build: the drone on a 1-DOF roll pivot, roll gains set over the uplink
+# (src/fc_rig.h). NEVER a free-flight image. It replaces the autoflight profile with its own arm/run
+# state machine, needs the PID controller it hooks into, takes its verbs and heartbeat from the
+# uart1 reader, and its motors from the ESP. fc_rig.cpp is compiled only here.
+set(ROSE_RIG 0 CACHE STRING "1=roll-harness (rig) tuning build -- never fly it free")
+if(ROSE_RIG)
+  foreach(_req ROSE_AUTOFLIGHT ROSE_USE_PID ROSE_UART_CMD ROSE_ESP_MOTORS)
+    if(NOT ${_req})
+      message(FATAL_ERROR "ROSE_RIG=1 needs ${_req}=1 (have '${${_req}}')")
+    endif()
+  endforeach()
+  target_sources(app PRIVATE src/fc_rig.cpp)
+endif()
+
 target_sources(app PRIVATE
   src/main.cpp
   src/estimator_complementary.cpp
@@ -293,7 +307,8 @@ target_compile_definitions(app PRIVATE ROSE_USE_EKF=${ROSE_USE_EKF}
   ROSE_FLIGHT_COMMIT=${ROSE_FLIGHT_COMMIT}
   ROSE_MOTOR_WINDOW_MS=${ROSE_MOTOR_WINDOW_MS}
   ROSE_COMMIT_MAX_MS=${ROSE_COMMIT_MAX_MS}
-  ROSE_CAMERA=${ROSE_CAMERA})
+  ROSE_CAMERA=${ROSE_CAMERA}
+  ROSE_RIG=${ROSE_RIG})
 
 if(NOT CS_GPIO_PIN STREQUAL "")
   target_compile_definitions(app PRIVATE CS_GPIO_PIN=${CS_GPIO_PIN})
@@ -335,6 +350,22 @@ if(ROSE_ESP_MOTORS)
       "ROSE_ESP_MOTORS=1 needs -DROSE_MOTOR_LINK_DIR=<riskybird>/integration/zephyr/motor_link")
   endif()
   target_include_directories(app PRIVATE ${ROSE_MOTOR_LINK_DIR}/include)
+endif()
+
+# DRAM flight recorder (riskybird integration/zephyr/flightrec): every control
+# tick into a DDR ring, read out over the ESP after the flight with
+# `rb flightlog fetch`. Off by default: RB_CMAKE_ARGS=-DROSE_FLIGHTREC=1.
+# Its sizing knobs (FLIGHTREC_DIV, FLIGHTREC_CAPACITY, FLIGHTREC_TAIL_MS,
+# FLIGHTREC_PREROLL) are #ifndef defaults in flightrec.c, so they go through
+# the preprocessor, e.g. RB_EXTRA_CPPFLAGS=-DFLIGHTREC_DIV=1.
+set(ROSE_FLIGHTREC "" CACHE STRING "1=record every control tick to DDR (riskybird flightrec)")
+if(ROSE_FLIGHTREC)
+  if(NOT RB_ROOT)
+    message(FATAL_ERROR "ROSE_FLIGHTREC=1 needs -DRB_ROOT=<riskybird checkout>")
+  endif()
+  target_sources(app PRIVATE ${RB_ROOT}/integration/zephyr/flightrec/src/flightrec.c)
+  target_include_directories(app PRIVATE ${RB_ROOT}/integration/zephyr/flightrec/include)
+  target_compile_definitions(app PRIVATE ROSE_FLIGHTREC=1)
 endif()
 
 target_include_directories(app PRIVATE

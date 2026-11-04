@@ -305,6 +305,14 @@ static float wall_push(int16_t d_mm)
 	return frac * WALL_MAX_REP_VEL;   /* 0..WALL_MAX_REP_VEL */
 }
 
+#if defined(ROSE_RIG) && ROSE_RIG
+/* Roll harness (fc_rig.h): the mixer reads the live MOTOR_TRIM_LEFT gain, so GAIN MOTOR_TRIM_LEFT
+ * reaches the motors; the build's value is only its default (fc_rig_gains_default). */
+#include "fc_rig.h"
+#undef MOTOR_TRIM_LEFT
+#define MOTOR_TRIM_LEFT (g_rig.trim_left_applied)   /* slewed toward gains.v[MOTOR_TRIM_LEFT] by fc_rig_step */
+#endif
+
 void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 				       const float setpoint[CTRL_NSTATES],
 				       float u_out[CTRL_NACTIONS], float dt)
@@ -315,6 +323,19 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 	 * written in angles, so convert (fc_pid_attitude, which also explains what that changed). */
 	float att[3], yaw_tgt;
 	fc_pid_attitude(state, setpoint, att, &yaw_tgt);
+#if defined(ROSE_RIG) && ROSE_RIG
+	/* Roll harness: u = [collective N, roll moment N*m, 0, 0] from fc_rig_roll_law, already scaled
+	 * (NOT by J*ATT_GAIN again); no altitude, velocity or tilt-compensation loop, and no pitch or
+	 * yaw moment -- the rig locks those axes. Into the same mixer and force->duty below. */
+	float u[4];
+	{
+		struct fc_rig_law_in in;
+
+		fc_rig_law_input(&g_rig, att[0], att[1], att[2] - yaw_tgt, &state[9], dt, &in);
+		fc_rig_roll_law(&g_rig.law, &g_rig.gains, &in, u, &g_rig.dbg);
+	}
+	(void)wall_push;   /* the flown path's only user is compiled out */
+#else
 	const float estRoll   = att[0];
 	const float estPitch  = att[1];
 	const float estYaw    = att[2];
@@ -456,6 +477,7 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 		if (u[3] >  ymax) { u[3] =  ymax; }
 		if (u[3] < -ymax) { u[3] = -ymax; }
 	}
+#endif
 
 	const float M[4][4] = {
 		{0.25f,  0.25f / l_arm, -0.25f / l_arm,  0.25f / k_drag},

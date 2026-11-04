@@ -34,6 +34,9 @@
 #include "estimator.hpp"
 #include "controller.hpp"
 #include "flightlog.h"
+#if defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC
+#include <riskybird/flightrec.h>
+#endif
 #include "side_tof.h"           /* side-ToF wall "bumper" (ROSE_BUMPER); no-op if disabled */
 #include "fc_shared_math.h"
 #include "flow.h"               /* PMW3901 optical flow (ROSE_FLOW); no-op if disabled */
@@ -556,6 +559,33 @@ static inline const char *telem_batt_state(void)
 	(int)(g_guard_tilt_rad * (180.0f / 3.14159265f) + 0.5f), \
 	FP3(g_guard_amag), (unsigned)g_guard_acc_skips, telem_batt_state(), \
 	FP3(g_gz_peak), FP3(g_amag_peak), (unsigned)g_gyro_rejects
+
+#if defined(ROSE_RIG) && ROSE_RIG
+/* Roll harness: the RIG line replaces the FC line on both sinks, at the same ROSE_TELEM_DIV. Its
+ * format is a host contract (RIG-SPEC "Host-side contracts"; tools/rb rig parses it): st= keeps
+ * the FC bit meanings, rs= adds the rig state (ESTOP while g_estop is latched), angles in mdeg,
+ * gx in mrad/s, coll in per-mille of MASS*g, exc in milli-units of its target, duty in 1/10000.
+ * rxo= and rxd= trail the line (parsers ignore fields they do not know): uart1 RX-ring overrun
+ * bytes and dropped uplink lines since boot -- see g_uart1_* below. */
+#undef TELEM_LINE_FMT
+#undef TELEM_LINE_ARGS
+#define RIG_MDEG(rad) ((int)((rad) * 57295.78f))
+#define TELEM_LINE_FMT \
+	"RIG it=%u st=%d rs=%s r=%d p=%d gx=%d sp=%d tgt=%d coll=%d exc=%d ex=%u gs=%u " \
+	"d=[%d %d %d %d] vb=%d rxo=%u rxd=%u\n"
+#define TELEM_LINE_ARGS \
+	(unsigned)iter, \
+	(g_armed ? 1 : 0) | (g_estop ? 2 : 0) | (g_arming ? 4 : 0) | (g_gyro_cal_done ? 8 : 0), \
+	g_estop ? "ESTOP" : fc_rig_run_state_name(g_rig.rs), \
+	RIG_MDEG(g_rig.dbg.roll), RIG_MDEG(g_rig.dbg.pitch), (int)(f.gyro[0] * 1000.0f), \
+	RIG_MDEG(g_rig.out.sp_roll), RIG_MDEG(g_rig.dbg.roll_tgt), \
+	(int)(g_rig.out.coll_frac * 1000.0f), (int)(g_rig.out.exc_val * 1000.0f), \
+	(unsigned)g_rig.exc_id, (unsigned)g_rig.gain_seq, \
+	(int)(g_last_duty[0] * 10000.0f), (int)(g_last_duty[1] * 10000.0f), \
+	(int)(g_last_duty[2] * 10000.0f), (int)(g_last_duty[3] * 10000.0f), \
+	(int)(g_vbat * 1000.0f), \
+	(unsigned)g_uart1_rx_overruns, (unsigned)g_uart1_lines_bad
+#endif
 
 /* ---- Sensor devices (Zephyr sensor API; bound per board overlay) ---- */
 #ifdef ROSE_SIM_STUB
@@ -1154,6 +1184,68 @@ static const char *safety_violation(const float *state, const float *gyro, const
     return why;
 }
 
+#if defined(ROSE_RIG) && ROSE_RIG
+/* ---- Roll harness ("rig"): the drone on a 1-DOF roll pivot, NEVER flown free ------------------
+ * fc_rig.h/.cpp hold the logic; these are main.cpp's hooks. g_rig takes the uplink verbs
+ * (uart_cmd_dispatch), one fc_rig_step() per tick (in place of the autoflight arm gate and
+ * profile) and feeds fc_rig_roll_law() in controller_pid.cpp. */
+#include "fc_rig.h"
+struct fc_rig_state g_rig;
+/* uart1 uplink delivery counters, published once per tick by uart_cmd_poll() (fc_uart_rx.h) and
+ * read by name from the ELF over RBPOKE: bytes received; bytes the RX ring dropped because it was
+ * full (the SiFive UART has no overrun flag, so FIFO losses are invisible); lines handed to
+ * uart_cmd_dispatch(); lines dropped (overlong, cut by noise, or damaged by a ring overrun).
+ * The RIG line carries the overruns as rxo= and the dropped lines as rxd=. */
+volatile uint32_t g_uart1_rx_bytes;
+volatile uint32_t g_uart1_rx_overruns;
+volatile uint32_t g_uart1_lines_ok;
+volatile uint32_t g_uart1_lines_bad;
+#if defined(SAFE_SOFT_LAND) && SAFE_SOFT_LAND
+#error "ROSE_RIG: soft-land has nowhere to descend to on the roll harness"
+#endif
+#define SAFE_SOFT_LAND 0
+/* The envelope on the rig: impact, rate and (when it is a control input) battery. Velocity, height,
+ * free-fall, accel-tilt, est-tilt and yaw-spin mean nothing on a pivot; roll and pitch are
+ * fc_rig_step's. Tested here rather than by filtering evaluate(), which returns only its FIRST
+ * reason: on a drone resting on a 30 deg stop accel-tilt wins every tick and "rate" is never
+ * reached. evaluate() still runs, for the g_guard_* telemetry. */
+static const char *rig_safety_violation(const float *gyro, const float *accel,
+					int *need_ms, float *meas, const char **unit)
+{
+	const float amag = sqrtf(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]);
+	float rate = fabsf(gyro[0]);
+
+	rate = fabsf(gyro[1]) > rate ? fabsf(gyro[1]) : rate;
+	rate = fabsf(gyro[2]) > rate ? fabsf(gyro[2]) : rate;
+	*need_ms = SAFE_DEBOUNCE_MS; *meas = 0.0f; *unit = "";
+	if (amag > (SAFE_IMPACT_MPS2)) {
+		*need_ms = SAFE_SHOCK_DEBOUNCE_MS; *meas = amag; *unit = "m/s2 |a|";
+		return "impact";
+	}
+	if (rate > SAFE_MAX_RATE_RADPS) {
+		*meas = rate; *unit = "rad/s";
+		return "rate";
+	}
+#if ROSE_BATT_SENSE && !ROSE_BATT_REPORT_ONLY
+	if (g_vbat >= 1.0f && g_vbat < BATT_CUTOFF_V) {
+		*meas = g_vbat; *unit = "V";
+		return "battery";
+	}
+#endif
+	return NULL;
+}
+/* Rig text to the ESP through the non-blocking queue, never esp_uart_write_line(): a polled write
+ * would land in the middle of a half-drained RIG line and corrupt both for the host parser. */
+static void rig_say(const char *line)
+{
+	const size_t n = strlen(line);
+
+	if (n > 0) {
+		esp_uart_queue_line(line, n);
+	}
+}
+#endif
+
 
 /* Say what the envelope IS, at boot, in units a human can check against a protractor. A guard
  * nobody can read is a guard nobody can verify, and this one was wrong for as long as it has
@@ -1654,6 +1746,10 @@ static inline void actuator_duty(const float *u, float duty[NACTIONS])
 #if defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
     const float ceiling = ((float)(AUTOFLIGHT_MAX_DUTY) < 1.0f) ? (float)(AUTOFLIGHT_MAX_DUTY) : 1.0f;
     fc_actuator_duty(u, duty, batt_thrust_scale(), ceiling, true, 1.0f);
+#if defined(ROSE_RIG) && ROSE_RIG
+    /* the final duties: which roll direction is saturated, for the next tick's anti-windup */
+    fc_rig_moment_saturation(duty, ceiling, &g_rig.sat_pos, &g_rig.sat_neg);
+#endif
 #else
     fc_actuator_duty(u, duty, batt_thrust_scale(), (float)MOTOR_DUTY_CEILING, false, MOTOR_MAX_DUTY);
 #endif
@@ -3263,6 +3359,9 @@ extern "C" void rose_cmd_disarm(void)
 #if defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
 	g_armed = false;   /* clear the arm latch (re-arm via the gate). Non-autoflight g_armed is const. */
 #endif
+#if defined(ROSE_RIG) && ROSE_RIG
+	fc_rig_disarm(&g_rig);   /* the rig state machine owns g_armed: DONE, RESET to re-arm */
+#endif
 }
 extern "C" void rose_cmd_set_hover_z(float m)
 {
@@ -3329,6 +3428,34 @@ static void uart_cmd_dispatch(char *line)
 	if (n == 0) {
 		return;
 	}
+#if defined(ROSE_RIG) && ROSE_RIG
+	{
+		/* Rig verbs first (HB COLL RSP GAIN GAINS EXC EXCSTOP RUNMS STOP); anything else falls
+		 * through. HB replies nothing; a NAK's reason stays off the wire, on the console. */
+		static char rig_reply[FC_RIG_REPLY_MAX];
+
+#if defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC
+		/* One line per call, so an accepted GAIN moves gain_seq by exactly one and
+		 * last_gain is that gain: log each one, even several in one tick. */
+		const uint32_t gs_before = g_rig.gain_seq;
+#endif
+
+		if (fc_rig_handle_command(&g_rig, line, k_uptime_get(), rig_reply, sizeof(rig_reply))) {
+#if defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC
+			if (g_rig.gain_seq != gs_before && g_rig.last_gain >= 0) {
+				flightrec_rig_gain(g_rig.gain_seq, (unsigned)g_rig.last_gain,
+						   g_rig.gains.v[g_rig.last_gain],
+						   (uint32_t)k_cyc_to_us_floor64(k_cycle_get_64()));
+			}
+#endif
+			rig_say(rig_reply);
+			if (g_rig.nak_reason != NULL && (ROSE_TELEM_CONSOLE || !g_armed)) {
+				printk("UARTCMD: rig NAK -- %s\n", g_rig.nak_reason);
+			}
+			return;
+		}
+	}
+#endif
 
 	if (strcmp(line, "ESTOP") == 0) {
 		rose_cmd_estop();
@@ -3381,6 +3508,83 @@ static void uart_cmd_dispatch(char *line)
 	}
 }
 
+#if defined(ROSE_RIG) && ROSE_RIG
+/*
+ * Rig builds read uart1 from its RX interrupt, not by polling. Polled once per loop iteration,
+ * the SiFive RX FIFO (8 bytes, ~0.7 ms of the link at 115200) overflowed silently between polls
+ * that are 2.8 ms apart on average and up to 18 ms: of 7 back-to-back GAIN lines one was applied,
+ * and a COLL 5 ms after RESET never arrived, so the rig never armed (2026-11-04). The ISR moves
+ * the FIFO into a 512-entry ring within one byte time; uart_cmd_poll() assembles lines from the
+ * ring with the same rules as before (fc_uart_rx.h). TX is untouched: frames, ACKs and the
+ * telemetry queue still write TXDATA by polling, and the TX watermark interrupt is never enabled.
+ * This is the ONLY uart1 RX reader in a rig image (telem_uart.c's needs ROSE_UART_TELEM, which
+ * cannot coexist with ROSE_UART_CMD).
+ */
+#ifndef CONFIG_UART_INTERRUPT_DRIVEN
+#error "ROSE_RIG reads uart1 from its RX interrupt: build with CONFIG_UART_INTERRUPT_DRIVEN=y (rb --mode rig-roll sets it)"
+#endif
+#include "fc_uart_rx.h"
+
+static struct fc_rx_ring g_uart1_ring;
+static struct fc_line_asm g_uart1_lines;
+
+/* rxcnt is 0, so RXWM pends while the FIFO holds any byte; it is level-triggered, so the FIFO is
+ * always emptied (a full ring drops and counts, it never leaves bytes behind to re-raise the IRQ).
+ * Not uart_irq_is_pending(): it ORs in TXWM, which is set whenever the TX FIFO is empty. */
+static void uart1_rx_isr(const struct device *dev, void *user_data)
+{
+	struct fc_rx_ring *const ring = (struct fc_rx_ring *)user_data;
+	uint8_t chunk[8];
+	int rounds = 8;   /* bound the ISR; the line is level, so anything left re-raises it */
+	int n;
+
+	if (!uart_irq_update(dev)) {
+		return;
+	}
+	while (rounds-- > 0 && (n = uart_fifo_read(dev, chunk, (int)sizeof(chunk))) > 0) {
+		for (int i = 0; i < n; ++i) {
+			fc_rx_ring_put(ring, chunk[i]);
+		}
+	}
+}
+
+static void uart1_rx_irq_start(void)
+{
+	if (!device_is_ready(esp_uart_dev)) {
+		printk("flight_controller: esp-uart NOT READY -- uplink commands will not be read\n");
+		return;
+	}
+	const int rc = uart_irq_callback_user_data_set(esp_uart_dev, uart1_rx_isr, &g_uart1_ring);
+
+	if (rc != 0) {
+		printk("flight_controller: uart1 RX callback FAILED (%d) -- uplink commands will not "
+		       "be read\n", rc);
+		return;
+	}
+	uart_irq_rx_enable(esp_uart_dev);
+	printk("flight_controller: uart1 RX interrupt-driven, %u-entry ring; counters "
+	       "g_uart1_rx_overruns/g_uart1_lines_ok/g_uart1_lines_bad\n", (unsigned)FC_RX_RING_SIZE);
+}
+
+static void uart_cmd_poll(void)
+{
+	/* Bounded like the polled reader: 256 is ~22 ms of the link, more than any iteration. */
+	int budget = 256;
+	int entry;
+
+	while (budget-- > 0 && (entry = fc_rx_ring_get(&g_uart1_ring)) >= 0) {
+		char *const line = fc_line_feed(&g_uart1_lines, entry);
+
+		if (line != NULL) {
+			uart_cmd_dispatch(line);
+		}
+	}
+	g_uart1_rx_bytes = fc_rx_ring_bytes(&g_uart1_ring);
+	g_uart1_rx_overruns = fc_rx_ring_overruns(&g_uart1_ring);
+	g_uart1_lines_ok = g_uart1_lines.lines_ok;
+	g_uart1_lines_bad = g_uart1_lines.lines_bad;
+}
+#else
 static void uart_cmd_poll(void)
 {
 	static char buf[80];
@@ -3424,6 +3628,7 @@ static void uart_cmd_poll(void)
 		}
 	}
 }
+#endif /* ROSE_RIG */
 #endif /* ROSE_UART_CMD */
 
 /* =============================================================================================
@@ -3773,6 +3978,29 @@ int main(void)
 #endif
 #endif
 
+#if defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC
+	flightrec_init();
+	printk("flight_controller: DRAM flight recorder ON -- %u samples x %u B, every %u ticks; "
+	       "read it after landing with rb flightlog fetch\n",
+	       (unsigned)flightrec_header()->capacity, (unsigned)flightrec_header()->sample_size,
+	       (unsigned)flightrec_header()->div);
+#endif
+#if defined(ROSE_RIG) && ROSE_RIG
+	fc_rig_init(&g_rig);
+#if defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC
+	/* The v3 snapshot holds the first FLIGHTREC_RIG_GAINS gains (enum order); the gains appended
+	 * after them (LIFT_I, LIFT_I_LIM) are logged only in the change ring (flightrec_rig_gain). */
+	static_assert(FC_RIG_GAIN_COUNT >= FLIGHTREC_RIG_GAINS, "recorder gain snapshot size");
+	flightrec_rig_bind(g_rig.gains.v, &g_rig.gain_seq);
+#endif
+	printk("flight_controller: *** ROLL-HARNESS (rig) BUILD -- NEVER FLY IT FREE *** arm needs RESET, "
+	       "HB and COLL > 0; guards: rig roll/pitch, rate, impact%s; no velocity/height/free-fall/"
+	       "accel-tilt/yaw/soft-land\n",
+	       (ROSE_BATT_SENSE && !ROSE_BATT_REPORT_ONLY) ? ", battery" : "");
+#if ROSE_UART_CMD
+	uart1_rx_irq_start();
+#endif
+#endif
 	motors_startup_pulse();   /* optional boot "go" signal (ROSE_START_PULSE_MS); no-op if unset */
 #if defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
 	/* Boot chirp (1-2-3-4 sweep) = "the board just reset". Fires EARLY, before the ~12 s sensor
@@ -3983,6 +4211,12 @@ int main(void)
 #if defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
 			g_armed = false; g_arming = false; g_flight_start_ms = 0;
 #endif
+#if defined(ROSE_RIG) && ROSE_RIG
+			/* fc_rig_step sees this same g_reset_gen edge later in the tick and returns the run
+			 * state, excitation and integrators to IDLE. Gains, COLL, RSP and RUNMS are KEPT:
+			 * RESET is what enables arming, and the host sends them before it. */
+			g_rig.sat_pos = false; g_rig.sat_neg = false;
+#endif
 #if ROSE_RECAL_ON_RESET
 			gyro_cal_restart();
 #endif
@@ -4033,6 +4267,9 @@ int main(void)
 			float meas = 0.0f;
 			const char *unit = "";
 			const char *why = safety_violation(state, f.gyro, f.accel, &need_ms, &meas, &unit);
+#if defined(ROSE_RIG) && ROSE_RIG
+			why = rig_safety_violation(f.gyro, f.accel, &need_ms, &meas, &unit);   /* see its note */
+#endif
 			static int64_t viol_since;   /* ms at which the current violation began (0 = none) */
 			static int     viol_count;   /* samples seen in the current violation */
 			static bool    guard_announced;
@@ -4096,7 +4333,58 @@ int main(void)
 #endif
 			}
 		}
-#if defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
+#if defined(ROSE_RIG) && ROSE_RIG
+		/* Roll harness: fc_rig_step replaces the arm gate and the altitude profile. It owns
+		 * g_armed and the collective (g_rig.out, read by controller_pid.cpp); its guards latch
+		 * g_estop like the envelope guard does -- command zero first, report afterwards. */
+		{
+			struct fc_rig_inputs ri;
+			struct fc_rig_outputs ro;
+			float att[3], yaw_tgt;
+
+			fc_pid_attitude(state, g_setpoint, att, &yaw_tgt);   /* true radians */
+			ri.now_ms = t_now;
+			ri.dt = dt;
+			ri.arm_enabled = g_arm_enabled;
+			ri.gyro_cal_done = g_gyro_cal_done;
+			for (int i = 0; i < 3; i++) {
+				ri.gyro[i] = f.gyro[i];
+			}
+			ri.roll_rad = att[0];
+			ri.pitch_rad = att[1];
+			ri.batt_ok = batt_ok_to_arm();
+			ri.estop = g_estop;
+			ri.reset_gen = g_reset_gen;
+			fc_rig_step(&g_rig, &ri, &ro);
+			if (ro.estop_req && !g_estop) {
+				g_estop = true;
+				g_armed = false;
+				send_control(u);   /* g_estop forces motors to 0 (u not read) */
+				printk("flight_controller: *** EMERGENCY CUTOFF *** %s; motors OFF (reset to clear)\n",
+				       ro.estop_reason);
+			}
+			g_armed = ro.armed;
+			g_arming = ro.arming;
+			if (ro.event != NULL) {
+				static char ev[112];
+				const char *text = strncmp(ro.event, "RIG ", 4) == 0 ? ro.event + 4 : ro.event;
+
+				snprintf(ev, sizeof(ev), "RIG EVENT %s%s%s\n", text,
+					 ro.estop_req ? ": " : "", ro.estop_req ? ro.estop_reason : "");
+				rig_say(ev);
+				if (ROSE_TELEM_CONSOLE || !g_armed) {
+					printk("%s", ev);
+				}
+			}
+			if (ro.send_gains) {
+				static char gl[FC_RIG_REPLY_MAX];
+
+				if (fc_rig_gains_format(&g_rig.gains, g_rig.gain_seq, gl, sizeof(gl)) > 0) {
+					rig_say(gl);
+				}
+			}
+		}
+#elif defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
 		/* Arming = LIFT-AND-PLACE gesture (glitch-reboot-safe): must be picked up past
 		 * LIFT_ARM_THRESHOLD_M, then set down level + on-ground + still held for PLACE_CONFIRM_MS.
 		 * Then fly the altitude profile until it completes or the hard cap, then disarm.
@@ -4312,6 +4600,78 @@ int main(void)
 		 * otherwise starve them on the shared I2C mutex. ~300 us/iter paces the loop to ~1.3 kHz --
 		 * still ample for control. */
 		k_usleep(300);
+#endif
+#if defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC && defined(ROSE_RIG) && ROSE_RIG
+		{
+			/* Rig layout (flightrec.h struct flightrec_rig_sample): what the roll law
+			 * saw and published this tick (g_rig.dbg), true radians. */
+			struct flightrec_rig_sample rs;
+			bool active = false;
+			int64_t cyc_us = (int64_t)k_cyc_to_us_floor64(k_cycle_get_64());
+			const struct fc_rig_dbg *d = &g_rig.dbg;
+
+			rs.t_us  = (uint32_t)cyc_us;
+			rs.dt_us = (uint16_t)MIN(dt * 1e6f, 65535.0f);
+			rs.seq   = (uint8_t)iter;
+			rs.flags = (uint8_t)((g_armed          ? FLIGHTREC_F_ARMED      : 0u) |
+					     (g_estop          ? FLIGHTREC_F_ESTOP      : 0u) |
+					     (g_arming         ? FLIGHTREC_F_ARMING     : 0u) |
+					     (g_gyro_cal_done  ? FLIGHTREC_F_CALDONE    : 0u) |
+					     (f.tof_valid      ? FLIGHTREC_F_TOF_VALID  : 0u) |
+					     (f.flow_valid     ? FLIGHTREC_F_FLOW_VALID : 0u) |
+					     (motor_gate_committed() ? FLIGHTREC_F_COMMITTED : 0u));
+			rs.rig_state = g_rig.rs;
+			rs.exc_id    = (uint8_t)g_rig.exc_id;
+			rs.gain_seq  = (uint16_t)g_rig.gain_seq;
+			for (int i = 0; i < 3; i++) {
+				rs.gyro[i] = state[9 + i];   /* what the rate loop used */
+			}
+			rs.roll = d->roll;            rs.pitch = d->pitch;
+			rs.roll_tgt = d->roll_tgt;    rs.rate_tgt = d->rate_tgt;
+			rs.rate_cmd = d->rate_cmd;    rs.moment = d->moment;
+			rs.exc_val = d->exc_val;      rs.coll_thrust = d->coll_thrust;
+			rs.att_int = d->att_int;      rs.rate_int = d->rate_int;
+			rs.pitch_cmd = d->pitch_cmd;  rs.yaw_cmd = d->yaw_cmd;
+			rs.accel_y = f.accel[1];      rs.accel_z = f.accel[2];
+			rs.vbat = telem_vbat();
+			for (int i = 0; i < 4; i++) {
+				float du = MIN(MAX(g_last_duty[i], 0.0f), 1.0f);
+
+				rs.duty[i] = (uint16_t)(du * 10000.0f + 0.5f);
+				active = active || g_last_duty[i] > 0.0f;
+			}
+			flightrec_tick(&rs, active);
+		}
+#elif defined(ROSE_FLIGHTREC) && ROSE_FLIGHTREC
+		{
+			struct flightrec_sample rs;
+			bool active = false;
+			int64_t cyc_us = (int64_t)k_cyc_to_us_floor64(k_cycle_get_64());
+
+			rs.t_us  = (uint32_t)cyc_us;
+			rs.dt_us = (uint16_t)MIN(dt * 1e6f, 65535.0f);
+			rs.seq   = (uint8_t)iter;
+			rs.flags = (uint8_t)((g_armed          ? FLIGHTREC_F_ARMED      : 0u) |
+					     (g_estop          ? FLIGHTREC_F_ESTOP      : 0u) |
+					     (g_arming         ? FLIGHTREC_F_ARMING     : 0u) |
+					     (g_gyro_cal_done  ? FLIGHTREC_F_CALDONE    : 0u) |
+					     (f.tof_valid      ? FLIGHTREC_F_TOF_VALID  : 0u) |
+					     (f.flow_valid     ? FLIGHTREC_F_FLOW_VALID : 0u) |
+					     (motor_gate_committed() ? FLIGHTREC_F_COMMITTED : 0u));
+			for (int i = 0; i < 3; i++) {
+				rs.gyro[i]   = f.gyro[i];
+				rs.att[i]    = state[3 + i];
+				rs.sp_att[i] = g_setpoint[3 + i];
+			}
+			rs.z   = state[2];
+			rs.zsp = g_setpoint[2];
+			for (int i = 0; i < 4; i++) {
+				rs.u[i]    = u[i];
+				rs.duty[i] = g_last_duty[i];
+				active = active || g_last_duty[i] > 0.0f;
+			}
+			flightrec_tick(&rs, active);
+		}
 #endif
 #if defined(ROSE_FLIGHTLOG) && ROSE_FLIGHTLOG
 		if (!g_estop && (iter % ROSE_FLIGHTLOG_DIV) == 0) {

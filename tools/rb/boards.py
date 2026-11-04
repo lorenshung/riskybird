@@ -1388,22 +1388,82 @@ PHOTO_MODES = (
 )
 
 
-def _with_photo_modes(workload: Workload) -> Workload:
-    known = set(workload.modes) | {m for m, *_ in PHOTO_MODES}
-    if any(base not in known for _m, base, *_ in PHOTO_MODES):
+def _with_photo_modes(workload: Workload, table=PHOTO_MODES) -> Workload:
+    known = set(workload.modes) | {m for m, *_ in table}
+    if any(base not in known for _m, base, *_ in table):
         # A photo mode on a preset that is gone would build as esp-motors plus the camera --
         # a flight image with none of the flown values. Leave them out rather than that.
         return workload
     return replace(
         workload,
-        modes=tuple(workload.modes) + tuple(m for m, *_ in PHOTO_MODES),
+        modes=tuple(workload.modes) + tuple(m for m, *_ in table),
         cmake_defines_by_mode=tuple(workload.cmake_defines_by_mode)
-        + tuple((m, cmake) for m, _b, cmake, _c, _n in PHOTO_MODES if cmake),
+        + tuple((m, cmake) for m, _b, cmake, _c, _n in table if cmake),
         cppflags_by_mode=tuple(workload.cppflags_by_mode)
-        + tuple((m, cpp) for m, _b, _cm, cpp, _n in PHOTO_MODES),
-        mode_bases=tuple(workload.mode_bases) + tuple((m, b) for m, b, *_ in PHOTO_MODES),
-        mode_notes=tuple(workload.mode_notes) + tuple((m, n) for m, _b, _cm, _c, n in PHOTO_MODES),
+        + tuple((m, cpp) for m, _b, _cm, cpp, _n in table if cpp),
+        mode_bases=tuple(workload.mode_bases) + tuple((m, b) for m, b, *_ in table),
+        mode_notes=tuple(workload.mode_notes) + tuple((m, n) for m, _b, _cm, _c, n in table),
     )
+
+
+# ---- roll harness ("rig") -------------------------------------------------------------------
+#
+# The drone on a 1-DOF roll pivot (hard stops at ~+-30 deg), held level at hover collective while
+# the roll loops are tuned over WiFi (workloads/flight_controller/src/fc_rig.h; RIG-SPEC). Same
+# (mode, base, CMake -D, preprocessor -D, note) shape as PHOTO_MODES and built the same way, on
+# esp-motors -- NOT a tools/flight/presets/*.env, which would be recorded as a build that flew.
+# ROSE_TELEM_DIV 50 is ~25 Hz of RIG lines at the measured ~1260 Hz loop. ROSE_FLOW=0: the rig
+# uses no flow, and the build only notes that the flow-spi alias is unused. The rig gains default
+# to the build's ATT_GAIN / MOTOR_TRIM_LEFT, i.e. esp-motors' 1.0 / 0.87, not t21's 0.85 / 1.0:
+# set them with GAIN before the first run.
+RIG_MODES = (
+    (
+        "rig-roll", "esp-motors",
+        (
+            ("ROSE_RIG", "1"),
+            ("ROSE_AUTOFLIGHT", "1"),
+            ("ROSE_UART_CMD", "1"),
+            ("ROSE_FLIGHT_COMMIT", "1"),
+            ("ROSE_COMMIT_MAX_MS", "900000"),   # 15 min from the first spin: one batch per load
+            ("ROSE_ARM_NO_GESTURE", "1"),
+            ("PID_MASS_KG", "0.050f"),
+            ("AUTOFLIGHT_MAX_DUTY", "0.95f"),
+            ("ROSE_BATT_REPORT_ONLY", "0"),
+            ("ROSE_TELEM_DIV", "50"),
+            ("ROSE_FLIGHTREC", "1"),
+            ("ROSE_FLOW", "0"),
+            # uart1 RX from its interrupt (main.cpp uart1_rx_isr, fc_uart_rx.h): polled once a
+            # tick, the 8-byte RX FIFO overflowed and uplink lines were lost. A -DCONFIG_ here, like
+            # the workload's CONFIG_UART_SIFIVE_PORT_1, because a derived mode builds with its base's
+            # .conf fragments (layout_mode) and a flight_controller-rig-roll.conf would never be
+            # read. TX stays polled; uart0 (console) only gains an unused, disabled IRQ hookup.
+            ("CONFIG_UART_INTERRUPT_DRIVEN", "y"),
+        ),
+        (
+            ("ROSE_VEL_LOOP", "0"),
+            ("ROSE_TELEM_CONSOLE", "0"),
+            ("FLIGHTREC_DIV", "4"),
+            # Start from the gains t21-hover-1.0m flew (its preset), not esp-motors' bench
+            # defaults: MOTOR_TRIM_LEFT 0.87 there was measured as a -6 deg bank.
+            ("ATT_GAIN", "0.85f"),
+            ("MOTOR_TRIM_LEFT", "1.0f"),
+            ("IMU_OFFSET_Y", "0.016f"),
+            # v2 stand: rigid blockers at ~15 deg; raise for a 30 deg stop. fc_rig.cpp's own
+            # defaults (0.44f / tilt - 0.09f) are sized for the 30 deg stop.
+            ("RIG_MAX_TILT_RAD", "0.227f"),   # 13 deg tilt guard, inside the ~15 deg blockers
+            ("RIG_TGT_MAX_RAD", "0.14f"),     # 8 deg roll-target clamp
+            # LiPo on the rig: t21's cutoff. The 3.2 V default estops on normal sag at hover
+            # collective (sim twin, R0 ~0.18 ohm); the bench PSU browns the ESP out above ~0.45 duty.
+            ("BATT_CUTOFF_V", "3.0f"),
+            # Time allowed from the end of RAMP_UP to come off the stop before ramping down. 8 s
+            # while a tethered USB cable loads one side; the 2 s default is for an untethered drone.
+            ("RIG_LIFTOFF_TIMEOUT_MS", "8000"),
+        ),
+        "NOT A FLIGHT BUILD -- roll harness only: the drone on the 1-DOF roll pivot, arming over "
+        "the uplink (RESET + HB + COLL), roll gains set live; it has no altitude, velocity or "
+        "free-fall protection and must NEVER be flown free",
+    ),
+)
 
 
 def _with_flight_presets(workload: Workload) -> Workload:
@@ -1436,7 +1496,9 @@ def _with_flight_presets(workload: Workload) -> Workload:
     )
 
 
-WORKLOADS["flight_controller"] = _with_photo_modes(_with_flight_presets(WORKLOADS["flight_controller"]))
+WORKLOADS["flight_controller"] = _with_photo_modes(
+    _with_photo_modes(_with_flight_presets(WORKLOADS["flight_controller"])), RIG_MODES
+)
 
 
 def get_board(name: str) -> Board:
