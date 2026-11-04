@@ -65,6 +65,10 @@ results/
 /hardware/zephyr/targets/esp32c6/PROGRAMMING.md
 /workloads/actuator_bringup/README.rst
 /workloads/sensor_bringup/README.rst
+/workloads/flight_controller/README.rst
+/tools/bench/groundstation/README.md
+/tools/bench/groundstation/mobile/DESIGN.md
+/tools/flight/esp32c6/README.md
 /hardware/chipyard/OSPI_I2C_INTEGRATION.md
 /hardware/chipyard/fpga/scripts/floorplan/README.md
 /hardware/chipyard/riskybird/INTEGRATION.md
