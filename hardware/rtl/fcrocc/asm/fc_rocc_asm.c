@@ -16,9 +16,12 @@
  * and writes a replay CSV in the same format as sim/replay_rtl.csv.
  *
  * Usage:
- *   fc_rocc_asm [-o OUTDIR] [--lint] SOURCE.fca
- *   fc_rocc_asm [-o OUTDIR] SOURCE.fca --replay SENSORS.csv OUT.csv
+ *   fc_rocc_asm [-o OUTDIR] [-D NAME=EXPR]... [--lint] SOURCE.fca
+ *   fc_rocc_asm [-o OUTDIR] [-D NAME=EXPR]... SOURCE.fca --replay SENSORS.csv OUT.csv
  * OUTDIR defaults to ./build (never the checked-in vsrc/ or firmware dirs).
+ * -D NAME=EXPR (or -DNAME=EXPR) defines a .set symbol before the source is read;
+ * a `.set NAME = ...` in the source is then skipped, so the source's .set is the
+ * default and the command line overrides it.
  *
  * ---- microword (64 bits; 63:43 are zero) ----
  *   [3:0] op  [10:4] sh (signed)  [18:11] fd  [26:19] fa  [34:27] fb  [42:35] fc
@@ -26,6 +29,9 @@
  * ---- source language ----
  *   ; or //            comment to end of line
  *   .set   NAME = EXPR                    compile-time symbol
+ *   .if EXPR / .else / .endif             conditional assembly (EXPR != 0; nests). Lines
+ *                                         in a false branch are not parsed at all, so they
+ *                                         emit nothing and claim no registers.
  *   .const NAME rN = EXPR [FMT]           boot-image constant (FMT: q<N> | int; default q24)
  *   .state NAME rN = EXPR [FMT]           boot-image state (program may write it)
  *   .input NAME rN                        input register (exported as FCR_IN_NAME)
@@ -152,9 +158,15 @@ static void die(const char *fmt, ...)
 enum { T_INT, T_FLOAT, T_DOUBLE };
 typedef struct { int t; double v; } val_t;
 
-typedef struct { char name[64]; val_t v; } setsym_t;
+typedef struct { char name[64]; val_t v; int cmdline; } setsym_t;
 static setsym_t g_set[512];
 static int g_nset;
+
+/* conditional assembly: one entry per open .if */
+typedef struct { int active, parent_active, line, else_seen; } cond_t;
+static cond_t g_cond[32];
+static int g_ncond;
+static int cond_active(void) { return g_ncond == 0 || g_cond[g_ncond - 1].active; }
 
 static const char *ep; /* expression cursor */
 static void skipws(void) { while (*ep == ' ' || *ep == '\t') ep++; }
@@ -513,13 +525,46 @@ static void do_line(char *line)
     char *rest = s + n;
     while (isspace((unsigned char)*rest)) rest++;
 
+    /* conditional assembly, handled before anything else so a false branch is never parsed */
+    if (!strcmp(kw, ".if")) {
+        if (g_ncond >= (int)(sizeof g_cond / sizeof g_cond[0])) die(".if nested too deep");
+        int parent = cond_active();
+        if (parent && !*rest) die(".if EXPR");
+        g_cond[g_ncond].parent_active = parent;
+        g_cond[g_ncond].active = parent && eval(rest).v != 0.0;
+        g_cond[g_ncond].line = g_line;
+        g_cond[g_ncond].else_seen = 0;
+        g_ncond++;
+        return;
+    }
+    if (!strcmp(kw, ".else")) {
+        if (!g_ncond) die(".else without .if");
+        if (*rest) die(".else takes no operands");
+        cond_t *c = &g_cond[g_ncond - 1];
+        if (c->else_seen) die("second .else for the .if at line %d", c->line);
+        c->else_seen = 1;
+        c->active = c->parent_active && !c->active;
+        return;
+    }
+    if (!strcmp(kw, ".endif")) {
+        if (!g_ncond) die(".endif without .if");
+        if (*rest) die(".endif takes no operands");
+        g_ncond--;
+        return;
+    }
+    if (!cond_active()) return;
+
     if (kw[0] == '.') {
         char name[64], regs[16];
         if (!strcmp(kw, ".set")) {
             char *eq = strchr(rest, '=');
             if (!eq || sscanf(rest, "%63[A-Za-z0-9_]", name) != 1) die(".set NAME = EXPR");
             if (g_pass == 2) return;
-            for (int i = 0; i < g_nset; i++) if (!strcmp(g_set[i].name, name)) die("'%s' already set", name);
+            for (int i = 0; i < g_nset; i++)
+                if (!strcmp(g_set[i].name, name)) {
+                    if (g_set[i].cmdline) { g_set[i].cmdline = 2; return; } /* -D overrides the default */
+                    die("'%s' already set", name);
+                }
             snprintf(g_set[g_nset].name, 64, "%s", name);
             g_set[g_nset].v = eval(eq + 1);
             g_nset++;
@@ -624,11 +669,13 @@ static void assemble(const char *path, int pass)
     g_gen = 0;
     memset(g_reggen, 0, sizeof g_reggen);
     memset(g_written, 0, sizeof g_written);
+    g_ncond = 0;
     while (fgets(line, sizeof line, fp)) {
         g_line++;
         do_line(line);
     }
     fclose(fp);
+    if (g_ncond) { g_line = g_cond[g_ncond - 1].line; die(".if without .endif"); }
     finish_program();
 }
 
@@ -787,19 +834,42 @@ static void replay(const char *in, const char *out)
     fprintf(stderr, "replay: %d steps -> %s (EST %ld cycles, CTRL %ld cycles per run)\n", step, out, ce, cc);
 }
 
+/* -D NAME=EXPR: a .set symbol that the source's own .set of NAME does not override */
+static void cmdline_define(const char *def)
+{
+    char name[64];
+    const char *eq = strchr(def, '=');
+    if (!eq || sscanf(def, "%63[A-Za-z0-9_]", name) != 1 || strlen(name) != (size_t)(eq - def)) {
+        fprintf(stderr, "-D wants NAME=EXPR, got '%s'\n", def);
+        exit(2);
+    }
+    for (int i = 0; i < g_nset; i++)
+        if (!strcmp(g_set[i].name, name)) { fprintf(stderr, "-D %s given twice\n", name); exit(2); }
+    g_file = "<command line>";
+    snprintf(g_set[g_nset].name, 64, "%s", name);
+    g_set[g_nset].v = eval(eq + 1);
+    g_set[g_nset].cmdline = 1;
+    g_nset++;
+}
+
 int main(int argc, char **argv)
 {
     const char *outdir = "build", *src = NULL, *rin = NULL, *rout = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-o") && i + 1 < argc) outdir = argv[++i];
+        else if (!strcmp(argv[i], "-D") && i + 1 < argc) cmdline_define(argv[++i]);
+        else if (!strncmp(argv[i], "-D", 2) && argv[i][2]) cmdline_define(argv[i] + 2);
         else if (!strcmp(argv[i], "--replay") && i + 2 < argc) { rin = argv[++i]; rout = argv[++i]; }
         else if (!strcmp(argv[i], "--lint")) ;  /* checks always run; kept for scripts */
-        else if (argv[i][0] == '-') { fprintf(stderr, "usage: %s [-o DIR] SRC.fca [--replay IN.csv OUT.csv]\n", argv[0]); return 2; }
+        else if (argv[i][0] == '-') { fprintf(stderr, "usage: %s [-o DIR] [-D NAME=EXPR]... SRC.fca [--replay IN.csv OUT.csv]\n", argv[0]); return 2; }
         else src = argv[i];
     }
-    if (!src) { fprintf(stderr, "usage: %s [-o DIR] SRC.fca [--replay IN.csv OUT.csv]\n", argv[0]); return 2; }
+    if (!src) { fprintf(stderr, "usage: %s [-o DIR] [-D NAME=EXPR]... SRC.fca [--replay IN.csv OUT.csv]\n", argv[0]); return 2; }
     g_file = src;
     assemble(src, 1);
+    for (int i = 0; i < g_nset; i++)
+        if (g_set[i].cmdline == 1)
+            fprintf(stderr, "fc_rocc_asm: warning: -D %s matches no .set in %s\n", g_set[i].name, src);
     assemble(src, 2);
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "mkdir -p '%s'", outdir);
