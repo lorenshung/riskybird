@@ -22,7 +22,8 @@
  *   5. imu        -- the estimator's only attitude source.
  *   6. camera     -- shares the I2C bus with everything above.
  *   7. flow       -- SPI, so independent of the bus; last of the sensors.
- *   8. motors     -- only under --mode motors, and only on request.
+ *   8. motors     -- only under --mode motors: duty frames to the ESP32,
+ *                    which owns the gates. This core drives no motor pin.
  */
 
 #include <riskybird/camera.h>
@@ -46,11 +47,10 @@
 
 #define PMW3901_NODE DT_NODELABEL(riskybird_pmw3901)
 
-#if DT_NODE_EXISTS(DT_ALIAS(pwm_motor1))
-#include <zephyr/drivers/pwm.h>
-#define HAVE_MOTORS 1
-#else
-#define HAVE_MOTORS 0
+/* Set by `rb build bootup_check --mode motors` (cppflags_by_mode in
+ * tools/rb/boards.py). The sweep goes through the ESP link; see stage 8. */
+#ifndef BOOTUP_MOTORS
+#define BOOTUP_MOTORS 0
 #endif
 
 /* ---------------------------------------------------------------- addresses */
@@ -95,7 +95,7 @@ static const char *const STAGE_NAME[S_COUNT] = {
 	[S_IMU] = "BMI088 IMU",
 	[S_CAMERA] = "HM01B0 camera",
 	[S_FLOW] = "PMW3901 flow",
-	[S_MOTORS] = "PWM motors",
+	[S_MOTORS] = "motors (ESP link)",
 };
 
 static enum verdict outcome[S_COUNT];
@@ -621,116 +621,132 @@ static void stage_flow(void)
 
 /* --------------------------------------------------------------- 8. motors */
 
-#if HAVE_MOTORS
-
-#define MOTOR_PERIOD_NSEC (50U * 1000U)
-
+#if BOOTUP_MOTORS
 /*
- * The sweep is a liveness test for the four outputs, so it has to be long
+ * The motors are driven by the ESP32-C6, not by this core. The ESP (esp_bridge
+ * --mode motors) owns all four gates and applies the 14-byte motor_link duty
+ * frames this core sends it on uart1 -- the same frames, wire and rate the
+ * flight controller uses, so this sweep exercises the flight path, gate FET
+ * and all. This image enables no PWM driver and drives no motor pin.
+ *
+ * Until 2026-11-03 this stage wrote the FPGA's own PWM comparators instead.
+ * That path no longer reaches a flying motor: motor 4's pad (F13) is dead, the
+ * ESP drives the same four gates with no arbitration, and a halted core left
+ * the comparators driving. Here a halted core stops sending frames and the ESP
+ * cuts all four within 120 ms.
+ *
+ * The sweep is a liveness test for the four motors, so it has to be long
  * enough and strong enough to SEE. 300 ms at 10% is inside the stiction of a
  * loaded motor -- it twitches and stops, which is indistinguishable from dead.
  *
  * Overridable at build time with
  *   RB_EXTRA_CPPFLAGS="-DBOOTUP_MOTOR_DUTY_PCT=n -DBOOTUP_MOTOR_PULSE_MS=n"
- * kept plain defines rather than Kconfig for the reason ddr_stress gives.
+ * kept plain defines rather than Kconfig for the reason ddr_stress gives. The
+ * ESP applies its own ceiling (ESP_LINK_MAX_DUTY_PCT, 25 by default) on top.
  */
+#include <zephyr/drivers/uart.h>
+#include <riskybird/motor_link.h>
+
+#if !DT_NODE_EXISTS(DT_ALIAS(esp_uart))
+#error "bootup_check --mode motors drives the motors through the ESP link: build \
+against a shell that elaborates serial@10021000 so rb appends fpga-esp-uart.overlay."
+#endif
+
 #ifndef BOOTUP_MOTOR_DUTY_PCT
 #define BOOTUP_MOTOR_DUTY_PCT 15
 #endif
 #ifndef BOOTUP_MOTOR_PULSE_MS
 #define BOOTUP_MOTOR_PULSE_MS 1000
 #endif
-
 /*
- * Seconds of warning before the sweep starts, as a Ctrl-C window.
+ * Seconds of warning before the sweep starts.
  *
  * There is deliberately no keypress gate. It could not be answered through a
  * piped GDB session -- the console is a separate serial node -- so a run driven
  * by rb debug sat at the prompt until it timed out and reported nothing, and
  * needing an extra -D flag to get past it made the documented command wrong.
- * Choosing --mode motors is the opt-in, exactly as it is for CONFIG_PWM.
+ * Choosing --mode motors is the opt-in.
  */
 #ifndef BOOTUP_MOTOR_WARN_SEC
 #define BOOTUP_MOTOR_WARN_SEC 3
 #endif
+/* 50 Hz, as the flight controller and motor_duty send: 6x margin on the
+ * ESP's 120 ms frame timeout. */
+#define BOOTUP_MOTOR_FRAME_MS 20
+#define BOOTUP_MOTOR_GAP_MS   700
+#define BOOTUP_MOTOR_COUNT    MOTOR_LINK_NMOTORS
+#define BOOTUP_MOTOR_NONE     MOTOR_LINK_NMOTORS
 
-#define MOTOR_PULSE_NSEC \
-	((MOTOR_PERIOD_NSEC * (unsigned)BOOTUP_MOTOR_DUTY_PCT) / 100U)
+BUILD_ASSERT(BOOTUP_MOTOR_DUTY_PCT > 0 && BOOTUP_MOTOR_DUTY_PCT <= 25,
+	     "BOOTUP_MOTOR_DUTY_PCT is a liveness sweep, not thrust: 1..25 "
+	     "(the ESP's default ceiling is 25)");
 
-/* One alias per motor, as motor_1..motor_4 declare them. The channel map lives
- * in bootup_check-motors.overlay; index order here is motor1..motor4. */
-static const struct pwm_dt_spec motors[] = {
-	PWM_DT_SPEC_GET(DT_ALIAS(pwm_motor1)),
-	PWM_DT_SPEC_GET(DT_ALIAS(pwm_motor2)),
-	PWM_DT_SPEC_GET(DT_ALIAS(pwm_motor3)),
-	PWM_DT_SPEC_GET(DT_ALIAS(pwm_motor4)),
-};
+static const struct device *const esp_link = DEVICE_DT_GET(DT_ALIAS(esp_uart));
+static uint32_t motor_frames;
 
-#define MOTOR_ALL_PARKED_MASK ((1U << ARRAY_SIZE(motors)) - 1U)
-
-/*
- * The motor aliases make the PWM devices initialize during POST_KERNEL. Park
- * them at the first APPLICATION priority, before main() can start the memory
- * and sensor stages. Keeping the mask visible gives the debugger and stage 8
- * evidence that every channel was forced off during that startup window.
- */
-volatile uint32_t bootup_motor_early_park_mask;
-
-static int park_motors_before_main(void)
+/* One frame: `motor` at `duty` (1/10000) and ARMED, or all four off and
+ * disarmed when motor is BOOTUP_MOTOR_NONE. */
+static void motor_frame(unsigned int motor, uint16_t duty)
 {
-	uint32_t parked = 0U;
+	static uint8_t seq;
+	uint16_t d[MOTOR_LINK_NMOTORS] = { 0, 0, 0, 0 };
+	uint8_t frame[MOTOR_LINK_FRAME_LEN];
+	uint8_t flags = 0u;
 
-	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
-		if (pwm_is_ready_dt(&motors[i]) &&
-		    pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0) == 0) {
-			parked |= (1U << i);
-		}
+	if (motor < BOOTUP_MOTOR_COUNT && duty > 0u) {
+		d[motor] = duty;
+		flags = MOTOR_LINK_FLAG_ARMED;
 	}
-	bootup_motor_early_park_mask = parked;
-
-	return parked == MOTOR_ALL_PARKED_MASK ? 0 : -EIO;
+	motor_link_encode(frame, ++seq, flags, d);
+	for (unsigned int i = 0; i < MOTOR_LINK_FRAME_LEN; i++) {
+		uart_poll_out(esp_link, frame[i]);
+	}
+	motor_frames++;
 }
 
-SYS_INIT(park_motors_before_main, APPLICATION, 0);
+/*
+ * Hold one command for `ms`, a frame every BOOTUP_MOTOR_FRAME_MS. The watchdog
+ * latch is checked before EVERY frame: on a trip this sends an explicit
+ * disarmed all-zero frame at once and returns false, rather than relying on
+ * the ESP noticing that frames stopped.
+ */
+static bool motor_hold(unsigned int motor, uint16_t duty, uint32_t ms)
+{
+	int64_t end = k_uptime_get() + ms;
+
+	while (k_uptime_get() < end) {
+		if (rb_motor_guard_tripped()) {
+			motor_frame(BOOTUP_MOTOR_NONE, 0u);
+			return false;
+		}
+		motor_frame(motor, duty);
+		k_msleep(BOOTUP_MOTOR_FRAME_MS);
+	}
+	return true;
+}
 
 static void stage_motors(void)
 {
-	unsigned int ready = 0, parked = 0, written = 0;
+	const uint16_t duty = (uint16_t)(BOOTUP_MOTOR_DUTY_PCT * 100U);
+	unsigned int commanded = 0;
 
-	/* Re-park before reporting as a second line of defense. */
-	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
-		if (pwm_is_ready_dt(&motors[i])) {
-			ready++;
-			if (pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0) == 0) {
-				parked++;
-			}
-		}
-	}
-	printf("         %u/4 channels ready, %u/4 parked at 0%% duty\n",
-	       ready, parked);
-	printf("         pre-main park mask 0x%02x (expect 0x%02x)\n",
-	       (unsigned)bootup_motor_early_park_mask,
-	       (unsigned)MOTOR_ALL_PARKED_MASK);
-
-	if (bootup_motor_early_park_mask != MOTOR_ALL_PARKED_MASK ||
-	    parked != ARRAY_SIZE(motors)) {
-		finish(S_MOTORS, BAD,
-		       "pre-main mask 0x%02x; %u/4 ready, %u/4 forced low now",
-		       (unsigned)bootup_motor_early_park_mask, ready, parked);
+	if (!device_is_ready(esp_link)) {
+		finish(S_MOTORS, BAD, "esp-uart not ready -- no frames can be sent");
 		return;
 	}
-
+	printf("         motors are driven by the ESP32 from motor_link frames on %s;\n"
+	       "         this image drives no motor pin. The ESP needs esp_bridge --mode\n"
+	       "         motors, applies its own duty ceiling, and cuts all four if\n"
+	       "         frames stop for 120 ms.\n", esp_link->name);
 	printf("\n"
-	       "  Motors run from +BATT; keep the propellers OFF for this sweep.\n"
-	       "  On USB alone with no battery, +BATT is only weakly cap-charged,\n"
-	       "  so individual motors may barely move or move unevenly. This is a\n"
-	       "  partial, per-motor symptom, not an all-or-nothing battery check.\n"
-	       "  This stage checks PWM comparator writes, not physical rotation.\n");
+	       "  Motors run from +BATT (battery port); keep the propellers OFF for\n"
+	       "  this sweep. This stage checks that each frame was sent, not that\n"
+	       "  anything turned: watch the motors, or read the ESP's RBLINK duty.\n");
 
 	/*
 	 * Attitude watchdog, armed BEFORE the countdown so it is already
-	 * sampling when the first motor turns. It kills every channel on excess
-	 * tilt, on free fall, or on impact.
+	 * sampling when the first motor turns. It latches on excess tilt, on free
+	 * fall, or on impact, and motor_hold() stops on the next frame.
 	 *
 	 * This stage had no supervision of any kind until 2026-09-21, when the
 	 * drone was knocked off the bench mid-sweep and kept driving all the way
@@ -738,18 +754,13 @@ static void stage_motors(void)
 	 * that: a frame dropped flat never tilts, so a tilt-only guard watches it
 	 * fall and does nothing.
 	 *
-	 * A guard that will not start is a FAILED stage, not a warning. Running
-	 * the sweep unsupervised is the exact situation this exists to prevent,
-	 * so it refuses rather than proceeding.
+	 * A guard that will not start is a FAILED stage, not a warning.
 	 */
 	{
-		int grc = rb_motor_guard_start(motors, ARRAY_SIZE(motors),
-					       MOTOR_PERIOD_NSEC, NULL);
+		int grc = rb_motor_guard_start_watch(NULL);
 
 		if (grc != 0) {
-			for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
-				(void)pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0);
-			}
+			motor_frame(BOOTUP_MOTOR_NONE, 0u);
 			finish(S_MOTORS, BAD,
 			       "attitude watchdog would not start (%d) -- refusing to sweep",
 			       grc);
@@ -757,19 +768,14 @@ static void stage_motors(void)
 		}
 	}
 	printf("         attitude watchdog armed: tilt>45deg, free fall, or impact "
-	       "kills all four\n");
+	       "stops the sweep\n");
 
 	/*
 	 * Opt-in guard self-test, motors OFF. Build with
 	 *   RB_EXTRA_CPPFLAGS="-DBOOTUP_GUARD_SELFTEST=1"
 	 * and the guard runs for BOOTUP_GUARD_SELFTEST_SEC seconds, printing what
-	 * it can see, before anything is allowed to spin.
-	 *
-	 * This exists because the sweep's window is about seven seconds with no
-	 * feedback, so an operator who tilts a moment late gets "watchdog clean"
-	 * -- which is indistinguishable from a guard that cannot see at all.
-	 * Showing the live tilt makes "it did not trip" a measurement instead of
-	 * an absence.
+	 * it can see, before anything is allowed to spin. Showing the live tilt
+	 * makes "it did not trip" a measurement instead of an absence.
 	 */
 #ifndef BOOTUP_GUARD_SELFTEST
 #define BOOTUP_GUARD_SELFTEST 0
@@ -802,10 +808,11 @@ static void stage_motors(void)
 	printf("         self-test finished without tripping.\n\n");
 #endif
 
+	/* Disarmed all-zero frames through the countdown: the ESP sees a live,
+	 * explicitly-off link before the first armed frame arrives. */
 	for (int left = BOOTUP_MOTOR_WARN_SEC; left > 0; left--) {
-		printf("  sweeping in %d ... (Ctrl-C to stop)\n", left);
-		k_msleep(1000);
-		if (rb_motor_guard_tripped()) {
+		printf("  sweeping in %d ...\n", left);
+		if (!motor_hold(BOOTUP_MOTOR_NONE, 0u, 1000U)) {
 			rb_motor_guard_stop();
 			finish(S_MOTORS, BAD, "watchdog tripped before the sweep: %s",
 			       rb_motor_guard_reason_str());
@@ -814,65 +821,53 @@ static void stage_motors(void)
 	}
 	printf("\n");
 
-	/*
-	 * One at a time, with a gap, and announced before and after. On this
-	 * board the four MOTOR nets are driven by the ESP32-C6 as well as the
-	 * FPGA -- both land on the same MOSFET gates with no arbitration -- so a
-	 * motor that is already turning when this starts is not evidence about
-	 * this output. Naming each command lets an operator correlate an observed
-	 * response, but no rotation feedback contributes to this stage's verdict.
-	 */
-	printf("         observe any response as each PWM comparator is written:\n");
-	for (size_t i = 0; i < ARRAY_SIZE(motors); i++) {
-		printf("         motor%u -> %u%% for %u ms ... ", (unsigned)i + 1U,
+	/* One at a time, with a gap, announced before and after, so an operator
+	 * can tie what they see to one motor. */
+	printf("         observe each motor as it is commanded:\n");
+	for (unsigned int i = 0; i < BOOTUP_MOTOR_COUNT; i++) {
+		uint32_t before = motor_frames;
+		bool ok;
+
+		printf("         motor%u -> %u%% for %u ms ... ", i + 1U,
 		       (unsigned)BOOTUP_MOTOR_DUTY_PCT, (unsigned)BOOTUP_MOTOR_PULSE_MS);
-		if (pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, MOTOR_PULSE_NSEC) != 0) {
-			printf("PWM WRITE FAILED\n");
-			continue;
-		}
-		written++;
-		k_msleep(BOOTUP_MOTOR_PULSE_MS);
-		(void)pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0);
-		/* What this stage can honestly claim: the comparator write landed.
-		 * There is no rotation feedback on this board, so "stopped" or
-		 * "driven" would be reporting something nobody measured. */
-		printf("active comparator write succeeded\n");
-		/* Checked between every pulse as well as inside the guard thread,
-		 * so the sweep stops advancing the moment the airframe moves
-		 * rather than working through the remaining motors. */
-		if (rb_motor_guard_tripped()) {
+		ok = motor_hold(i, duty, BOOTUP_MOTOR_PULSE_MS);
+		/* Explicit off before anything is printed: console output on a
+		 * polled UART takes milliseconds. */
+		motor_frame(BOOTUP_MOTOR_NONE, 0u);
+		printf("%u frames sent, then off\n", (unsigned)(motor_frames - before));
+		if (!ok) {
 			int32_t a = rb_motor_guard_trip_accel();
 
 			rb_motor_guard_stop();
 			finish(S_MOTORS, BAD,
-			       "WATCHDOG KILLED THE MOTORS at motor%u: %s (|a|=%d mm/s^2)",
-			       (unsigned)i + 1U, rb_motor_guard_reason_str(), (int)a);
+			       "WATCHDOG STOPPED THE SWEEP at motor%u: %s (|a|=%d mm/s^2)",
+			       i + 1U, rb_motor_guard_reason_str(), (int)a);
 			return;
 		}
-		k_msleep(700);
+		commanded++;
+		if (!motor_hold(BOOTUP_MOTOR_NONE, 0u, BOOTUP_MOTOR_GAP_MS)) {
+			rb_motor_guard_stop();
+			finish(S_MOTORS, BAD,
+			       "WATCHDOG STOPPED THE SWEEP after motor%u: %s",
+			       i + 1U, rb_motor_guard_reason_str());
+			return;
+		}
 	}
 
 	{
 		uint32_t seen = rb_motor_guard_samples();
 
 		rb_motor_guard_stop();
-		if (written != ARRAY_SIZE(motors)) {
-			finish(S_MOTORS, BAD,
-			       "%u/%u PWM comparator writes succeeded at %u%% duty",
-			       written, (unsigned)ARRAY_SIZE(motors),
-			       (unsigned)BOOTUP_MOTOR_DUTY_PCT);
-			return;
-		}
-		/* Two things are reported and neither is rotation. The write count
-		 * is what was actually checked. The watchdog sample count is there
-		 * because zero would mean the guard thread never ran, which is
-		 * indistinguishable from "watched and saw nothing" in any message
-		 * that only says the sweep passed. */
+		motor_frame(BOOTUP_MOTOR_NONE, 0u);
+		/* Two things are reported and neither is rotation: what was sent,
+		 * and how many samples the watchdog took -- zero would mean the
+		 * guard thread never ran, which no "passed" message can show. */
 		finish(S_MOTORS, OK,
-		       "%u/%u PWM comparator writes succeeded at %u%% duty; "
+		       "%u/%u motors commanded at %u%% via the ESP link (%u frames); "
 		       "rotation not verified; watchdog clean over %u samples",
-		       written, (unsigned)ARRAY_SIZE(motors),
-		       (unsigned)BOOTUP_MOTOR_DUTY_PCT, (unsigned)seen);
+		       commanded, (unsigned)BOOTUP_MOTOR_COUNT,
+		       (unsigned)BOOTUP_MOTOR_DUTY_PCT, (unsigned)motor_frames,
+		       (unsigned)seen);
 	}
 }
 
@@ -880,10 +875,10 @@ static void stage_motors(void)
 
 static void stage_motors(void)
 {
-	finish(S_MOTORS, SKIP, "built without PWM -- use --mode motors");
+	finish(S_MOTORS, SKIP, "not built for motors -- use --mode motors");
 }
 
-#endif /* HAVE_MOTORS */
+#endif /* BOOTUP_MOTORS */
 
 /* ------------------------------------------------------------------- main */
 

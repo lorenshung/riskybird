@@ -82,6 +82,16 @@ int rb_motor_guard_start(const struct pwm_dt_spec *motors, size_t count,
 			 uint32_t period_nsec,
 			 const struct rb_motor_guard_config *cfg);
 
+/*
+ * Start guarding with nothing for a trip to zero: the guard only latches
+ * rb_motor_guard_tripped(), and the CALLER must stop its motors when it sees
+ * that. This is for motors this core does not drive itself -- bootup_check's
+ * sweep sends motor_link frames to the ESP32, which owns the gates. Poll the
+ * latch before every frame; the ESP's 120 ms frame timeout covers a core that
+ * stops sending. Same thresholds and return values as rb_motor_guard_start().
+ */
+int rb_motor_guard_start_watch(const struct rb_motor_guard_config *cfg);
+
 /* Stop guarding. Motors are parked on the way out regardless of trip state. */
 void rb_motor_guard_stop(void);
 

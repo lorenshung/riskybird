@@ -17,6 +17,7 @@ struct request {
 	enum kind kind;
 	bool fast;
 	uint32_t addr;
+	uint8_t mode;     /* BOOT: ICAP sequence, see EspLinkIprog (0 = IPROG) */
 	char args[48];
 };
 

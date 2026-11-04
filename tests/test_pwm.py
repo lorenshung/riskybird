@@ -390,31 +390,38 @@ class BootupMotorSafetyTests(unittest.TestCase):
     def setUp(self) -> None:
         self.source = BOOTUP_WORKLOAD.read_text(encoding="utf-8")
 
-    def test_all_motors_are_parked_before_main(self) -> None:
-        self.assertIn(
-            "SYS_INIT(park_motors_before_main, APPLICATION, 0);",
-            self.source,
-        )
-        init_body = re.search(
-            r"static int park_motors_before_main\(void\)\s*\{(.*?)\n\}",
-            self.source,
-            re.DOTALL,
-        )
-        self.assertIsNotNone(init_body)
-        self.assertIn(
-            "pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, 0)",
-            init_body.group(1),
-        )
-        self.assertIn(
-            "bootup_motor_early_park_mask = parked",
-            init_body.group(1),
-        )
+    """The sweep goes through the ESP link (2026-11-03): duty frames to the
+    ESP32, which owns the gates. These pin the properties that replaced the
+    old FPGA-PWM parking."""
 
-    def test_stage_refuses_sweep_if_early_park_failed(self) -> None:
+    def test_no_fpga_pwm_in_any_mode(self) -> None:
+        self.assertNotIn("drivers/pwm.h", self.source)
+        self.assertNotIn("pwm_set_dt", self.source)
+        conf = (ROOT / "hardware" / "zephyr" / "targets"
+                / "fpga" / "workloads" / "bootup_check-motors.conf")
+        active = [l for l in conf.read_text(encoding="utf-8").splitlines()
+                  if l.strip() and not l.lstrip().startswith("#")]
+        self.assertNotIn("CONFIG_PWM=y", active)
+
+    def test_watchdog_is_checked_before_every_frame(self) -> None:
+        body = re.search(r"static bool motor_hold\(.*?\n\}", self.source, re.DOTALL)
+        self.assertIsNotNone(body)
+        hold = body.group(0)
+        self.assertLess(hold.index("rb_motor_guard_tripped()"),
+                        hold.index("motor_frame(motor, duty)"))
+        self.assertIn("motor_frame(BOOTUP_MOTOR_NONE, 0u)", hold)
+
+    def test_sweep_refuses_without_a_watchdog_and_stops_after_each_pulse(self) -> None:
+        self.assertIn("rb_motor_guard_start_watch(NULL)", self.source)
+        self.assertIn("refusing to sweep", self.source)
         self.assertRegex(
             self.source,
-            r"bootup_motor_early_park_mask != MOTOR_ALL_PARKED_MASK",
+            r"(?s)ok = motor_hold\(i, duty, BOOTUP_MOTOR_PULSE_MS\);\s*(/\*.*?\*/\s*)?"
+            r"motor_frame\(BOOTUP_MOTOR_NONE, 0u\);",
         )
+
+    def test_duty_is_bounded_at_build_time(self) -> None:
+        self.assertIn("BOOTUP_MOTOR_DUTY_PCT <= 25", self.source)
 
 
 class ElaboratedShellTests(unittest.TestCase):

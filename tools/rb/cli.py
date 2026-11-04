@@ -1571,15 +1571,17 @@ def load_elf(
     mode: str,
     port_arg: str | None,
     baudrate: int,
+    ram_console: bool = False,
 ) -> None:
     if workload.blocked_reason is not None:
         raise RbError(f"{workload.name} is blocked: {workload.blocked_reason}")
     target = get_target(board.name)
-    elf = zephyr_elf(target, workload, mode)
+    elf = zephyr_elf(target, workload, mode, ram_console)
     if not elf.is_file():
         raise RbError(
             f"Zephyr ELF is missing: {elf}\n"
             f"Run: rb build {workload.name} --target {target.name} --mode {mode}"
+            + (" --ram-console" if ram_console else "")
         )
     port_arg = port_arg or os.environ.get("RB_TSI_PORT")
     if port_arg and "://" in port_arg:
@@ -1639,6 +1641,7 @@ def cmd_load(args: argparse.Namespace) -> int:
         args.mode or workload.default_mode,
         args.port,
         args.baudrate,
+        args.ram_console,
     )
     return 0
 
@@ -3990,6 +3993,7 @@ def build_parser() -> argparse.ArgumentParser:
         "built with the ESP loader only)",
     )
     load.add_argument("--baudrate", type=int, default=921600)
+    load.add_argument("--ram-console", action="store_true", help="load the --ram-console build (console in ram_console_buf, readable over JTAG or an ESP RBPOKE1 session) -- for a drone with no programmer board attached")
     load.set_defaults(func=cmd_load)
 
     console = sub.add_parser("console", help="open the FPGA UART console")
