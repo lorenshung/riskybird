@@ -64,6 +64,11 @@ class WithArty100TTweaks(freqMHz: Double = 50, ddr: Boolean = true, uartTsi: Boo
   new chipyard.harness.WithAllClocksFromHarnessClockInstantiator ++
   new chipyard.clocking.WithPassthroughClockGenerator ++
   (if (ddr) new WithArty100TDDRMem else new WithArty100TScratchpadMem) ++
+  // Defines the inputs of any SPI port no board binder above connects (e.g. the
+  // drone periphery's flow SPI on a shell without WithArty200TSPI). The fork put
+  // this in Chipyard's AbstractConfig; here it is innermost of the board's
+  // binders, so every board SPI binder (always outer to the tweaks) still wins.
+  new chipyard.harness.WithSPITiedOff ++
   new freechips.rocketchip.subsystem.WithoutTLMonitors)
 
 /** Opt-in HM01B0 capture, including the I2C controller used to configure the sensor. */

@@ -1,0 +1,26 @@
+fpga-shells: arty_a7_200 entry in the write_cfgmem board table.
+
+write_cfgmem.tcl looks the board up in ::program::boards::spec, which
+boards.tcl rebuilds whenever it is sourced, so an entry cannot be added from
+outside without replacing the script. The arty_a7_200 board directory itself
+comes from RiskyBird's overlay (hardware/fpga-shells/xilinx/arty_a7_200): a
+TE0712 with the XC7A200T and the 32 MiB S25FL256S configuration flash. This
+is the RiskyBird fork's entry with one correction: iface spix1, not spix4.
+The board's bitstreams are SPIx1 (hardware/fpga-shells/xilinx/arty_a7_200/
+constraints/arty-config.xdc: the flash's QUAD bit is clear), and write_cfgmem
+refuses an SPIx4 configuration-memory file for them ([Writecfgmem 68-20]
+SPI_BUSWIDTH is "1"). Drop it if the board ever lands in fpga-shells upstream
+with its own entry.
+
+diff --git a/xilinx/common/tcl/boards.tcl b/xilinx/common/tcl/boards.tcl
+index c3ffc1f..0ef2c77 100644
+--- a/xilinx/common/tcl/boards.tcl
++++ b/xilinx/common/tcl/boards.tcl
+@@ -5,6 +5,7 @@ namespace eval ::program::boards {}
+ set ::program::boards::spec [dict create \
+ 	arty            [dict create  iface spix4   size 16   bitaddr 0x0        memdev {n25q128-3.3v-spi-x1_x2_x4}] \
+ 	arty_a7_100     [dict create  iface spix4   size 16   bitaddr 0x0        memdev {s25fl128sxxxxxx0-spi-x1_x2_x4}] \
++	arty_a7_200     [dict create  iface spix1   size 32   bitaddr 0x0        memdev {s25fl256sxxxxxx0-spi-x1_x2_x4}] \
+ 	nexys_video     [dict create  iface spix4   size 32   bitaddr 0x0        memdev {s25fl256sxxxxxx0-spi-x1_x2_x4}] \
+ 	vc707           [dict create  iface bpix16  size 128  bitaddr 0x3000000  ] \
+ 	vcu118          [dict create  iface spix8   size 256  bitaddr 0x0        memdev {mt25qu01g-spi-x1_x2_x4_x8}]]

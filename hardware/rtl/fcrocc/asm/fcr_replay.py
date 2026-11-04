@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Replay a sensor trace through the FcRoCC interpreter exactly as sim/tb_fc_rocc.sv does.
 
-Usage: fcr_replay.py [--rom R] [--init I] [--sensors S] [--out O]
+Usage: fcr_replay.py [--rom R] [--init I] [--map M] [--sensors S] [--out O]
 Defaults use ../vsrc/*.hex and ../sim/sensors.csv; output defaults to stdout.
+The program entry points and register map come from --map (an fc_rocc_map.svh), else from an
+fc_rocc_map.svh next to --rom (as fc_rocc_asm writes them), else the checked-in values below.
+A ROM assembled with options that move CTRL_START (e.g. -D FLOW_BODYZ=1) needs its own map.
 """
 import argparse
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,13 +31,29 @@ def toq(v, q):
     return int(s + (0.5 if v >= 0.0 else -0.5))   # int() truncates toward zero like $rtoi
 
 
+def load_map(path):
+    """Read the localparams of an fc_rocc_map.svh into the module-level map."""
+    global EST_START, CTRL_START, U, SOUT
+    p = dict((k, int(v)) for k, v in re.findall(r"\b(\w+)\s*=\s*(\d+)", open(path).read()))
+    EST_START, CTRL_START = p["EST_START"], p["CTRL_START"]
+    for k in IN:
+        IN[k] = p["IN_" + k]
+    U = [p["U%d" % i] for i in range(4)]
+    m = re.search(r"SOUT\s*\[[^]]*\]\s*=\s*'\{([^}]*)\}", open(path).read())
+    SOUT = [int(x) for x in m.group(1).split(",")]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rom", default=os.path.join(HERE, "../vsrc/fc_rocc_rom.hex"))
     ap.add_argument("--init", default=os.path.join(HERE, "../vsrc/fc_rocc_init.hex"))
+    ap.add_argument("--map", default=None)
     ap.add_argument("--sensors", default=os.path.join(HERE, "../sim/sensors.csv"))
     ap.add_argument("--out", default="-")
     a = ap.parse_args()
+    mp = a.map or os.path.join(os.path.dirname(os.path.abspath(a.rom)), "fc_rocc_map.svh")
+    if a.map or os.path.exists(mp):
+        load_map(mp)
 
     core = Core(load_hex(a.rom), load_hex(a.init))
     out = sys.stdout if a.out == "-" else open(a.out, "w")

@@ -85,13 +85,13 @@ for k,v in S["dispatches"].items():
 json.dump(S,open(sys.argv[2],"w"),indent=2)
 PY
   python -m modelblaster.pipeline.ingest_xpurt_schedule --schedule "$SO/dronet_ku040_2bk_sched.json" \
-      --registry cores/chipyard_ku040_dronedual_q31.json --ir dronet:"$GEN/graph.json" \
+      --registry "$RB_MB/cores/chipyard_ku040_dronedual_q31.json" --ir dronet:"$GEN/graph.json" \
       --cpu-p-kind gemmini_q31 --cpu-e-kind rvv --name ku040_dronet_2bk_dev --out "$SO/ku040_dronet_2bk_dev.c"
   python -m modelblaster.pipeline.generate_xpurt_main --schedule "$SO/dronet_ku040_2bk_sched.json" \
       --out "$SO/ku040_dronet_2bk_dev_main.c" --name ku040_dronet_2bk_dev \
       --dispatch-table-header ku040_dronet_2bk_dev.h --platform zephyr \
       --core-kinds rvv,gemmini_q31 --backends rvv,gemmini_q31 \
-      --model-gen-dir dronet="$GEN/gemmini_q31" --networks dronet --registry cores/chipyard_ku040_dronedual_q31.json
+      --model-gen-dir dronet="$GEN/gemmini_q31" --networks dronet --registry "$RB_MB/cores/chipyard_ku040_dronedual_q31.json"
   cp "$SO"/dronet_ku040_2bk_sched.json "$SO"/ku040_dronet_2bk_dev.{c,h} "$SO"/ku040_dronet_2bk_dev_main.c "$DUAL/"
 fi
 
@@ -105,7 +105,11 @@ CONFIG_RISCV_V_KERNEL_ONLY=y
 CONFIG_MP_MAX_NUM_CPUS=2
 CONFIG_RV_BOOT_HART=0
 CONF
+# A shell captured here (hardware/modelblaster) or one of ModelBlaster's own,
+# like the default q31ws_32x32_acc. GCC ignores an -isystem that does not exist.
 PC=$RB_MB/cores/gemmini/include/per_config/$GEMMINI_CONFIG
+[ -d "$PC" ] || PC=$MB/cores/gemmini/include/per_config/$GEMMINI_CONFIG
+test -d "$PC" || { echo "no per_config/$GEMMINI_CONFIG in $RB_MB or $MB" >&2; exit 2; }
 GCF="-march=rv64imac_zicsr_zifencei;-mabi=lp64;-isystem$PC;-isystem$MB/cores/gemmini/include;-isystem$MB/cores/gemmini;-isystem$MB/kernels/gemmini_q31;-DGEMMINI_ROCC;-DBAREMETAL;-DMODELBLASTER_GEMMINI_HWIO_WEIGHTS=1;-DMODELBLASTER_GEMMINI_Q31_ACC_SCALE=1"
 RCF="-march=rv64imac_zve64x;-mabi=lp64;-DMODELBLASTER_RVV_IHWOC_WEIGHTS=1"
 echo "== west build -> $BUILD_DIR =="

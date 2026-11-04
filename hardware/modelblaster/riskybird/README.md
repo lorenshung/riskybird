@@ -73,7 +73,10 @@ on absolute task-accuracy claims.
 
 Activate the Zephyr build environment and provide `ZEPHYR_SDK_INSTALL_DIR`,
 `CONSOLE_CONF`, and `CONSOLE_OVERLAY`. `ZCS` defaults to ModelBlaster's parent;
-use it to select another Zephyr workspace. These recipes build ELFs only:
+use it to select another Zephyr workspace. These recipes build ELFs only. They
+read `backends/modelblaster` (or `$MB`) and write generated sources, caches and
+builds under `$SCRATCH` (default `.rb/modelblaster/ku040` or
+`.rb/modelblaster/stack3` at the repository root), never into the backend:
 
 ```sh
 bash examples/dronet/int8/build_ku040_dual.sh       # single-frame NCHW baseline

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * PMW3901 optical-flow front-end (see flow.h). Reuses the standalone pmw3901.c driver
- * (samples/riskybird/pmw3901_test) with the optimized busy_wait_us read path (~285 us/read).
+ * (workloads/pmw3901_test) with the optimized busy_wait_us read path (~285 us/read).
  */
 #include "flow.h"
 #include "fc_shared_math.h"
@@ -205,6 +205,15 @@ static uint32_t flow_rose_t_prev;
 
 void flow_rose_request(void)
 {
+	/* Read no faster than the hardware thread does (FLOW_PERIOD_MS): the counts accumulate in the
+	 * sensor between reads, and at a ~1 kHz loop a read every iteration would see 0-1 counts, a far
+	 * coarser angular flow than the drone's 100 Hz reads ever get. */
+	static int64_t next_ms;
+	const int64_t now = k_uptime_get();
+	if (now < next_ms) {
+		return;
+	}
+	next_ms = now + FLOW_PERIOD_MS;
 	rose_request(flow_rose, ROSE_FLOW_BURST_CMD, 0U);
 	flow_rose_pending = true;
 }

@@ -23,7 +23,9 @@
 #include <gemmini.h>
 #include <gemmini_params.h>
 #include <gemmini_counter.h>
-#include "/home/cobble/Tools/mb_wt_conv0loadonce/kernels/gemmini_q31_rvv/conv2d_pool_loadonce.h"
+/* Resolved through the include path (-I <ModelBlaster checkout>/kernels/gemmini_q31_rvv, or the
+ * conv0 worktree holding conv2d_pool_loadonce.h); no checkout path is baked in. */
+#include "conv2d_pool_loadonce.h"
 
 /* ---- conv0 shape + requant (the real DroNet first layer) ---- */
 enum {

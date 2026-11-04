@@ -21,7 +21,7 @@
 
 ; ---- physical / tuning parameters (C names; f = float, as in the C sources) ----
 .set GRAVITY        = 9.81f
-.set IMU_OFFSET_Y   = -0.016f     ; IMU lever arm, body y (m). C default is 0; PCB value -0.016
+.set IMU_OFFSET_Y   = 0.016f      ; IMU lever arm, body y (m; +y = left, FLU). C default is 0; PCB value +0.016
 .set IMU_ALPHA_TAU  = 0.02f       ; gyro-derivative LP time constant (s)
 .set KP             = 0.5f        ; Mahony gravity-trim gain
 .set Z_GAIN         = 0.5f        ; ToF observer, z
@@ -60,10 +60,20 @@
 .set GRAMS_PER_NEWTON = 101.9368f
 .set MOTORS         = 4.0f
 
+; ---- assembly-time options (override with fc_rocc_asm -D NAME=VALUE) ----
+; FLOW_BODYZ: the flow update's body-z velocity term, as fc_flow_to_world() in
+; workloads/flight_controller/src/fc_shared_math.h with -DFC_FLOW_BODYZ.  0 (the default, as in
+; the C code and as flown) drops it and assembles the original ROM unchanged; 1 adds 12 words to
+; EST, which moves CTRL_START, so the ROM, fc_rocc_fw.h and fc_rocc_map.svh must be used together.
+.set FLOW_BODYZ     = 0
+
 ; ---- firmware map exports (fc_rocc_fw.h) ----
 .export QA 24
 .export Q_POS 27
 .export Q_VEL 28
+.if FLOW_BODYZ
+.export FLOW_BODYZ 1
+.endif
 
 ; ---- constants (boot image).  Several registers carry more than one meaning; each extra
 ; name re-derives the same bits from its own parameter and the assembler checks they agree.
@@ -551,6 +561,11 @@
     add      t:r138, pb, pa
     mul.24   t:r137, TWO, t
     sub      R8:r138, ONE, t
+.if FLOW_BODYZ
+    mov      R2_bz:new, R2                           ; R[2], R[5], R[8] are overwritten before EST 6
+    mov      R5_bz:new, R5
+    mov      R8_bz:new, R8
+.endif
 
 ; ---- EST 5. ToF tilt gate + vertical height;  world accel a_w = R a - g
     clt      tilt_ok:r137, TOF_COS_MIN, R8
@@ -581,7 +596,8 @@
     mul.20   t:r138, awz, DT
     add      vz_p:r112, VEL_Z, t
 
-; ---- EST 6. flow fuse v_xy = R[0..1, 3..4] * flow  /  ZUPT on the ground  / clamp |v| <= VMAX
+; ---- EST 6. flow fuse v_xy = R[0..1, 3..4] * flow (+ R[2], R[5] * bz with FLOW_BODYZ)
+;             /  ZUPT on the ground  / clamp |v| <= VMAX
     mul.24   R1_f1:r138, R1, F1
     mul.24   R0_f0:r119, R0, F0
     add      t:r123, R0_f0, R1_f1
@@ -590,6 +606,20 @@
     mul.24   R3_f0:r134, R3, F0
     add      t:r131, R3_f0, R4_f1
     vsh      vfy:r134, t, Q24_TO_Q28
+.if FLOW_BODYZ
+; fc_flow_to_world(): bz = (R^T v)_z = R[2]*vx + R[5]*vy + R[8]*vz on the predicted velocity (the C
+; passes vx/vy/vz after `v += a_w*dt`, before the ToF observer); then vfx += R[2]*bz, vfy += R[5]*bz.
+; Q24 R x Q28 v -> Q28 (mul.24).
+    mul.24   bz_x:new, R2_bz, vx_p
+    mul.24   bz_y:new, R5_bz, vy_p
+    mul.24   bz_z:new, R8_bz, vz_p
+    add      t:new, bz_x, bz_y
+    add      bz:new, t, bz_z
+    mul.24   R2_bz_v:new, R2_bz, bz
+    add      vfx:new, vfx, R2_bz_v
+    mul.24   R5_bz_v:new, R5_bz, bz
+    add      vfy:new, vfy, R5_bz_v
+.endif
     clt      hv_low:r131, h_vert, ZUPT_H
     mul.0    zupt:r123, tof_vert, hv_low             ; zupt = tof_vert && h_vert < ZUPT
     sel      vx_z:r131, zupt, ZERO, vx_p

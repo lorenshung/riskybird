@@ -5,7 +5,7 @@
  * The At35 core carries the SAME drone periphery (and PLIC source numbering) as
  * RocketArty200TDroneFullDDRDmaUartConfig -- guaranteed by AccelConfigs.scala
  * (:41 "same PLIC source numbering, same pins"). So the sensor/peripheral binding
- * below is identical to samples/rose_flight_controller's FullDDR overlay; only
+ * below is identical to workloads/flight_controller's FullDDR overlay; only
  * the peripheral clock (50 -> 35 MHz) and plic ndev (20 -> 16, the At35
  * generated-DTS value, max source = OSPI-DMA at line 16) differ.
  *

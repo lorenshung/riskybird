@@ -20,7 +20,7 @@
  * (the classic "all pixels identical" failure). Switch TEST_PATTERN to 0 for a live image.
  *
  * Build (DroneFullDDR shell -- has OSPI + I2C + DDR):
- *   west build -b chipyard_riscv64 -d build_camcap samples/riskybird/camera_capture_fpga -- \
+ *   west build -b chipyard_riscv64 -d build_camcap workloads/camera_capture_fpga -- \
  *     -DDTC_OVERLAY_FILE="<elf>/overlays/fpga-common.overlay;<elf>/overlays/arty200t.overlay" \
  *     -DCONFIG_UART_HTIF=n -DCONFIG_UART_SIFIVE=y -DCONFIG_UART_SIFIVE_PORT_0=y \
  *     -DCONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC=50000

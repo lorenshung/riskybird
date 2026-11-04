@@ -1,5 +1,6 @@
-"""The accelerator-shell contracts: the post-link ISA scan, and the published
-DroNet codegen for the Gemmini+Saturn shells.
+"""The accelerator-shell contracts: the post-link ISA scan, the published
+DroNet codegen for the Gemmini+Saturn shells, where `rb modelblaster generate`
+writes, and the shells' Gemmini header layout.
 
 Pure host tests. Nothing here needs Chipyard, a toolchain or a board.
 """
@@ -7,6 +8,8 @@ Pure host tests. Nothing here needs Chipyard, a toolchain or a board.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -129,6 +132,169 @@ class PublishedCodegenTests(unittest.TestCase):
         gen = ROOT / "artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_zve64x-gray-nhwc"
         picks = json.loads((gen / "kernel_picks.json").read_text())["picks"]
         self.assertEqual(picks["linear_s8"]["source"], "reference")
+
+
+class CodegenRootTests(unittest.TestCase):
+    """`rb modelblaster generate` runs ModelBlaster's runner without writing into it."""
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        tmp = Path(self._tmp.name)
+        self.mb = tmp / "backends" / "modelblaster"
+        self.root = tmp / "build" / "modelblaster"
+        files = {
+            ".git/HEAD": "ref: refs/heads/main\n",
+            "pipeline/extract_graph.py": "",
+            "kernels/gemmini_q31/k.c": "kernel\n",
+            "cores/gemmini/include/gemmini.h": "",
+            "cores/gemmini/include/gemmini_params.h": "default16x16\n",
+            "cores/gemmini/include/per_config/default16x16/gemmini_params.h": "",
+            "cores/gemmini/rocc-software/src/xcustom.h": "",
+            "examples/_run_lib.sh": "",
+            "examples/lenet/run.sh": "",
+            "examples/dronet/run.sh": "",
+            "examples/dronet/int8/fq.csv": "",
+            "examples/dronet/int8/cache/gemmini_q31/cached.c": "cached\n",
+            "examples/dronet/int8/generated/stale.c": "",
+            "examples/dronet/int8/build/stale.o": "",
+            "examples/dronet/fp32/cache/rvv/a.c": "",
+        }
+        for rel, text in files.items():
+            (self.mb / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.mb / rel).write_text(text)
+        for name, value in (("MODELBLASTER", self.mb), ("CODEGEN_ROOT", self.root)):
+            patcher = patch.object(mb, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _backend_snapshot(self) -> dict[str, str]:
+        return {str(p.relative_to(self.mb)): p.read_text()
+                for p in sorted(self.mb.rglob("*")) if p.is_file()}
+
+    def test_generated_dir_is_under_the_codegen_root(self) -> None:
+        self.assertEqual(mb.generated_dir("dronet", "int8", "gemmini_q31"),
+                         self.root / "examples/dronet/int8/generated/gemmini_q31")
+
+    def test_runner_sees_the_codegen_root_as_its_repo_root(self) -> None:
+        run_sh = mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertEqual(run_sh, self.root / "examples/dronet/run.sh")
+        # run.sh's own REPO_ROOT computation, which does not resolve links.
+        repo_root = subprocess.run(
+            ["bash", "-c", 'cd "$(dirname "$1")/../.." && pwd', "_", str(run_sh)],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        self.assertEqual(Path(repo_root), self.root)
+
+    def test_layout_links_everything_but_the_runner_outputs(self) -> None:
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        links = {
+            "pipeline": "pipeline", "kernels": "kernels",
+            "examples/_run_lib.sh": "examples/_run_lib.sh",
+            "examples/lenet": "examples/lenet",
+            "examples/dronet/run.sh": "examples/dronet/run.sh",
+            "examples/dronet/int8/fq.csv": "examples/dronet/int8/fq.csv",
+        }
+        for rel, target in links.items():
+            with self.subTest(rel=rel):
+                self.assertTrue((self.root / rel).is_symlink())
+                self.assertEqual(Path(os.readlink(self.root / rel)), self.mb / target)
+        self.assertFalse((self.root / ".git").exists())
+        for rel in ("examples", "examples/dronet", "examples/dronet/int8",
+                    "examples/dronet/fp32", "examples/dronet/int8/cache/gemmini_q31"):
+            with self.subTest(rel=rel):
+                path = self.root / rel
+                self.assertTrue(path.is_dir() and not path.is_symlink())
+        for rel in ("examples/dronet/int8/generated", "examples/dronet/int8/build",
+                    "examples/dronet/fp32/cache"):
+            self.assertFalse((self.root / rel).exists(), rel)
+
+    def test_kernel_cache_is_reseeded_from_the_pin_every_run(self) -> None:
+        before = self._backend_snapshot()
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        cache = self.root / "examples/dronet/int8/cache/gemmini_q31"
+        (cache / "cached.c").write_text("rewritten by a run\n")
+        (cache / "new.c").write_text("added by a run\n")
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertEqual(sorted(p.name for p in cache.iterdir()), ["cached.c"])
+        self.assertFalse((cache / "cached.c").is_symlink())
+        self.assertEqual((cache / "cached.c").read_text(), "cached\n")
+        self.assertEqual(self._backend_snapshot(), before)
+
+    def test_a_target_without_a_tracked_cache_starts_empty(self) -> None:
+        mb._prepare_codegen_root("dronet", "fp16", "rvv_f16")
+        cache = self.root / "examples/dronet/fp16/cache/rvv_f16"
+        self.assertTrue(cache.is_dir() and not any(cache.iterdir()))
+
+    def test_links_follow_the_pin(self) -> None:
+        (self.mb / "examples/added").mkdir()
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertTrue((self.root / "examples/added").is_symlink())
+        (self.mb / "examples/added").rmdir()
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertFalse(os.path.lexists(self.root / "examples/added"))
+
+    def test_the_shell_header_replaces_the_fallback_header(self) -> None:
+        before = self._backend_snapshot()
+        shell = Path(self._tmp.name) / "shell" / "gemmini_params.h"
+        shell.parent.mkdir()
+        shell.write_text("drone shell\n")
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31", header=shell)
+        include = self.root / "cores/gemmini/include"
+        for rel in ("cores", "cores/gemmini", "cores/gemmini/include"):
+            path = self.root / rel
+            self.assertTrue(path.is_dir() and not path.is_symlink(), rel)
+        self.assertEqual(Path(os.readlink(include / "gemmini_params.h")), shell)
+        self.assertEqual((include / "gemmini_params.h").read_text(), "drone shell\n")
+        self.assertEqual(Path(os.readlink(include / "gemmini.h")),
+                         self.mb / "cores/gemmini/include/gemmini.h")
+        self.assertEqual(Path(os.readlink(include / "per_config")),
+                         self.mb / "cores/gemmini/include/per_config")
+        self.assertEqual(Path(os.readlink(self.root / "cores/gemmini/rocc-software")),
+                         self.mb / "cores/gemmini/rocc-software")
+        self.assertEqual(self._backend_snapshot(), before)
+        # Without a header the root goes back to linking the backend's cores/.
+        mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertEqual(Path(os.readlink(self.root / "cores")), self.mb / "cores")
+        self.assertEqual(self._backend_snapshot(), before)
+
+    def test_a_real_file_in_the_way_is_not_deleted(self) -> None:
+        (self.root / "examples/dronet").mkdir(parents=True)
+        (self.root / "examples/dronet/run.sh").write_text("mine\n")
+        with self.assertRaises(mb.ModelBlasterError):
+            mb._prepare_codegen_root("dronet", "int8", "gemmini_q31")
+        self.assertEqual((self.root / "examples/dronet/run.sh").read_text(), "mine\n")
+
+
+class GateHeaderTests(unittest.TestCase):
+    def test_default_is_a_captured_drone_shell(self) -> None:
+        header = mb.gemmini_header(mb.DEFAULT_GEMMINI_CONFIG)
+        self.assertTrue(header.is_file())
+        self.assertTrue(header.is_relative_to(mb.RB_MODELBLASTER))
+
+    def test_an_uncaptured_config_is_refused(self) -> None:
+        with self.assertRaises(mb.ModelBlasterError):
+            mb.gemmini_header("NoSuchShellConfig")
+
+
+class PerConfigHeaderTests(unittest.TestCase):
+    """The shells' Gemmini headers use ModelBlaster's per_config/<name>/ layout.
+
+    gemmini.h includes "include/gemmini_params.h" and the kernels include
+    <gemmini_params.h>; with -isystem per_config/<name> first, both must find
+    this shell's header. A directory with only the second spelling sends
+    gemmini.h to ModelBlaster's default16x16 header without a word.
+    """
+
+    def test_both_spellings_name_the_same_header(self) -> None:
+        base = ROOT / "hardware/modelblaster/cores/gemmini/include/per_config"
+        configs = sorted(p for p in base.iterdir() if p.is_dir())
+        self.assertTrue(configs)
+        for config in configs:
+            with self.subTest(config=config.name):
+                header = config / "gemmini_params.h"
+                self.assertTrue(header.is_file())
+                self.assertTrue((config / "include" / "gemmini_params.h").samefile(header))
 
 
 if __name__ == "__main__":

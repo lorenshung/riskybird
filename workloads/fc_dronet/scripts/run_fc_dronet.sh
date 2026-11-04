@@ -20,7 +20,7 @@ set -uo pipefail
 
 WT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RB="${RB:-$(cd "${WT}/../.." && pwd)}"                   # this repository
-CFG="${CFG:-${RB}/hardware/pcb/scripts/openocd/arty200t_rocket.cfg}"
+CFG="${CFG:-${RB}/hardware/openocd/arty200t.cfg}"          # Rocket target; ft-link.cfg (adapter) is added below
 ELF="${ELF:-${WT}/build_fc_dronet/zephyr/zephyr.elf}"
 ENTRY="${ENTRY:-0x80000000}"
 OPENOCD="${OPENOCD:-openocd}"
@@ -35,7 +35,7 @@ ps aux 2>/dev/null | grep -E 'openocd|west build|openFPGALoader' | grep -v grep 
   echo "!! another bench/JTAG job is running -- ABORTING (you are lower priority)."; exit 3; }
 echo "-- FTDI topology (pick the Rocket-debug FTDI path + its console ttyUSB) --"
 lsusb -t 2>/dev/null | grep -iE "ftdi|0403|ttyUSB" || lsusb | grep -i 0403
-[ -n "${FTDI_LOCATION}" ] && export FTDI_LOCATION
+[ -n "${FTDI_LOCATION}" ] && export RB_FTDI_LOCATION="${FTDI_LOCATION}"
 [ -f "$ELF" ] || { echo "ELF not found: $ELF (build first)"; exit 1; }
 [ -f "$CFG" ] || { echo "openocd cfg not found: $CFG"; exit 1; }
 
@@ -48,7 +48,7 @@ echo "=== load ${ELF} -> Rocket @ ${ENTRY} (FTDI_LOCATION='${FTDI_LOCATION:-auto
 # Open the console BEFORE resume so the boot banner + first samples are captured.
 stty -F "$CONSOLE_DEV" "$CONSOLE_BAUD" raw -echo 2>/dev/null || echo "(warn: stty $CONSOLE_DEV failed)"
 ( timeout "${CAPTURE_SECS}" cat "$CONSOLE_DEV" | tee "$OUT" ) & CATPID=$!
-"$OPENOCD" -f "$CFG" -c "$OOCMD"
+"$OPENOCD" -f "$(dirname "$CFG")/ft-link.cfg" -f "$CFG" -c "$OOCMD"
 wait "$CATPID" 2>/dev/null || true
 echo "=== capture -> ${OUT} ==="
 echo "--- PID loop rate (FC ROSE_PROFILE) ---"; grep -iE "PROFILE|loop|it=" "$OUT" | tail -5

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * UART telemetry downlink for the FPGA flight controller. When the FC runs on the FPGA Rocket, the
- * ESP32 acts purely as a wireless bridge (samples/riskybird/fpga_telem_bridge): the FC writes
+ * ESP32 acts purely as a wireless bridge (workloads/fpga_telem_bridge): the FC writes
  * newline-framed telemetry lines to the 2nd SiFive UART (uart1 @ 0x1002_1000, TXD=F14 -> ESP U0RXD)
  * and the ESP relays them over its SoftAP as UDP broadcast. Raw MMIO (SiFive uart0 reg map), polled
  * TX -- no Zephyr driver instance / IRQ mapping needed. Enabled with -DROSE_UART_TELEM=1.

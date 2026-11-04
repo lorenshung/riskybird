@@ -31,21 +31,23 @@ submodules under `backends/`.
 | `hardware/rtl/` | RiskyBird's own RTL: `fcrocc` (flight-control RoCC and its microcode assembler), `ospi`, `uartdma`, `esplink` |
 | `hardware/zephyr/` | devicetree overlays and Kconfig fragments per FPGA target |
 | `hardware/{gemmini,fpga-shells,firesim,modelblaster}/` | RiskyBird configs and files for those backends |
-| `hardware/pcb/` | the board designs (v2 boards and the v3 base), their docs and bring-up log, and riskybird-academy |
+| `hardware/pcb/` | submodule (lorenshung/riskybird `riskybirdv3-layout`; `git submodule update --init hardware/pcb`): the board designs (v2 boards and the v3 base), their docs and bring-up log, and riskybird-academy |
 | `hardware/{openocd,spioverjtag}/` | OpenOCD configs and the SPI-over-JTAG flash loader |
 | `hardware/{flight,bench}/` | GDB scripts for flight-bench and bench debugging |
 | `hardware/padtest/` | bare-metal FPGA pad tests |
 | `tools/flight/`, `tools/bench/` | flight recording, ESP32-C6 link firmware, ground station |
 | `integration/zephyr/` | shared Zephyr modules: camera, ToF, motor link, motor guard |
-| `backends/` | submodules: chipyard, zephyr-chipyard-sw, modelblaster |
+| `backends/` | submodules: chipyard, zephyr-chipyard-sw, modelblaster and RoSE at plain upstream pins; saturn at the Saturn commit RiskyBird's accelerator shells need |
+| `patches/`, `.backend-overlays`, `.submodule-redirects` | what `tools/backend-patches` and `tools/submodule-redirects` put into the backends |
 | `prune/moved-to-top.tsv` | where each file copied out of a backend came from |
 | `tests/` | repository tests |
 
 ## Getting started
 
 ```sh
-git submodule update --init backends/zephyr-chipyard-sw backends/chipyard
+git submodule update --init backends/zephyr-chipyard-sw backends/chipyard backends/saturn
 source ./rb-env.sh
+rb env setup zephyr && rb env setup chipyard   # also applies the redirects, overlay and patch queue
 rb doctor          # tools, environments and attached hardware
 rb targets         # FPGA and Zephyr targets
 rb workloads       # workloads and which targets they support

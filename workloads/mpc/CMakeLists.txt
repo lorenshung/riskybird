@@ -31,7 +31,7 @@ set(MATLIB_EXTERNAL_BUILD ON CACHE BOOL "Zephyr owns compiler flags" FORCE)
 include("${TINYMPC_DIR}/external/matlib/matlib_header.cmake")
 
 # The KU040 shell deliberately uses a 32 KiB on-chip scratchpad. Preserve the
-# full ten-step controller on Arty100T and use a three-step receding horizon on
+# full ten-step controller on the TE0712-100T and use a three-step receding horizon on
 # KU040 so the exact same model and cost matrices fit in physical memory.
 if(RB_BOARD STREQUAL "ku040")
   target_compile_definitions(app PRIVATE NHORIZON=3)

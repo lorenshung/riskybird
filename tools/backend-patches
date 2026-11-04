@@ -132,6 +132,16 @@ def local_edits(repo: Path) -> str:
     return git(repo, "diff", "HEAD", "--name-status", "--ignore-submodules=all")
 
 
+def tier_installed(path: Path) -> bool:
+    """Whether the top-level backend (backends/<name>) containing path is checked out.
+
+    A queue or link inside a backend that is not checked out belongs to a tier
+    that is not installed (a bench-only clone has no Chipyard) and is skipped.
+    """
+    top = ROOT / Path(*path.relative_to(ROOT).parts[:2])
+    return is_repo(top)
+
+
 def rel(p: Path) -> str:
     return os.path.relpath(p, ROOT)
 
@@ -153,6 +163,9 @@ def check() -> int:
     bad = 0
     for repo, patches in queues():
         problems = []
+        if not tier_installed(repo):
+            print(f"skip {rel(repo)}  ({rel(ROOT / Path(*repo.relative_to(ROOT).parts[:2]))} not checked out)")
+            continue
         if not is_repo(repo):
             print(f"FAIL {rel(repo)}: not checked out")
             bad += 1
@@ -173,6 +186,9 @@ def check() -> int:
               f"+ {len(patches)} patch(es)" + (f"  [{'; '.join(problems)}]" if problems else ""))
     for link, target in overlays():
         problems = []
+        if not tier_installed(link):
+            print(f"skip link {rel(link)}  (backend not checked out)")
+            continue
         want = link_text(link, target)
         if not target.exists():
             problems.append(f"target {rel(target)} missing")
@@ -193,6 +209,8 @@ def check() -> int:
 
 def apply() -> None:
     for repo, patches in queues():
+        if not tier_installed(repo):
+            continue
         if not is_repo(repo):
             raise SystemExit(f"{rel(repo)}: not checked out")
         if git(repo, "rev-parse", "HEAD") != pinned(repo):
@@ -203,12 +221,19 @@ def apply() -> None:
         if not queue_diff(repo, patches):
             print(f"  {rel(repo)}: already applied")
             continue
-        if local_edits(repo):
+        # Already carrying the first k patches (a patch was appended to the
+        # queue since the last apply): apply the rest.
+        done = next((k for k in range(len(patches))
+                     if (not local_edits(repo) if k == 0 else not queue_diff(repo, patches[:k]))),
+                    None)
+        if done is None:
             raise SystemExit(f"{rel(repo)}: has edits that are not the queue; "
                              "revert or commit them first")
-        git(repo, "apply", *map(str, patches))
-        print(f"  {rel(repo)}: applied {len(patches)} patch(es)")
+        git(repo, "apply", *map(str, patches[done:]))
+        print(f"  {rel(repo)}: applied {len(patches) - done} patch(es)")
     for link, target in overlays():
+        if not tier_installed(link):
+            continue
         if not link.parent.is_dir():
             raise SystemExit(f"{rel(link)}: its backend is not checked out")
         want = link_text(link, target)
