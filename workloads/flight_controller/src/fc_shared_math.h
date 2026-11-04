@@ -32,16 +32,24 @@ static inline void fc_gibbs_to_euler(const float *r, float *roll, float *pitch, 
 }
 /* What the hierarchical PID compares its angle targets against.
  *
- * The PID's targets are angles in radians: desRoll/desPitch = -a_y/g, a_x/g (small-angle bank for a
- * horizontal acceleration), VEL_TILT_MAX, ROLL/PITCH_TRIM_RAD, and the thrust tilt compensation
- * cos(roll)*cos(pitch). Until 2026-11 it was handed the Gibbs parameters state[3..5] directly, which
- * are tan(theta/2), about HALF the angle. So the vehicle banked ~2x what each target and cap said,
- * the attitude and yaw P loops ran at half their written gain (effective tau 2x), and the thrust
- * compensation under-corrected. This returns Euler angles and a yaw target on the same branch as
- * the yaw estimate (setpoint[5] is a Gibbs yaw too). -DPID_GIBBS_LEGACY=1 restores the old
- * behaviour, which is what every build flown before 2026-11 did. */
+ * state[3..5] is the Gibbs attitude tan(theta/2), about HALF the angle. Every build that has flown
+ * fed it to the PID as if it were radians, and was tuned that way. This returns honest ZYX Euler
+ * angles (and a yaw target on the same branch as the yaw estimate; setpoint[5] is a Gibbs yaw too).
+ * The PID then decides how to use them (controller_pid.cpp, PID_FLOWN_SCALE):
+ *
+ *   default            honest radians, constants rescaled to what flew: the same true tilt caps
+ *                      (~29 deg from VEL_TILT_MAX 0.26, ~23 deg from the velocity integral), loop
+ *                      gains and trim effect, up to the tan(theta/2) vs theta/2 nonlinearity near
+ *                      the cap. Thrust tilt compensation is exact (it was cos of ~half the angle).
+ *   -DPID_TILT_TIGHT=1 honest radians with the constants read as radians: every tilt cap and trim
+ *                      halves, attitude/yaw P gain doubles, velocity-loop gain halves. Measured in
+ *                      sim to lose the vehicle in a 20 deg wind (riskybird-sim results/).
+ *   -DPID_GIBBS_LEGACY=1  the raw Gibbs parameters, exactly what flew. */
 #ifndef PID_GIBBS_LEGACY
 #define PID_GIBBS_LEGACY 0
+#endif
+#ifndef PID_TILT_TIGHT
+#define PID_TILT_TIGHT 0
 #endif
 static inline void fc_pid_attitude(const float *state, const float *setpoint,
                                    float att[3], float *yaw_tgt)
