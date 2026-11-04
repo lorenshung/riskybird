@@ -182,15 +182,12 @@ static void guard_entry(void *a, void *b, void *c)
 	}
 }
 
-int rb_motor_guard_start(const struct pwm_dt_spec *motors, size_t count,
-			 uint32_t period_nsec,
-			 const struct rb_motor_guard_config *cfg)
+static int guard_start(const struct pwm_dt_spec *motors, size_t count,
+		       uint32_t period_nsec,
+		       const struct rb_motor_guard_config *cfg)
 {
 	const struct device *accel = DEVICE_DT_GET(DT_ALIAS(bmi088_accel));
 
-	if (motors == NULL || count == 0U) {
-		return -EINVAL;
-	}
 	if (!device_is_ready(accel)) {
 		/* Reported, never silently skipped: "no watchdog" must be a
 		 * visible outcome, not the same as "watchdog saw nothing". */
@@ -227,6 +224,21 @@ int rb_motor_guard_start(const struct pwm_dt_spec *motors, size_t count,
 	}
 	k_thread_name_set(guard_tid, "motor_guard");
 	return 0;
+}
+
+int rb_motor_guard_start(const struct pwm_dt_spec *motors, size_t count,
+			 uint32_t period_nsec,
+			 const struct rb_motor_guard_config *cfg)
+{
+	if (motors == NULL || count == 0U) {
+		return -EINVAL;
+	}
+	return guard_start(motors, count, period_nsec, cfg);
+}
+
+int rb_motor_guard_start_watch(const struct rb_motor_guard_config *cfg)
+{
+	return guard_start(NULL, 0U, 0U, cfg);
 }
 
 void rb_motor_guard_stop(void)
