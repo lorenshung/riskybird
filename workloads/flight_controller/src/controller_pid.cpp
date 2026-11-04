@@ -14,6 +14,7 @@
  *   original firmware (and TinyMPC here) we regulate horizontal VELOCITY to the setpoint.
  */
 #include "controller_pid.hpp"
+#include "fc_shared_math.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -184,7 +185,9 @@ static float forceToVoltage(float forceNewtons)
  * the controller CANNOT observe: with no optical flow there is no horizontal-velocity feedback, so a
  * small attitude/thrust bias makes the drone hover tilted and drift at a fixed rate. +ROLL_TRIM_RAD
  * banks right (-y) to cancel a LEFT (+y) drift; +PITCH_TRIM_RAD noses forward (+x). Flip the sign if
- * the drift grows. Tune per airframe via -DROLL_TRIM_RAD=<rad>. */
+ * the drift grows. Tune per airframe via -DROLL_TRIM_RAD=<rad>. These are TRUE radians since the
+ * Gibbs conversion (fc_pid_attitude); before it a trim of t banked the vehicle by ~2t, so a trim tuned
+ * on an older build (flight-logs T23+: PITCH_TRIM_RAD 0.045) needs doubling to keep the same bank. */
 #ifndef ROLL_TRIM_RAD
 #define ROLL_TRIM_RAD 0.0f
 #endif
@@ -282,10 +285,13 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 {
 	/* dt now matters: the altitude loop carries an integral term (below). */
 
-	/* unpack state (our layout) */
-	const float estRoll   = state[3];
-	const float estPitch  = state[4];
-	const float estYaw    = state[5];
+	/* unpack state (our layout). state[3..5] is the Gibbs attitude tan(theta/2); the loops below are
+	 * written in angles, so convert (fc_pid_attitude, which also explains what that changed). */
+	float att[3], yaw_tgt;
+	fc_pid_attitude(state, setpoint, att, &yaw_tgt);
+	const float estRoll   = att[0];
+	const float estPitch  = att[1];
+	const float estYaw    = att[2];
 	const float estVel_1  = state[6];   /* vx */
 	const float estVel_2  = state[7];   /* vy */
 	const float estVel_3  = state[8];   /* vz */
@@ -299,7 +305,6 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 	const float desHeight = setpoint[2];
 	float desVel_1        = setpoint[6];
 	float desVel_2        = setpoint[7];
-	const float yaw_tgt   = setpoint[5];
 
 	/* Wall repulsion: bias the horizontal-velocity setpoint away from any close wall. Body frame
 	 * is FLU (+x fwd, +y left): a front (+x) wall pushes -x, back (-x) pushes +x; a left (+y) wall

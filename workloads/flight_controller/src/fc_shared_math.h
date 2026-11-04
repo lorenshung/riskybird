@@ -19,6 +19,45 @@ static inline float fc_yaw_from_gibbs(const float *r)
     const float n2 = 1.0f + r[0]*r[0] + r[1]*r[1] + r[2]*r[2];
     return atan2f(2.0f*(r[2] + r[0]*r[1]), n2 - 2.0f*(r[1]*r[1] + r[2]*r[2]));
 }
+/* Gibbs attitude r = state[3..5] = q_xyz/q_w -> ZYX Euler roll, pitch, yaw (rad). Exact at any
+ * attitude short of a 180 deg rotation (q_w = 0, where r itself is singular). With q = (1, r)/|.|,
+ * the usual quaternion formulas carry a common 1/|q|^2 that cancels in atan2 and divides in asin. */
+static inline void fc_gibbs_to_euler(const float *r, float *roll, float *pitch, float *yaw)
+{
+    const float n2 = 1.0f + r[0]*r[0] + r[1]*r[1] + r[2]*r[2];
+    *roll = atan2f(2.0f*(r[0] + r[1]*r[2]), n2 - 2.0f*(r[0]*r[0] + r[1]*r[1]));
+    float sp = 2.0f*(r[1] - r[2]*r[0]) / n2;
+    *pitch = asinf(sp > 1.0f ? 1.0f : (sp < -1.0f ? -1.0f : sp));
+    *yaw = fc_yaw_from_gibbs(r);
+}
+/* What the hierarchical PID compares its angle targets against.
+ *
+ * The PID's targets are angles in radians: desRoll/desPitch = -a_y/g, a_x/g (small-angle bank for a
+ * horizontal acceleration), VEL_TILT_MAX, ROLL/PITCH_TRIM_RAD, and the thrust tilt compensation
+ * cos(roll)*cos(pitch). Until 2026-11 it was handed the Gibbs parameters state[3..5] directly, which
+ * are tan(theta/2), about HALF the angle. So the vehicle banked ~2x what each target and cap said,
+ * the attitude and yaw P loops ran at half their written gain (effective tau 2x), and the thrust
+ * compensation under-corrected. This returns Euler angles and a yaw target on the same branch as
+ * the yaw estimate (setpoint[5] is a Gibbs yaw too). -DPID_GIBBS_LEGACY=1 restores the old
+ * behaviour, which is what every build flown before 2026-11 did. */
+#ifndef PID_GIBBS_LEGACY
+#define PID_GIBBS_LEGACY 0
+#endif
+static inline void fc_pid_attitude(const float *state, const float *setpoint,
+                                   float att[3], float *yaw_tgt)
+{
+#if PID_GIBBS_LEGACY
+    att[0] = state[3]; att[1] = state[4]; att[2] = state[5];
+    *yaw_tgt = setpoint[5];
+#else
+    fc_gibbs_to_euler(&state[3], &att[0], &att[1], &att[2]);
+    const float yt = 2.0f * atanf(setpoint[5]);
+    float e = att[2] - yt;                      /* wrap the yaw error to (-pi, pi] */
+    while (e >  3.14159265f) e -= 6.28318531f;
+    while (e < -3.14159265f) e += 6.28318531f;
+    *yaw_tgt = att[2] - e;
+#endif
+}
 /* World-frame horizontal vector -> a frame yawed by `yaw` (x along that heading, y to its left). */
 static inline void fc_world_to_heading(float vx, float vy, float yaw, float out[2])
 {
