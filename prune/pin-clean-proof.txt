@@ -327,6 +327,45 @@ $ git status --short
       zephyr, ModelBlaster and TinyMPC gitlinks unchanged). flight_controller esp-motors
       and bootup_check rebuild on it.
 
+7. Approved follow-ups (commits 30849b4, 891dd70 and the one recording this)
+---------------------------------------------------------------------------
+  7a. WithSPITiedOff moved from AbstractConfig (Chipyard patch 0004, dropped) into
+      the three board tweaks fragments; tacit's useBP default left stock (tacit
+      patch 0003, dropped) and the predictor-off Tacit shells use
+      WithTacitEncoderBP(useBP = false). Re-elaborated at 157dd69 and compared with
+      the section-1b/6a outputs: RocketArty200TDroneFullDDR, FullDDRLoader,
+      GemminiSaturnFp16At35, GemminiSaturnFp16At35Tacit, FullDDRDmaUart,
+      RocketArty100TOspi, RocketKU040OspiDDR, RocketKU040DroneDual: every .sv, .dts,
+      .fir and .json identical (only firtool.log and file-list order differ).
+      RocketArty200TDroneLogicConfig (flow SPI with no board binder, so it relies on
+      the tie-off), fork 0c3a178 vs tip: harness and every other module identical,
+      only the upstream CSRFile/PTW/Rocket differences of 1b (0 lines after the
+      normalisation there).
+  7b. fpga-shells patch 0002 adds arty_a7_200 to write_cfgmem's board table.
+        vivado -mode batch -nojournal -nolog \
+          -source backends/chipyard/fpga/fpga-shells/xilinx/common/tcl/write_cfgmem.tcl \
+          -tclargs arty_a7_200 loader.mcs <RocketArty200TDroneFullDDRLoaderConfig .bit>
+      With the fork's entry (iface spix4) the lookup resolves but Vivado 2023.1 refuses:
+        ERROR: [Writecfgmem 68-20] SPI_BUSWIDTH property is set to "1" on bitfile ...
+        This property has to be set to "4" to generate a configuration memory file
+        for the SPIX4 interface.
+      With iface spix1 (as committed): 0 errors, loader.mcs (13.5 MB) + loader.prm.
+      Note: tools/rb/esp_flash.py, the ESP remote loader, writes the .bit's
+      configuration payload itself (bit_payload()); it does not use write_cfgmem.
+  7c. TACIT trace layout consumers (DTS node/compatible, sink-target width, ingress
+      fields): none in riskybird-dev (tools, bench, flight, rb, xpurt, workloads
+      incl. the ESP firmware, integration, hardware/zephyr). Upstream zcs samples
+      tacit and iree write the encoder's target register with small IDs, which the
+      8-bit field accepts unchanged.
+  7d. hardware/pcb is a submodule again (lorenshung/riskybird riskybirdv3-layout
+      e1a5a50). Its tree equals the removed directory plus its own .gitmodules.
+        git clone <pin-clean> fresh2 && git submodule update --init hardware/pcb
+          -> checked out e1a5a5029b7fef68680eec18b948aa51b3da82af; nested
+             gym-pybullet-drones a9d4b06 declared by it (uninitialised)
+        tools/submodule-redirects check / tools/backend-patches check on that
+          bench-only clone: rows for uninstalled backends skipped, exit 0.
+      Test suite after both commits: Ran 345, OK (skipped=62).
+
 Appendix: comparison scripts
 --- cmp-gen.py
 #!/usr/bin/env python3
