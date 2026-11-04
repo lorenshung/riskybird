@@ -56,6 +56,21 @@
 # and CONFIGFALLBACK makes a failed IPROG load (CRC or ID error) fall back to
 # the golden image instead of leaving the FPGA unconfigured. USR_ACCESS
 # TIMESTAMP is what the ESP link reports as the image identity.
+#
+# SPI_32BIT_ADDR stays YES, and with it WBSTAR[23:0] holds flash address bits
+# [31:8]: the update slot at 0x800000 is WBSTAR 0x8000 (the ESP does the shift).
+# Writing the byte address made every IPROG wrap to 0, i.e. golden (2026-11-02).
+#
+# TIMER_CFG arms the configuration watchdog. A slot whose header is gone (power
+# lost while erasing it) has no sync word, and without the watchdog the FPGA
+# scans the flash forever (DONE=0, measured >2.5 min). With it, the IPROG falls
+# back to golden in ~3 s (BOOTSTS 0x0d03: WTO_ERROR, then FALLBACK); the timer
+# value written by golden's header stays armed across the ICAP IPROG, and the
+# slot image's own header re-arms it, so a slot cut short mid-write also falls
+# back (0x0d03, ~2 s). 0x3E030 is long enough for a 4.9 MB x1 image (every valid
+# boot so far); its margin is not measured. A slot with an erased sector in the
+# middle falls back on its CRC error (BOOTSTS 0x2503). JTAG SRAM loads of
+# watchdog images still work.
 set_property -dict [list \
 	CFGBVS {VCCO} \
 	CONFIG_VOLTAGE {3.3} \
@@ -69,4 +84,5 @@ set_property -dict [list \
 	BITSTREAM.CONFIG.USR_ACCESS {TIMESTAMP} \
 	BITSTREAM.GENERAL.COMPRESS {TRUE} \
 	BITSTREAM.CONFIG.CONFIGFALLBACK {ENABLE} \
+	BITSTREAM.CONFIG.TIMER_CFG {32'h0003E030} \
 	] [current_design]

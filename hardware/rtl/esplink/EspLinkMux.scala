@@ -59,8 +59,12 @@ import chisel3.util._
  *    0x3e FLASH  configuration-flash bridge (EspLinkFlash), 115200. ack "RBFL"
  *    0x3b FLASH  the same at flashFastBaud: the ack goes at 115200,
  *                every byte after it at the fast rate, both ways.  ack "RBFL"
- *    0x3f BOOT   followed by addr:u32le and ~addr:u32le inside the key
- *                window; then the ack, then ICAPE2 IPROG to addr.  ack "RBBT"
+ *    0x3f BOOT   followed by addr:u32le and chk:u32le inside the key
+ *                window; then the ack, then ICAPE2 IPROG with WBSTAR = addr
+ *                (flash address >> 8 in SPI 32-bit mode).        ack "RBBT"
+ *                chk = ~addr ^ (mode * 0x01010101) selects the ICAP sequence
+ *                (EspLinkIprog: 0 IPROG, 1 bare IPROG, 2 WBSTAR only, 3
+ *                packed); any other chk is ignored.
  *
  *  Every ack is the four ASCII bytes followed by the 32-bit image id
  *  (USR_ACCESS, the bitstream's build timestamp) MSB first, so the ESP can tell
@@ -356,6 +360,10 @@ class EspLinkMux(clockHz: Double, c: EspLinkLoaderParams = EspLinkLoaderParams()
   val bootIdx = RegInit(0.U(4.W))
   val bootAddr = Cat(bootArg(3), bootArg(2), bootArg(1), bootArg(0))
   val bootChk  = Cat(bootArg(7), bootArg(6), bootArg(5), bootArg(4))
+  // The check word also picks the ICAP sequence (EspLinkIprog modes):
+  // ~addr ^ (mode * 0x01010101), so plain ~addr is mode 0, the real IPROG.
+  val bootMatch = (0 until 4).map(m => bootChk === (~bootAddr ^ (BigInt(m) * 0x01010101L).U(32.W)))
+  val bootMode  = RegInit(0.U(2.W))
 
   val byteRx = Module(new EspLinkByteRx(div))
   byteRx.io.in := rx
@@ -400,6 +408,7 @@ class EspLinkMux(clockHz: Double, c: EspLinkLoaderParams = EspLinkLoaderParams()
 
   val iprog = Module(new EspLinkIprog)
   iprog.io.addr  := bootAddr
+  iprog.io.mode  := bootMode
   val iprogFired = RegInit(false.B)
   iprog.io.start := state === sIprog && timer === 0.U && !iprogFired
   when (state =/= sIprog) { iprogFired := false.B } .elsewhen (iprog.io.start) { iprogFired := true.B }
@@ -454,7 +463,8 @@ class EspLinkMux(clockHz: Double, c: EspLinkLoaderParams = EspLinkLoaderParams()
           bootIdx := bootIdx + 1.U
         }
         when (bootIdx === 8.U) {
-          state := Mux(bootChk === ~bootAddr, sAck, sUart)
+          state := Mux(bootMatch.reduce(_ || _), sAck, sUart)
+          bootMode := PriorityEncoder(bootMatch)
         }
       }
       is (sAck) {
@@ -478,6 +488,8 @@ class EspLinkMux(clockHz: Double, c: EspLinkLoaderParams = EspLinkLoaderParams()
         // and stay here: the FPGA is about to reconfigure. A break gets out
         // if it somehow does not.
         when (timer =/= 0.U) { timer := timer - 1.U }
+        // Mode 2 only sets WBSTAR and desyncs: the FPGA keeps running.
+        when (iprogFired && !iprog.io.busy && bootMode === 2.U) { state := sUart }
       }
       is (sFence) {
         when (io.memQuiet || timer === 0.U) {
