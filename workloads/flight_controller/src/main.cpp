@@ -2795,8 +2795,10 @@ static bool read_sensor_frame(struct sensor_frame *f)
 #else
 	int rc_a = sensor_sample_fetch(accel_dev);
 	int rc_g = sensor_sample_fetch(gyro_dev);
-#if HAVE_FLOW
-	sensor_sample_fetch(flow_dev);
+#if HAVE_FLOW && !(defined(ROSE_FLOW) && ROSE_FLOW)
+	sensor_sample_fetch(flow_dev);   /* RoSE virtual flow: velocity, not counts */
+#elif defined(ROSE_FLOW) && ROSE_FLOW
+	flow_rose_request();             /* RoSE co-sim PMW3901 burst (no-op on hardware); see flow.c */
 #endif
 	PF_ACC(pf_imu_fetch, _pf);
 	f->tof_valid = false;
@@ -2854,7 +2856,9 @@ static bool read_sensor_frame(struct sensor_frame *f)
 	PF_ACC(pf_imu_get, _pf);
 	f->flow[0] = f->flow[1] = 0.0f;
 	f->flow_valid = true;
-#if HAVE_FLOW
+#if defined(ROSE_FLOW) && ROSE_FLOW
+	flow_rose_collect();   /* before the down-ToF request below shares its reqrsp channel */
+#elif HAVE_FLOW
 	{
 		struct sensor_value vx, vy;
 		sensor_channel_get(flow_dev, (enum sensor_channel)ROSE_SENSOR_CHAN_FLOW_VX, &vx);
