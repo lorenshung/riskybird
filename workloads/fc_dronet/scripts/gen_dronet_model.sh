@@ -16,7 +16,8 @@
 #       generated dir is absent.
 set -uo pipefail
 
-MB_SRC="${MB_SRC:-/home/cobble/Tools/zephyr-chipyard-sw/modelblaster}"
+RB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+MB_SRC="${MB_SRC:-${RB_ROOT}/backends/modelblaster}"
 REL="examples/dronet/int8/generated_gray/hetero_tiled_rvvadd"
 SRC="${MB_SRC}/${REL}"
 DST="${DST:-${SRC}}"    # default: use the source in place (build points MODEL_DIR here)
@@ -31,7 +32,7 @@ if have_all "$SRC"; then
     mkdir -p "$DST"; cp -v "${SRC}"/* "$DST"/ 2>/dev/null || true
     echo "copied -> ${DST}"
   fi
-  echo ">> build with:  MODEL_DIR=${DST} MB_REPO=${MB_SRC} scripts/build_fc_dronet.sh"
+  echo ">> build with:  MODEL_DIR=${DST} MB_REPO=${MB_SRC} workloads/fc_dronet/scripts/build_fc_dronet.sh"
   exit 0
 fi
 
@@ -41,7 +42,7 @@ MISSING: ${SRC} is incomplete.
 REGENERATE (mode B) inside a modelblaster checkout @ 10b50ba:
 
   cd ${MB_SRC}
-  source /home/cobble/Tools/zephyr-chipyard-sw/scripts/activate_conda.sh
+  source ${RB_ROOT}/backends/zephyr-chipyard-sw/scripts/activate_conda.sh
   # grayscale (1ch), fused Gemmini+Saturn(RVV) target, NHWC islands + conv0-pool
   # fusion + rvv_seg relayouts (the integrated stack):
   MODELBLASTER_DRONET_CHANNELS=1 \\

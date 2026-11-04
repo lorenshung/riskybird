@@ -26,7 +26,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 WIFI="$HERE/riskybird-wifi-macos.sh"
-PANEL="$ROOT/backends/zephyr-chipyard-sw/samples/rose_flight_controller/tools/groundstation/riskybird_panel.py"
+PANEL="$HERE/groundstation/riskybird_panel.py"
 LOGDIR="$ROOT/results/riskybird-logs"
 RELAY=14560
 AUTO=""

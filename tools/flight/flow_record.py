@@ -4,7 +4,7 @@ Flow-calibration RECORDER GUI for the riskybird FC (ROSE_FLOW + enhanced telemet
 
 Reads the flight-controller "flow:" line (raw angular flow, gyro, compensated velocity, squal)
 and the "it=" height, plots them live, and lets YOU control recording: type a label, press REC
-(or Spacebar), do the motion, press STOP -> a labeled CSV lands in tools/recordings/ for me to
+(or Spacebar), do the motion, press STOP -> a labeled CSV lands in tools/flight/recordings/ for me to
 analyze. This removes the timing-sync problem: opening the port reboots the FC (~13 s), so just
 wait for the status to say STREAMING, then record whenever you're ready.
 

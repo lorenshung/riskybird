@@ -4,7 +4,7 @@
 # COMBINED core RocketArty200TDroneGemminiSaturnFp16At35Config.
 #
 # Combines, in ONE Zephyr binary flashed to ONE hart:
-#   * the full flight controller (samples/rose_flight_controller) -- PID control
+#   * the full flight controller (workloads/flight_controller) -- PID control
 #     loop in main() at high (prio 0) priority, sensors, estimator, camera/ToF
 #     background threads; and
 #   * DroNet inference (the 13.31 fps integrated Gemmini+Saturn build,
@@ -13,7 +13,7 @@
 #     LOW-priority (prio 13) background thread.
 #
 # Build (see scripts/build_fc_dronet.sh for the canonical invocation):
-#   west build -p -b chipyard_riscv64 samples/rose_fc_dronet -- \
+#   west build -p -b chipyard_riscv64 workloads/fc_dronet -- \
 #     -DMB_REPO=<abs path to a modelblaster checkout @10b50ba/equivalent> \
 #     -DMODEL_DIR=<MB_REPO>/examples/dronet/int8/generated_gray/hetero_tiled_rvvadd \
 #     -DMODELBLASTER_KERNEL_CFLAGS="-march=rv64imac_zve64x;-mabi=lp64;..." \
@@ -25,18 +25,21 @@ cmake_minimum_required(VERSION 3.20.0)
 # Locations (FC must be known before find_package so its dts/bindings -- e.g.
 # riskybird,pwm-motors.yaml -- are on the binding search path via DTS_ROOT).
 # ---------------------------------------------------------------------------
-get_filename_component(FC ${CMAKE_CURRENT_SOURCE_DIR}/../rose_flight_controller ABSOLUTE)
-get_filename_component(TINYMPC ${CMAKE_CURRENT_SOURCE_DIR}/../drone_control/tinympc ABSOLUTE)
-list(APPEND DTS_ROOT ${FC})
+get_filename_component(RB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../.. ABSOLUTE)
+get_filename_component(FC ${CMAKE_CURRENT_SOURCE_DIR}/../flight_controller ABSOLUTE)
+if(NOT DEFINED TINYMPC)
+  set(TINYMPC ${RB_ROOT}/backends/zephyr-chipyard-sw/samples/drone_control/tinympc)
+endif()
+list(APPEND DTS_ROOT ${RB_ROOT}/hardware/zephyr)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(rose_fc_dronet)
 
 # DroNet model + modelblaster runtime. MB_REPO/MODEL_DIR default to this
-# worktree's own modelblaster submodule but are meant to be passed in by
+# checkout's backends/modelblaster submodule but are meant to be passed in by
 # build_fc_dronet.sh so the exact 10b50ba integrated files are used.
 if(NOT DEFINED MB_REPO)
-  set(MB_REPO ${CMAKE_CURRENT_SOURCE_DIR}/../../modelblaster)
+  set(MB_REPO ${RB_ROOT}/backends/modelblaster)
 endif()
 get_filename_component(MB_REPO "${MB_REPO}" ABSOLUTE)
 if(NOT DEFINED MODEL_DIR)
@@ -101,7 +104,7 @@ set(ROSE_DRONET_NAV 0 CACHE STRING "1=DroNet drives velocity/yaw setpoints from 
 # Sources: the full FC + the DroNet model/kernels/runtime + the DroNet thread.
 # ---------------------------------------------------------------------------
 target_sources(app PRIVATE
-  # ---- flight controller (from samples/rose_flight_controller) ----
+  # ---- flight controller (from workloads/flight_controller) ----
   ${FC}/src/main.cpp
   ${FC}/src/estimator_complementary.cpp
   ${FC}/src/estimator_ekf.cpp
@@ -133,10 +136,19 @@ zephyr_link_libraries(-Wl,--no-relax)
 
 # The generated DroNet kernels.c is the ONLY V (Saturn RVV) translation unit:
 # give it the Gemmini+RVV march + include/-D set. Everything else builds no-V.
+# The Gemmini parameters of the shell this runs on. ModelBlaster's own fallback
+# header (cores/gemmini/include/gemmini_params.h) used to be a symlink to this
+# config and now points at default16x16, and gemmini.h includes it by a quoted
+# path that no -isystem order overrides, so the header is force-included: its
+# include guard then makes every later include of either path a no-op.
+if(NOT DEFINED GEMMINI_PARAMS_DIR)
+  set(GEMMINI_PARAMS_DIR ${RB_ROOT}/hardware/modelblaster/cores/gemmini/include/per_config/RocketArty200TDroneGemminiSaturnFp16At35Config)
+endif()
 if(NOT DEFINED MODELBLASTER_KERNEL_CFLAGS OR "${MODELBLASTER_KERNEL_CFLAGS}" STREQUAL "")
   set(MODELBLASTER_KERNEL_CFLAGS
     "-march=rv64imac_zve64x;-mabi=lp64;\
--isystem${MB_REPO}/cores/gemmini/include/per_config/default16x16;\
+-include;${GEMMINI_PARAMS_DIR}/gemmini_params.h;\
+-isystem${GEMMINI_PARAMS_DIR};\
 -isystem${MB_REPO}/cores/gemmini/include;\
 -isystem${MB_REPO}/cores/gemmini;\
 -DGEMMINI_ROCC;-DBAREMETAL;\

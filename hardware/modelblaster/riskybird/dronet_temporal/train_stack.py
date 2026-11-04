@@ -13,7 +13,7 @@ Adapted from himax/train_himax.py. Correctness rules:
   - drop anomalous huge-int filenames (>1e12; the ~31 tii uint64-overflow frames)
 """
 import os, sys, time, csv, glob, argparse
-from _paths import ROOT as MB_ROOT
+from _paths import OUT
 import numpy as np, torch, torch.nn as nn, torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True
@@ -35,7 +35,7 @@ if a.epochs < 1 or a.bs < 1:
     ap.error("epochs and batch size must be positive")
 N=a.N
 if N < 1: ap.error("--N must be positive")
-OUT=a.out or str(MB_ROOT / "build" / f"dronet_himax_stack{N}")
+OUT=a.out or str(OUT / f"dronet_himax_stack{N}")
 dev="cuda" if torch.cuda.is_available() else "cpu"
 HUGE=1e12
 

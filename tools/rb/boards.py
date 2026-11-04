@@ -640,6 +640,9 @@ I2C_TARGETS = PERIPHERAL_TARGETS
 # UART, the sensor bus, the camera OSPI). RocketArty200TOspiConfig, the board
 # default, has none of the drone periphery, so a drone workload built without
 # --config failed on every arty200t build.
+# The TinyMPC library the flight controller links. It stays in the Zephyr
+# backend (samples/drone_control/tinympc, a submodule of zephyr-chipyard-sw).
+FLIGHT_TINYMPC = ZEPHYR_BACKEND / "samples" / "drone_control" / "tinympc"
 DRONE_DEFAULT_CONFIGS = (("arty200t", "RocketArty200TDroneFullDDRConfig"),)
 # The same sentence for every mode that drives the motor pins from the FPGA.
 FPGA_PWM_LEGACY = (
@@ -806,25 +809,25 @@ WORKLOADS = {
     # this cannot be built against a 32 KiB scratchpad config, and the check
     # says so at build time rather than at the link error.
     # The flight stack that actually flew on the ESP32-C6, built here for the
-    # FPGA. Its source_dir points INTO the Zephyr backend rather than into
-    # workloads/: the sample is maintained upstream on
-    # ucb-bar/zephyr-chipyard-sw, and copying it into this repository would fork
-    # a 4,500-line application that is still being developed there. Building it
-    # in place means `rb` adds a target instead of a branch.
+    # FPGA. Its source_dir is workloads/flight_controller, this repository's own
+    # fork of Dima's rose_flight_controller sample. The upstream original stays
+    # in the Zephyr backend (samples/rose_flight_controller) as the RoSE sample;
+    # rb never builds that copy, so RiskyBird changes land here and the backend
+    # stays a clean upstream checkout.
     #
     # The application selects its subsystems from device-tree aliases
     # (DT_NODE_EXISTS(DT_ALIAS(flow/tof/baro))), so which sensors are compiled
     # in is decided by the FPGA overlay, not here -- which is what makes a
     # sensor-at-a-time bring-up possible. See docs/flight-on-fpga.md.
     # Dima's estimator, on its own. Same sources as flight_controller -- this is
-    # a build variant, not a fork -- with the controller compiled out, so a bench
+    # a build variant, not a second copy -- with the controller compiled out, so a bench
     # run measures the estimator and nothing else. The stale workloads/state
     # Madgwick target is NOT this: on the same stationary board it settles to
     # roll -178.7 deg where this reports roll 0.10, so the two disagree by half a
     # turn and only one of them flies.
     "flight_estimator": _workload(
         "flight_estimator",
-        source_dir=ZEPHYR_BACKEND / "samples" / "rose_flight_controller",
+        source_dir=ROOT / "workloads" / "flight_controller",
         modes=("default", "flow"),
         targets=("arty200t",),
         summary="RoSE estimator alone: attitude, altitude and sensor validity, no controller",
@@ -834,13 +837,17 @@ WORKLOADS = {
         # (ROSE_UART_CMD, on by default whenever the esp-uart alias exists)
         # references uart1, and without the port the link fails with an
         # undefined __device_dts_ord_* in uart_cmd_reply.
-        cmake_defines=(("ROSE_ESTIMATOR_ONLY", "1"), ("CONFIG_UART_SIFIVE_PORT_1", "y")),
+        cmake_defines=(
+            ("ROSE_ESTIMATOR_ONLY", "1"),
+            ("CONFIG_UART_SIFIVE_PORT_1", "y"),
+            ("TINYMPC", str(FLIGHT_TINYMPC)),
+        ),
         cmake_defines_by_mode=(("flow", FLOW_DEFINES),),
         default_configs=DRONE_DEFAULT_CONFIGS,
     ),
     "flight_controller": _workload(
         "flight_controller",
-        source_dir=ZEPHYR_BACKEND / "samples" / "rose_flight_controller",
+        source_dir=ROOT / "workloads" / "flight_controller",
         # One mode per bring-up phase, each selecting a device-tree overlay that
         # adds one subsystem to the previous. The overlays #include each other
         # rather than restating the IMU rates and bus speed, so the phases
@@ -856,7 +863,10 @@ WORKLOADS = {
         # alone, so omitting this makes non-telem modes fail at link time with
         # an undefined __device_dts_ord_* reference. flight_controller-telem.conf
         # repeats the setting so the console-moving mode remains self-contained.
-        cmake_defines=(("CONFIG_UART_SIFIVE_PORT_1", "y"),),
+        # TINYMPC: the top-level copy has no ../drone_control beside it, so it
+        # is pointed at the Zephyr backend's TinyMPC submodule (generic, still
+        # upstream there).
+        cmake_defines=(("CONFIG_UART_SIFIVE_PORT_1", "y"), ("TINYMPC", str(FLIGHT_TINYMPC))),
         # Per-mode, because these are CMake cache variables: a .conf fragment
         # cannot reach them, and a mode that cannot set them is a mode whose
         # defining feature has to be remembered as a -D on the command line.
@@ -1177,8 +1187,7 @@ WORKLOADS = {
         minimum_ram_by_mode=(("default", 0x6000000),),
     ),
     # DroNet through ModelBlaster's harness. Built in place from the
-    # ModelBlaster backend, the way flight_controller is built in place from the
-    # Zephyr one: the harness is maintained upstream and takes the generated
+    # ModelBlaster backend: the harness is maintained upstream and takes the generated
     # model as -DMODEL_DIR, so there is nothing for a workloads/dronet/
     # directory to hold that would not be a copy.
     #

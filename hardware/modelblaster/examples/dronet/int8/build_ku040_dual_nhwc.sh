@@ -16,8 +16,11 @@
 #
 # Same env gotcha as the NCHW script: do NOT source set_envvars_sdk.sh under set -e/pipefail.
 set -euo pipefail
-: "${MB:=$(cd "$(dirname "$0")/../../.." && pwd)}"
-: "${ZCS:=$(dirname "$MB")}"
+RB_MB="$(cd "$(dirname "$0")/../../.." && pwd)"             # hardware/modelblaster (RiskyBird overlay)
+RB_ROOT="$(cd "$RB_MB/../.." && pwd)"
+: "${MB:=$RB_ROOT/backends/modelblaster}"                   # pinned ModelBlaster backend
+: "${ZCS:=$RB_ROOT/backends/zephyr-chipyard-sw}"
+: "${SCRATCH:=$RB_ROOT/.rb/modelblaster/ku040}"             # generated sources, build and cache dirs
 : "${ZEPHYR_SDK:=${ZEPHYR_SDK_INSTALL_DIR:?activate the Zephyr SDK environment first}}"
 : "${CONSOLE_OVERLAY:?set CONSOLE_OVERLAY to the KU040 dual console devicetree overlay}"
 : "${CONSOLE_CONF:?set CONSOLE_CONF to the KU040 dual console Kconfig fragment}"
@@ -27,11 +30,11 @@ done
 : "${GEMMINI_CONFIG:=q31ws_32x32_acc}"
 : "${REGEN_MODEL:=1}"     # 1 = re-extract + assign_layouts + regen both backends
 : "${REGEN_SCHED:=0}"     # 1 = regenerate schedule/main; 0 = use committed ku040_dual_nhwc/ artifacts
-: "${BUILD_DIR:=$MB/examples/dronet/int8/build/ku040_dronet_nhwc}"
+: "${BUILD_DIR:=$SCRATCH/build/ku040_dronet_nhwc}"
 
-GEN=$MB/examples/dronet/int8/generated
-DUAL=$MB/examples/dronet/int8/ku040_dual_nhwc   # committed NHWC schedule + dispatch table + main
-SO=$MB/examples/xpurt_demo/int8/generated       # scratch (gitignored)
+GEN=$SCRATCH/generated
+DUAL=$RB_MB/examples/dronet/int8/ku040_dual_nhwc   # committed NHWC schedule + dispatch table + main
+SO=$SCRATCH/xpurt_demo_generated       # scratch (gitignored)
 
 command -v python >/dev/null
 command -v west >/dev/null
@@ -55,7 +58,7 @@ if [ "$REGEN_MODEL" = "1" ]; then
       --quant int8 --num-calibration 1 --fusion-target gemmini_q31_rvv
   echo "== assign_layouts --policy islands (NHWC island around the conv chain) =="
   python pipeline/assign_layouts.py "$GEN/graph.json" "$GEN/graph.json" --policy islands \
-      --hint examples/dronet/int8/dronet_layout_hint.json --model dronet --report
+      --hint "$RB_MB/examples/dronet/int8/dronet_layout_hint.json" --model dronet --report
   # gemmini_q31_rvv = NHWC fused conv2d_pool + conv2d_nhwc + gemmini_blocked_tb32 relayouts
   # (+ rvv bn/add, which are unused on hart1); rvv = hart0 bn/add/relu/linear/sigmoid.
   for BK in gemmini_q31_rvv rvv; do
@@ -65,8 +68,8 @@ if [ "$REGEN_MODEL" = "1" ]; then
     echo "== generate_kernels [$BK] =="
     python -m modelblaster.pipeline.generate_kernels --ir "$GEN/graph.json" \
         --out-dir "$GEN/$BK" --backend reference --target "$BK" --quant int8 \
-        --io "$GEN/io.npz" --repo-root "$MB" --build-dir "$MB/examples/dronet/int8/build/${BK}_nhwc" \
-        --harness-dir "$MB/harness" --cache-dir "$MB/examples/dronet/int8/cache/${BK}_nhwc" \
+        --io "$GEN/io.npz" --repo-root "$MB" --build-dir "$SCRATCH/build/${BK}_nhwc" \
+        --harness-dir "$MB/harness" --cache-dir "$SCRATCH/cache/${BK}_nhwc" \
         --algorithms all --global-curated-dir "$MB/kernels"
   done
 fi
@@ -109,7 +112,7 @@ CONFIG_RISCV_V_KERNEL_ONLY=y
 CONFIG_MP_MAX_NUM_CPUS=2
 CONFIG_RV_BOOT_HART=0
 CONF
-PC=$MB/cores/gemmini/include/per_config/$GEMMINI_CONFIG
+PC=$RB_MB/cores/gemmini/include/per_config/$GEMMINI_CONFIG
 # gemmini_q31_rvv kernels.c carries rvv bn/add (need zve64x) + the NHWC conv2d_pool that
 # #includes conv2d_pool_loadonce.h (need -isystem kernels/gemmini_q31_rvv).
 GCF="-march=rv64imac_zve64x;-mabi=lp64;-isystem$PC;-isystem$MB/cores/gemmini/include;-isystem$MB/cores/gemmini;-isystem$MB/kernels/gemmini_q31_rvv;-DGEMMINI_ROCC;-DBAREMETAL;-DMODELBLASTER_GEMMINI_HWIO_WEIGHTS=1;-DMODELBLASTER_GEMMINI_Q31_ACC_SCALE=1"

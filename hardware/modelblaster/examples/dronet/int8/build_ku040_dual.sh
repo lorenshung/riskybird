@@ -12,8 +12,11 @@
 # IMPORTANT env gotcha: do NOT `source set_envvars_sdk.sh` under `set -e`/pipefail
 # (its find|head SIGPIPEs and aborts the script). Set the ZEPHYR_* vars explicitly.
 set -euo pipefail
-: "${MB:=$(cd "$(dirname "$0")/../../.." && pwd)}"          # modelblaster repo root
-: "${ZCS:=$(dirname "$MB")}"
+RB_MB="$(cd "$(dirname "$0")/../../.." && pwd)"             # hardware/modelblaster (RiskyBird overlay)
+RB_ROOT="$(cd "$RB_MB/../.." && pwd)"
+: "${MB:=$RB_ROOT/backends/modelblaster}"                   # pinned ModelBlaster backend
+: "${ZCS:=$RB_ROOT/backends/zephyr-chipyard-sw}"
+: "${SCRATCH:=$RB_ROOT/.rb/modelblaster/ku040}"             # generated sources, build and cache dirs
 : "${ZEPHYR_SDK:=${ZEPHYR_SDK_INSTALL_DIR:?activate the Zephyr SDK environment first}}"
 : "${CONSOLE_OVERLAY:?set CONSOLE_OVERLAY to the KU040 dual console devicetree overlay}"
 : "${CONSOLE_CONF:?set CONSOLE_CONF to the KU040 dual console Kconfig fragment}"
@@ -23,11 +26,11 @@ done
 : "${GEMMINI_CONFIG:=q31ws_32x32_acc}"                       # per_config header dir (DIM=32)
 : "${REGEN_MODEL:=1}"     # 1 = re-extract + regen both backends; 0 = reuse existing generated/
 : "${REGEN_SCHED:=0}"     # 1 = regenerate schedule/main; 0 = use committed ku040_dual/ artifacts
-: "${BUILD_DIR:=$MB/examples/dronet/int8/build/ku040_dronet_gray_2bk}"
+: "${BUILD_DIR:=$SCRATCH/build/ku040_dronet_gray_2bk}"
 
-GEN=$MB/examples/dronet/int8/generated
-DUAL=$MB/examples/dronet/int8/ku040_dual   # committed schedule + dispatch table + main
-SO=$MB/examples/xpurt_demo/int8/generated  # scratch for regenerated schedule (gitignored)
+GEN=$SCRATCH/generated
+DUAL=$RB_MB/examples/dronet/int8/ku040_dual   # committed schedule + dispatch table + main
+SO=$SCRATCH/xpurt_demo_generated  # scratch for regenerated schedule (gitignored)
 
 # ---- environment (explicit; portable) ---------------------------------------
 command -v python >/dev/null
@@ -58,8 +61,8 @@ if [ "$REGEN_MODEL" = "1" ]; then
     echo "== generate_kernels [$BK] (tiled_conv/tiled_conv_pool -- NO im2col_full_C) =="
     python -m modelblaster.pipeline.generate_kernels --ir "$GEN/graph.json" \
         --out-dir "$GEN/$BK" --backend reference --target "$BK" --quant int8 \
-        --io "$GEN/io.npz" --repo-root "$MB" --build-dir "$MB/examples/dronet/int8/build/${BK}_gray" \
-        --harness-dir "$MB/harness" --cache-dir "$MB/examples/dronet/int8/cache/${BK}_gray" \
+        --io "$GEN/io.npz" --repo-root "$MB" --build-dir "$SCRATCH/build/${BK}_gray" \
+        --harness-dir "$MB/harness" --cache-dir "$SCRATCH/cache/${BK}_gray" \
         --algorithms all --global-curated-dir "$MB/kernels"
   done
 fi
@@ -102,7 +105,7 @@ CONFIG_RISCV_V_KERNEL_ONLY=y
 CONFIG_MP_MAX_NUM_CPUS=2
 CONFIG_RV_BOOT_HART=0
 CONF
-PC=$MB/cores/gemmini/include/per_config/$GEMMINI_CONFIG
+PC=$RB_MB/cores/gemmini/include/per_config/$GEMMINI_CONFIG
 GCF="-march=rv64imac_zicsr_zifencei;-mabi=lp64;-isystem$PC;-isystem$MB/cores/gemmini/include;-isystem$MB/cores/gemmini;-isystem$MB/kernels/gemmini_q31;-DGEMMINI_ROCC;-DBAREMETAL;-DMODELBLASTER_GEMMINI_HWIO_WEIGHTS=1;-DMODELBLASTER_GEMMINI_Q31_ACC_SCALE=1"
 RCF="-march=rv64imac_zve64x;-mabi=lp64;-DMODELBLASTER_RVV_IHWOC_WEIGHTS=1"
 echo "== west build -> $BUILD_DIR =="

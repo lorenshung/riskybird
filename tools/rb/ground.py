@@ -36,8 +36,7 @@ BENCH = ROOT / "tools" / "bench"
 READY_SH = BENCH / "riskybird-ready.sh"
 WIFI_MACOS = BENCH / "riskybird-wifi-macos.sh"
 MONITOR = BENCH / "riskybird-flightready.py"
-WIFI_LINUX = (ROOT / "backends" / "zephyr-chipyard-sw" / "samples" / "rose_flight_controller"
-              / "tools" / "groundstation" / "riskybird_wifi_setup.sh")
+WIFI_LINUX = BENCH / "groundstation" / "riskybird_wifi_setup.sh"
 LOG_DIR = ROOT / "results" / "riskybird-logs"
 STATUS = LOG_DIR / "ready-status.json"
 

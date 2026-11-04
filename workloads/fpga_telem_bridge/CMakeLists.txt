@@ -8,7 +8,7 @@ target_sources(app PRIVATE src/main.c)
 # Embed the shared mobile flight page (gzipped) so the ESP serves it from flash at GET /.
 set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated)
 generate_inc_file_for_target(app
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../rose_flight_controller/tools/groundstation/mobile/mobile.html
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/bench/groundstation/mobile/mobile.html
   ${gen_dir}/mobile_html.gz.inc --gzip)
 
 # Per-service iterable ROM section for the HTTP resources (see src/sections-rom.ld).

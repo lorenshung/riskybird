@@ -51,6 +51,11 @@ from typing import Iterable, Sequence
 from .boards import CHIPYARD, MODELBLASTER, ROOT
 from .environments import zephyr_env
 
+# RiskyBird's own ModelBlaster content -- the Gemmini per_config headers for the
+# FPGA shells, the overlay models and examples -- lives here, not inside the
+# pinned backend, which is a clean upstream checkout.
+RB_MODELBLASTER = ROOT / "hardware" / "modelblaster"
+
 
 # Chipyard's RISC-V tools, which is where spike and libgemmini.so live.
 #
@@ -713,6 +718,19 @@ def generate(
     rb, from RiskyBird's overlays, against exactly these sources.
     """
     run_sh = MODELBLASTER / "examples" / model / "run.sh"
+    overlay_sh = RB_MODELBLASTER / "examples" / model / "run.sh"
+    if not run_sh.is_file() and overlay_sh.is_file():
+        # The overlay runner sets REPO_ROOT to its own tree and sources
+        # examples/_run_lib.sh from there, and the model module it names is
+        # imported as modelblaster.models.<name>, a regular package inside the
+        # backend. Neither resolves without a change in the backend, so say so
+        # rather than run a script that fails three layers down.
+        raise ModelBlasterError(
+            f"{model!r} is a RiskyBird overlay example ({overlay_sh.parent}); "
+            "ModelBlaster's runner cannot find a model or example that lives "
+            "outside backends/modelblaster. Run it from a standalone "
+            "ModelBlaster checkout with hardware/modelblaster copied in."
+        )
     if not run_sh.is_file():
         available = sorted(
             p.name for p in (MODELBLASTER / "examples").iterdir()
@@ -865,6 +883,9 @@ def verification_status(gen_dir: Path) -> dict | None:
 
 def per_config_header_dir(config: str) -> Path:
     """Where the Gemmini header elaborated for `config` lives, if it is captured."""
+    overlay = RB_MODELBLASTER / "cores" / "gemmini" / "include" / "per_config" / config
+    if overlay.is_dir():
+        return overlay
     return MODELBLASTER / "cores" / "gemmini" / "include" / "per_config" / config
 
 
@@ -1034,6 +1055,7 @@ def kernel_cflags(target: str, *, gemmini_config: str | None = None) -> list[str
     `gemmini_config` selects cores/gemmini/include/per_config/<name>/, which is
     how a build gets the gemmini_params.h that MATCHES THE ELABORATED HARDWARE
     rather than whichever one is checked in. Pass the Chipyard config name. The
+    RiskyBird shells' headers are looked up in hardware/modelblaster first. The
     mesh width, the scratchpad geometry and whether a mvin scale unit exists at
     all live in that header, and a mismatch is not a build error -- it is a
     binary that drives Gemmini with the wrong parameters.
@@ -1064,6 +1086,19 @@ def kernel_cflags(target: str, *, gemmini_config: str | None = None) -> list[str
             f"{result.stderr[-2000:]}"
         )
     flags = [flag for flag in result.stdout.strip().split(";") if flag]
+    if gemmini_config is not None:
+        # ModelBlaster's flag table expands <gemmini_config> under its own
+        # root, which only holds the upstream configs. The FPGA shells' headers
+        # live in hardware/modelblaster, so point the same -isystem there when
+        # that is where this config is captured. Position is kept: the
+        # per-config directory must stay ahead of cores/gemmini/include.
+        backend_dir = MODELBLASTER / "cores" / "gemmini" / "include" / "per_config" / gemmini_config
+        local_dir = per_config_header_dir(gemmini_config)
+        if local_dir != backend_dir:
+            flags = [
+                flag.replace(str(backend_dir), str(local_dir)) if flag.startswith("-isystem") else flag
+                for flag in flags
+            ]
 
     def _include_path(flag: str) -> str | None:
         for prefix in ("-isystem", "-I"):

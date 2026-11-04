@@ -6,10 +6,10 @@
 # `fuser /dev/ttyUSB1`; wait if busy. Does NOT reflash SPI (SRAM load only).
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/.." && pwd)"
+RB_ROOT="$(cd "$HERE/../.." && pwd)"
 SECS="${1:-60}"
-ELF="$REPO/build_gemmini_ubench/zephyr/zephyr.elf"
-OCD_CFG="$REPO/../riskybird/scripts/openocd/arty200t_rocket.cfg"
+ELF="$HERE/build_gemmini_ubench/zephyr/zephyr.elf"
+OCD_CFG="$RB_ROOT/hardware/pcb/scripts/openocd/arty200t_rocket.cfg"
 CON=/dev/ttyUSB1
 CONLOG="$HERE/con_ubench.log"
 echo "=== ELF: $ELF ==="; ls -la "$ELF"

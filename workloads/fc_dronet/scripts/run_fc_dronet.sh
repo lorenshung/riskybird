@@ -19,8 +19,8 @@
 set -uo pipefail
 
 WT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RB="${RB:-/home/cobble/Tools/riskybird}"                 # openocd cfg lives here
-CFG="${CFG:-${RB}/scripts/openocd/arty200t_rocket.cfg}"
+RB="${RB:-$(cd "${WT}/../.." && pwd)}"                   # this repository
+CFG="${CFG:-${RB}/hardware/pcb/scripts/openocd/arty200t_rocket.cfg}"
 ELF="${ELF:-${WT}/build_fc_dronet/zephyr/zephyr.elf}"
 ENTRY="${ENTRY:-0x80000000}"
 OPENOCD="${OPENOCD:-openocd}"

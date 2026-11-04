@@ -8,7 +8,7 @@ import os, sys, json, csv, glob, time
 N=int(os.environ["N"]); NORM=90.0
 N_CALIB=int(os.environ.get("N_CALIB","64")); N_SUB=int(os.environ.get("N_SUB","6000"))
 OUT=os.environ.get("OUT_DIR",f"/tmp/stack{N}_sweep")
-from _paths import ROOT as MB_ROOT, required_path
+from _paths import OVERLAY, required_path
 import numpy as np, torch
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True
 import torchvision.transforms.functional as TF
@@ -17,7 +17,7 @@ from modelblaster.pipeline import extract_graph as EG
 from int8_sim import simulate_int8
 from hybrid_sim import simulate_hybrid
 ROOT=required_path("MODELBLASTER_DRONET_STACK3_DATA", directory=True)
-CKPT=required_path("MODELBLASTER_DRONET_STACK3_CKPT", default=str(MB_ROOT / "models/checkpoints/dronet_stack3/best.pt") if N == 3 else None)
+CKPT=required_path("MODELBLASTER_DRONET_STACK3_CKPT", default=str(OVERLAY / "models/checkpoints/dronet_stack3/best.pt") if N == 3 else None)
 HUGE=1e12
 if min(N, N_CALIB, N_SUB) < 1: raise SystemExit("N, N_CALIB and N_SUB must be positive")
 def load_stack(paths,size=112):

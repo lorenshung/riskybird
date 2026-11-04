@@ -9,7 +9,7 @@
 # dark until a manual power-cycle / SW1 tap. A SEPARATE esptool reset afterward boots it cleanly.
 # (A UART-bridge board resets fine from RTS, which is why this never happened on earlier hardware.)
 #
-# Usage: tools/flash_boot.sh [build_dir] [port]
+# Usage: tools/flight/esp32c6/flash_boot.sh [build_dir] [port]
 #   build_dir  default: build_flow
 #   port       default: /dev/ttyACM0
 set -e

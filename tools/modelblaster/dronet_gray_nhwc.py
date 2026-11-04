@@ -193,7 +193,7 @@ def main() -> int:
         nhwc.mkdir(parents=True, exist_ok=True)
         run([py, "pipeline/assign_layouts.py", str(fused / "graph.json"),
              str(nhwc / "graph.json"), "--policy", "islands",
-             "--hint", "examples/dronet/int8/dronet_layout_hint.json", "--model", "dronet"],
+             "--hint", str(mb.RB_MODELBLASTER / "examples/dronet/int8/dronet_layout_hint.json"), "--model", "dronet"],
             env, m, log)
         for name in ("weights.npz", "io.npz", "passes_applied.json"):
             shutil.copy2(fused / name, nhwc / name)

@@ -31,10 +31,10 @@ zephyr_link_libraries(-Wl,--no-relax)
 # SCALAR (no vector) on purpose — the software rearrangement it does is not
 # the RVV path the shipped im2col kernel uses; only the GEMM / tiled_conv
 # hardware numbers are load-bearing (see the header in src/bench.c).
-get_filename_component(REPO "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+get_filename_component(REPO "${CMAKE_CURRENT_SOURCE_DIR}/../../backends/modelblaster" ABSOLUTE)
 set_source_files_properties(src/bench.c PROPERTIES COMPILE_OPTIONS
   "-march=rv64imac_zicsr_zifencei;-mabi=lp64;\
--isystem${REPO}/modelblaster/cores/gemmini/include/per_config/default16x16;\
+-isystem${REPO}/cores/gemmini/include/per_config/default16x16;\
 -isystem${REPO}/cores/gemmini/include;\
 -isystem${REPO}/cores/gemmini;\
 -DGEMMINI_ROCC;-DBAREMETAL;\

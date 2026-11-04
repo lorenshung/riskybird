@@ -11,14 +11,15 @@ import sys
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2]  # hardware/modelblaster (overlay)
+RB_ROOT = ROOT.parents[1]
 sys.path.insert(0, str(ROOT / "riskybird/dronet_temporal"))
 import _paths
 
 
 class MigrationTests(unittest.TestCase):
     def test_artifact_assembly_uses_movable_basenames(self):
-        for p in (ROOT / "riskybird/artifacts").rglob("test_io.S"):
+        for p in (RB_ROOT / "artifacts/modelblaster").rglob("test_io.S"):
             for line in p.read_text().splitlines():
                 if '.incbin "' in line:
                     self.assertNotIn('/', line.split('"')[1], str(p))
@@ -77,7 +78,7 @@ class MigrationTests(unittest.TestCase):
                 p.chmod(0o755)
             fragment = d / 'console.conf'
             fragment.touch()
-            env = dict(os.environ, PATH=f'{d}:/usr/bin:/bin', MB=str(ROOT),
+            env = dict(os.environ, PATH=f'{d}:/usr/bin:/bin', MB=str(RB_ROOT / 'backends/modelblaster'),
                        ZCS=folder, ZEPHYR_BASE=folder, ZEPHYR_SDK_INSTALL_DIR=folder,
                        CONSOLE_CONF=str(fragment), CONSOLE_OVERLAY=str(fragment))
             for script in scripts:

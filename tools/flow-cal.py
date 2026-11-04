@@ -232,7 +232,7 @@ def do_fit(runs, complaints, kept, dropped, args, thr) -> int:
     print("Set it with, e.g.:")
     print(f'  RB_EXTRA_CPPFLAGS="-DFLOW_RAD_PER_COUNT={med:.6f}f"')
     print("or change the #ifndef default in")
-    print("  backends/zephyr-chipyard-sw/samples/rose_flight_controller/src/flow.c")
+    print("  workloads/flight_controller/src/flow.c")
     if len(inliers) < 5:
         print()
         print(f"WARNING: only {len(inliers)} run(s) survived. The procedure asks for "

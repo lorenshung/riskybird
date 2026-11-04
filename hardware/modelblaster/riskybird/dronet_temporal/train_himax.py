@@ -5,7 +5,7 @@ Grayscale 112x112 (deploy input). Official partition split. Steering head only.
 label_yaw_rate is raw deg/s (+-90) -> normalize /90 to [-1,+1] (+CCW=turn left, our convention).
 BALANCE=1 -> WeightedRandomSampler by |yaw| bins to counter the ~83% straight-flight zeros."""
 import os, sys, time, csv, glob, argparse
-from _paths import ROOT as MB_ROOT
+from _paths import OUT
 import numpy as np, torch, torch.nn as nn, torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True
@@ -16,7 +16,7 @@ ap=argparse.ArgumentParser()
 ap.add_argument("--epochs",type=int,default=int(os.environ.get("EPOCHS","45")))
 ap.add_argument("--bs",type=int,default=64); ap.add_argument("--lr",type=float,default=1e-3)
 ap.add_argument("--root",default=os.environ.get("MODELBLASTER_DRONET_STACK3_DATA"))
-ap.add_argument("--out",default=str(MB_ROOT / "build" / "dronet_himax"))
+ap.add_argument("--out",default=str(OUT / "dronet_himax"))
 ap.add_argument("--norm",type=float,default=90.0)  # deg/s -> [-1,1]
 ap.add_argument("--res",type=int,default=int(os.environ.get("RES","112")))  # 112=small(deploy) 200=original DroNet
 a=ap.parse_args()

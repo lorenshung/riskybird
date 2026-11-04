@@ -14,7 +14,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MAIN = ROOT / "samples/rose_flight_controller/src/main.cpp"
+MAIN = ROOT / "workloads/flight_controller/src/main.cpp"
 
 
 class FlightControllerMerge(unittest.TestCase):

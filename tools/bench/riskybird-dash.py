@@ -11,7 +11,7 @@ therefore has no route to anything else. Python 3.8+; macOS ships one.
 
 WHY THIS EXISTS RATHER THAN riskybird_panel.py
 ----------------------------------------------
-backends/zephyr-chipyard-sw/.../tools/groundstation/riskybird_panel.py is the
+tools/bench/groundstation/riskybird_panel.py is the
 older, richer panel (3D view, drift rings, trend strip) and it still works -- its
 CORE_RE matches this carrier's telemetry line, so run it if you want the 3D view.
 But it was written for the ESP-NATIVE flight controller, and three of the things
@@ -61,7 +61,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # =============================================================================
 #
 # The flight controller's line, copied out of the format string in
-# backends/zephyr-chipyard-sw/samples/rose_flight_controller/src/main.cpp (the
+# workloads/flight_controller/src/main.cpp (the
 # `if (ROSE_TELEM && (iter % ROSE_TELEM_DIV) == 0)` block) rather than guessed:
 #
 #   flight_controller: it=%d dt=%dms roll=%s%d.%03d pitch=%s%d.%03d yaw=%s%d.%03d

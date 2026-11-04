@@ -3,7 +3,7 @@
 # Join a riskybird drone SoftAP from a Mac WITHOUT losing the host's internet.
 #
 # This is the macOS counterpart of
-#   backends/zephyr-chipyard-sw/samples/rose_flight_controller/tools/groundstation/riskybird_wifi_setup.sh
+#   tools/bench/groundstation/riskybird_wifi_setup.sh
 # which is Linux/NetworkManager only. Same goal, different mechanism, and the
 # difference is not cosmetic -- it is forced by what macOS can and cannot do.
 #

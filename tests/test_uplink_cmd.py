@@ -33,12 +33,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 FC_MAIN = (
     ROOT
-    / "backends/zephyr-chipyard-sw/samples/rose_flight_controller/src/main.cpp"
+    / "workloads/flight_controller/src/main.cpp"
 )
 PANEL = (
     ROOT
-    / "backends/zephyr-chipyard-sw/samples/rose_flight_controller"
-    / "tools/groundstation/riskybird_panel.py"
+    / "tools/bench/groundstation/riskybird_panel.py"
 )
 
 # The newer dashboard lives in the setup tree, which is a sibling checkout and

@@ -2,8 +2,9 @@
 
 This directory owns the model recipes and generated baselines formerly stored in
 RiskyBird's integration and PCB repositories. The owning checkout is the single
-`backends/zephyr-chipyard-sw/modelblaster` submodule; board firmware/overlays belong
-in its Zephyr parent and Scala hardware configs belong in Chipyard.
+`backends/modelblaster` submodule, which stays a clean upstream checkout; the
+RiskyBird additions live under `hardware/modelblaster`. Board firmware and overlays
+belong in `workloads/` and `hardware/zephyr`, and Scala hardware configs belong in Chipyard.
 
 ## Preserved histories and outputs
 

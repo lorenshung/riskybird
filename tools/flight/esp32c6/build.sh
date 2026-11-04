@@ -4,7 +4,7 @@
 # The parameters differ a lot between these (loop duration, autoflight vs bench, motor duty,
 # watchdog, flightlog), so each config lives here by name instead of a hand-typed -D soup.
 #
-#   tools/build.sh <preset> [feel: motor_duty]
+#   tools/flight/esp32c6/build.sh <preset> [feel: motor_duty]
 #
 #   viz    -> build_viz  : VISUALIZE ONLY. Continuous loop, motors OFF (AUTOFLIGHT_MAX_DUTY=0),
 #                          EKF + flow + fast boot. For tethered state_viz sensor/pose/state work.
@@ -25,30 +25,43 @@
 set +u   # source the env BEFORE `set -e` (activate_conda.sh returns nonzero during init -> 127)
 source /home/cobble/.claude/projects/-home-cobble-Tools-riskybird/esp32env.sh >/dev/null 2>&1
 set -e
-cd /home/cobble/Tools/zephyr-chipyard-sw
+# west needs the Zephyr workspace as cwd; the application itself is this repository's
+# workloads/flight_controller, passed by absolute path.
+RB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cd "${ZCS:-$RB_ROOT/backends/zephyr-chipyard-sw}"
 
+# Build directories go under this repository's build/, not into the backend checkout.
+OUT="${OUT:-$RB_ROOT/build/flight/esp32c6}"
 B="esp32c6_devkitc/esp32c6/hpcore"
-A="samples/rose_flight_controller"
+A="$RB_ROOT/workloads/flight_controller"
+# The board files the sample used to carry in boards/ (which west picked up by name) live in
+# hardware/zephyr/targets/esp32c6/workloads/ now, so name them explicitly. This overlay is
+# complete on its own: it is not combined with targets/esp32c6/target.overlay.
+ESP="$RB_ROOT/hardware/zephyr/targets/esp32c6/workloads"
+# TINYMPC and DTS_ROOT: the app no longer sits beside samples/drone_control, and the
+# riskybird,pwm-motors binding is in hardware/zephyr/dts/bindings.
+BOARD_ARGS="-DDTC_OVERLAY_FILE=$ESP/flight_controller.overlay -DEXTRA_CONF_FILE=$ESP/flight_controller.conf
+  -DTINYMPC=$PWD/samples/drone_control/tinympc -DDTS_ROOT=$RB_ROOT/hardware/zephyr"
 # common to the flight-controller presets (dump is minimal and sets its own):
 C="-DROSE_USE_PID=1 -DROSE_USE_EKF=1 -DROSE_FLOW=1 -DROSE_BUMPER=1 -DROSE_BUMPER_READDRESS_ONLY=1 -DROSE_ACTUATE_TIMEOUT_MS=0"
 
 case "${1:-}" in
   viz)
-    DIR=build_viz
-    west build -b "$B" "$A" -d "$DIR" -- $C -DCTRL_ITERS=0 \
+    DIR="$OUT/build_viz"
+    west build -b "$B" "$A" -d "$DIR" -- $BOARD_ARGS $C -DCTRL_ITERS=0 \
       -DEXTRA_CPPFLAGS="-DROSE_AUTOFLIGHT=1 -DVL53L1X_TIMING_BUDGET_US=100000 -DHOVER_Z_M=0.20f \
         -DT_CLIMB_MS=1500 -DT_HOVER_MS=1500 -DT_DESCEND_MS=1500 -DAUTOFLIGHT_MAX_DUTY=0.0f \
         -DPID_MASS_KG=0.060f -DSAFE_MAX_VEL_MPS=1000.0f"
     NOTE="motors OFF, continuous" ;;
   feel)
-    DIR=build_feel
+    DIR="$OUT/build_feel"
     DUTY="${2:-0.10}"
-    west build -b "$B" "$A" -d "$DIR" -- $C -DCTRL_ITERS=0 \
+    west build -b "$B" "$A" -d "$DIR" -- $BOARD_ARGS $C -DCTRL_ITERS=0 \
       -DEXTRA_CPPFLAGS="-DMOTOR_MAX_DUTY=${DUTY}f -DSAFE_MAX_TILT_RAD=2.5f \
         -DSAFE_MAX_RATE_RADPS=1000.0f -DSAFE_MAX_VEL_MPS=1000.0f"
     NOTE="bench always-armed, motors scaled to ${DUTY}, flip-upside-down kill (~136 deg)" ;;
   flight)
-    DIR=build_fly
+    DIR="$OUT/build_fly"
     # === WORKING position-hold config -- 2026-08-13 milestone (~1 m drift). BARE drone (cage OFF). ===
     # Fix stack that got here (see docs/FLIGHT_BUILD.md): fly bare (the prop cage was too heavy ->
     # thrust-marginal -> altitude saturation -> tip); altitude INTEGRAL (KI_HEIGHT) auto-calibrates
@@ -57,7 +70,7 @@ case "${1:-}" in
     # + gyro-rate flow gate (FLOW_GYRO_MAX) + tilt slew limit (TILT_SLEW_RADPS) to stop the roll<->flow
     # oscillation; velocity PI (KI_VEL) auto-trims the constant tilt and kills the steady drift.
     # NOTE: ROSE_USE_EKF=0 is REQUIRED -- the EKF's tof_gate decouples altitude and climbs away.
-    west build -b "$B" "$A" -d "$DIR" -- \
+    west build -b "$B" "$A" -d "$DIR" -- $BOARD_ARGS \
       -DROSE_USE_PID=1 -DROSE_USE_EKF=0 -DROSE_FLOW=1 -DROSE_BUMPER=1 -DROSE_BUMPER_READDRESS_ONLY=1 \
       -DROSE_ACTUATE_TIMEOUT_MS=0 -DCTRL_ITERS=20000 \
       -DEXTRA_CPPFLAGS="-DROSE_AUTOFLIGHT=1 -DROSE_ARM_NO_GESTURE=1 -DROSE_FLIGHTLOG=1 -DROSE_FLIGHTLOG_ERASE=1 \
@@ -71,11 +84,11 @@ case "${1:-}" in
         -DSAFE_MAX_HEIGHT_M=1.2f -DAUTOFLIGHT_MAX_DUTY=0.95f -DPID_MASS_KG=0.038f -DSAFE_MAX_VEL_MPS=2.0f"
     NOTE="WORKING position-hold: bare drone, complementary, gyro-cal + alt/vel integrators + flow filtering" ;;
   dump)
-    DIR=build_dump
-    west build -b "$B" "$A" -d "$DIR" -- -DROSE_USE_PID=1 \
+    DIR="$OUT/build_dump"
+    west build -b "$B" "$A" -d "$DIR" -- $BOARD_ARGS -DROSE_USE_PID=1 \
       -DEXTRA_CPPFLAGS="-DROSE_FLIGHTLOG_DUMP=1"
     NOTE="flightlog CSV dump" ;;
   *)
-    echo "usage: tools/build.sh <viz|feel|flight|dump> [feel: motor_duty, e.g. 0.10]"; exit 1 ;;
+    echo "usage: tools/flight/esp32c6/build.sh <viz|feel|flight|dump> [feel: motor_duty, e.g. 0.10]"; exit 1 ;;
 esac
 echo "build.sh: '$1' [$NOTE] -> $DIR/zephyr/zephyr.elf   (flash: west flash -d $DIR, then POR)"

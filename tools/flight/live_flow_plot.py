@@ -14,7 +14,7 @@ Axes are the RAW sensor axes (no remap) so you can map them to the drone frame y
 
 IMPORTANT: opens the port with DTR/RTS DEASSERTED -- on the ESP32-C6 USB-Serial/JTAG those map
 to BOOT/EN, so a default open resets the board into ROM download mode (silent). See
-tools/serial_capture.py open_noreset().
+tools/flight/serial_capture.py open_noreset().
 
 Run in the conda 'zephyr' env:
     python live_flow_plot.py            # /dev/ttyACM0

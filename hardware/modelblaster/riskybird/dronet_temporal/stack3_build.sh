@@ -2,8 +2,10 @@
 # Historical temporal benchmark recipe: synthetic input, trained temporal weights,
 # 14 Gemmini / 14 RVV operations. This is not real-data accuracy evaluation.
 set -euo pipefail
-M="${MB:-$(cd "$(dirname "$0")/../.." && pwd)}"
-ZCS="${ZCS:-$(dirname "$M")}"
+RB_MB="$(cd "$(dirname "$0")/../.." && pwd)"   # hardware/modelblaster (RiskyBird overlay)
+RB_ROOT="$(cd "$RB_MB/../.." && pwd)"
+M="${MB:-$RB_ROOT/backends/modelblaster}"      # pinned ModelBlaster backend
+ZCS="${ZCS:-$RB_ROOT/backends/zephyr-chipyard-sw}"
 SDK="${ZEPHYR_SDK_INSTALL_DIR:?activate the Zephyr SDK environment first}"
 : "${CONSOLE_CONF:?set CONSOLE_CONF to the KU040 dual console Kconfig fragment}"
 : "${CONSOLE_OVERLAY:?set CONSOLE_OVERLAY to the KU040 dual console devicetree overlay}"
@@ -14,7 +16,7 @@ export MODELBLASTER_GEMMINI_CONFIG=q31ws_32x32_acc
 # Preserve the original unverified fast-kernel selection explicitly.
 export MODELBLASTER_CURATED_VERIFY=0
 export MODELBLASTER_DRONET_CHANNELS=3 MB_ENABLE_FUSION=1
-export MODELBLASTER_DRONET_CKPT="${MODELBLASTER_DRONET_CKPT:-$M/models/checkpoints/dronet_stack3/best.pt}"
+export MODELBLASTER_DRONET_CKPT="${MODELBLASTER_DRONET_CKPT:-$RB_MB/models/checkpoints/dronet_stack3/best.pt}"
 for file in "$CONSOLE_CONF" "$CONSOLE_OVERLAY" "$MODELBLASTER_DRONET_CKPT"; do
     test -f "$file" || { echo "missing required file: $file" >&2; exit 2; }
 done
@@ -31,7 +33,7 @@ echo "== extract grayscale+fused =="
 python -m modelblaster.pipeline.extract_graph --model dronet --out-dir $GEN --quant int8 --num-calibration 1 --fusion-target gemmini_q31_rvv 2>&1 | tail -2
 echo "== assign_layouts --policy islands (NHWC) =="
 python pipeline/assign_layouts.py $GEN/graph.json $GEN/graph.json --policy islands \
-  --hint examples/dronet/int8/dronet_layout_hint.json --model dronet --report 2>&1 | tail -3
+  --hint "$RB_MB/examples/dronet/int8/dronet_layout_hint.json" --model dronet --report 2>&1 | tail -3
 python - <<PY
 import json;g=json.load(open("examples/dronet/int8/generated_stack3/graph.json"))
 ops=[o for o in g["ops"] if o.get("dispatch_id") is not None]
@@ -87,13 +89,13 @@ CONFIG_RISCV_V_KERNEL_ONLY=y
 CONFIG_MP_MAX_NUM_CPUS=2
 CONFIG_RV_BOOT_HART=0
 CONF
-PC=$M/cores/gemmini/include/per_config/q31ws_32x32_acc
+PC=$RB_MB/cores/gemmini/include/per_config/q31ws_32x32_acc
 GCF="-march=rv64imac_zve64x;-mabi=lp64;-isystem$PC;-isystem$M/cores/gemmini/include;-isystem$M/cores/gemmini;-isystem$M/kernels/gemmini_q31_rvv;-DGEMMINI_ROCC;-DBAREMETAL;-DMODELBLASTER_GEMMINI_HWIO_WEIGHTS=1;-DMODELBLASTER_GEMMINI_Q31_ACC_SCALE=1"
 RCF="-march=rv64imac_zve64x;-mabi=lp64;-DMODELBLASTER_RVV_IHWOC_WEIGHTS=1"
-D=examples/dronet/int8/ku040_dual_stack3
+D=$RB_MB/examples/dronet/int8/ku040_dual_stack3
 west build -p always -b chipyard_riscv64 harness_xpurt --build-dir examples/xpurt_demo/int8/build/ku040_dronet_stack3 -- \
   -DMODEL_NAMES=dronet -DMODEL_DIRS_BASE=$M/$GEN -DMODEL_BACKENDS=gemmini_q31_rvv,rvv \
-  -DXPURT_SCHEDULE_C=$M/$D/ku040_dronet_stack3_dev.c -DXPURT_MAIN_C=$M/$D/ku040_dronet_stack3_dev_main.c -DXPURT_INCLUDE_DIR=$M/$D \
+  -DXPURT_SCHEDULE_C=$D/ku040_dronet_stack3_dev.c -DXPURT_MAIN_C=$D/ku040_dronet_stack3_dev_main.c -DXPURT_INCLUDE_DIR=$D \
   -DMODELBLASTER_KERNEL_CFLAGS_GEMMINI_Q31_RVV="$GCF" -DMODELBLASTER_KERNEL_CFLAGS_RVV="$RCF" \
   -DEXTRA_CONF_FILE="$M/harness_xpurt/backends/rvv.conf;$M/harness/backends/firesim_chipyard_dual_gemmini.conf;$CONSOLE_CONF;$TASK_TMP/sf.conf" \
   -DEXTRA_DTC_OVERLAY_FILE="$CONSOLE_OVERLAY"

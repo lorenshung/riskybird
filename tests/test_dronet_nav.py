@@ -14,7 +14,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "samples/rose_flight_controller/src"
+SRC = ROOT / "workloads/flight_controller/src"
 MAIN = SRC / "main.cpp"
 
 # Quaternion helpers shared by the C++ checks: q = qz(yaw) * qy(pitch) * qx(roll) as Gibbs r = q_xyz/q_w.

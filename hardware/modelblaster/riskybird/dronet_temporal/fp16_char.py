@@ -9,7 +9,7 @@ os.environ["MODELBLASTER_DRONET_CHANNELS"]="1"
 DATASET=os.environ.get("DATASET","simforest")
 N_SUB=int(os.environ.get("N_SUB","40")); N_CALIB=int(os.environ.get("N_CALIB","64"))
 OUT=os.environ.get("OUT_DIR",f"/tmp/fp16char_{DATASET}")
-from _paths import ROOT as MB_ROOT, required_path
+from _paths import required_path
 import numpy as np, torch
 from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True
 from torchvision import transforms

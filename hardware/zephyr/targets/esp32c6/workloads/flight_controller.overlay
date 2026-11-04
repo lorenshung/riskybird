@@ -33,7 +33,11 @@
 };
 
 &pinctrl {
-	i2c0_default: i2c0_default {
+	/* Same pins as the base-board contract in targets/esp32c6/target.overlay
+	 * (riskybird_i2c0_default). Restated under its own label because this
+	 * overlay is applied alone (tools/flight/esp32c6/build.sh), never together
+	 * with target.overlay, whose BMI088 labels it would duplicate. */
+	fc_i2c0_pins: fc_i2c0_pins {
 		group1 {
 			pinmux = <I2C0_SDA_GPIO15>, <I2C0_SCL_GPIO14>;
 			bias-pull-up;
@@ -74,7 +78,7 @@
 
 &i2c0 {
 	status = "okay";
-	pinctrl-0 = <&i2c0_default>;
+	pinctrl-0 = <&fc_i2c0_pins>;
 	pinctrl-names = "default";
 	clock-frequency = <I2C_BITRATE_FAST>;
 

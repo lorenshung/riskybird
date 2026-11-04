@@ -3,10 +3,9 @@
 Dump + analyze the rose_flight_controller on-board flash flight log.
 
 The firmware must be flashed with the DUMP build, which prints the whole log as CSV
-once at boot then idles:
-    west build -b esp32c6_devkitc/esp32c6/hpcore samples/rose_flight_controller -d build_dump -- \
-        -DROSE_USE_PID=1 -DEXTRA_CPPFLAGS="-DROSE_FLIGHTLOG_DUMP=1"
-    west flash -d build_dump
+once at boot then idles (the preset passes the ESP board files and TinyMPC path):
+    tools/flight/esp32c6/build.sh dump
+    tools/flight/esp32c6/flash_boot.sh build/flight/esp32c6/build_dump
 
 Then run this. It resets the board via DTR/RTS *while attached* (the dump prints ~0.5 s
 after boot, before the host would re-enumerate, so we must be listening across the reset),

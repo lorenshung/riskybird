@@ -7,7 +7,7 @@
 WHY THIS EXISTS
 ---------------
 The ground stations under
-`backends/zephyr-chipyard-sw/samples/rose_flight_controller/tools/groundstation/`
+`tools/bench/groundstation/`
 are Dima's, and they fly: `riskybird_panel.py` and the mobile page have both
 driven a real drone. But they were written for the ESP-NATIVE flight
 controller, where the board itself has WiFi and unicasts telemetry to UDP
