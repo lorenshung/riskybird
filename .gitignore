@@ -82,6 +82,7 @@ results/
 /workloads/flight_controller/docs/MOTOR_MUSIC.md
 /workloads/flight_controller/docs/TELEMETRY_BRINGUP.md
 /workloads/flight_controller/docs/TELEMETRY_PLAN.md
+/workloads/flight_controller/docs/DRONET_NAV.md
 /workloads/ads7128_test/README.rst
 /workloads/bmi088_test/README.rst
 /workloads/i2c_scanner/README.rst
