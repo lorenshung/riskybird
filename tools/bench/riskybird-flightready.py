@@ -33,11 +33,14 @@ and each retry switches the Mac's Wi-Fi, so leave it off unless that is wanted.
 """
 
 import argparse
+import atexit
 import datetime
 import json
 import os
 import re
+import signal
 import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -109,13 +112,81 @@ class State:
 S = State()
 
 
-def rx(port, relay, logf):
+def udp_source(port):
+    """Datagrams from a normal socket bound to :port."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(("0.0.0.0", port))
-    out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if relay else None
     while True:
         data, _ = s.recvfrom(4096)
-        now = time.time()
+        yield time.time(), data
+
+
+def pcap_source(iface, port):
+    """Datagrams to :port captured on iface by tcpdump, without a socket.
+
+    For a host whose firewall rejects the drone's unicast (it answers ICMP
+    "admin prohibited" and no socket ever sees the datagram): libpcap sees a
+    packet at the interface, before the firewall. Nothing on the host changes.
+    tcpdump needs root; it is run through `sudo -n`, so sudo must not prompt.
+    Timestamps are the kernel's receive times from the capture.
+    """
+    cmd = ["tcpdump", "-i", iface, "-n", "-U", "-w", "-", "udp", "dst", "port", str(port)]
+    if os.geteuid() != 0:
+        cmd = ["sudo", "-n"] + cmd
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    f = proc.stdout
+
+    def stop_capture(*_):
+        # sudo relays SIGTERM to tcpdump; without this a killed monitor leaves a
+        # root tcpdump running until its next write hits the closed pipe.
+        if proc.poll() is None:
+            proc.terminate()
+
+    atexit.register(stop_capture)
+
+    def take(n):
+        buf = b""
+        while len(buf) < n:
+            chunk = f.read(n - len(buf))
+            if not chunk:
+                raise SystemExit(f"[ready] tcpdump on {iface} stopped (exit {proc.poll()}) -- "
+                                 "is sudo passwordless and the interface up?")
+            buf += chunk
+        return buf
+
+    gh = take(24)
+    magic = struct.unpack("<I", gh[:4])[0]
+    if magic in (0xA1B2C3D4, 0xA1B23C4D):
+        end = "<"
+    elif magic in (0xD4C3B2A1, 0x4D3CB2A1):
+        end = ">"
+    else:
+        raise SystemExit(f"[ready] not a pcap stream from tcpdump (magic {magic:#x})")
+    nano = magic in (0xA1B23C4D, 0x4D3CB2A1)
+    link = struct.unpack(end + "I", gh[20:24])[0]
+    l2 = {1: 14, 113: 16, 276: 20}.get(link)   # Ethernet, Linux cooked, Linux cooked v2
+    if l2 is None:
+        raise SystemExit(f"[ready] unsupported capture link type {link}")
+    while True:
+        sec, frac, incl, _orig = struct.unpack(end + "IIII", take(16))
+        pkt = take(incl)
+        ts = sec + frac / (1e9 if nano else 1e6)
+        off = l2
+        if link == 1 and pkt[12:14] == b"\x81\x00":   # 802.1Q tag
+            off += 4
+        if len(pkt) < off + 28 or (pkt[off] >> 4) != 4:
+            continue
+        ihl = (pkt[off] & 0x0F) * 4
+        if pkt[off + 9] != 17:                      # not UDP
+            continue
+        udp = off + ihl
+        ulen = struct.unpack(">H", pkt[udp + 4:udp + 6])[0]
+        yield ts, pkt[udp + 8:udp + ulen]
+
+
+def rx(source, relay, logf):
+    out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if relay else None
+    for now, data in source:
         if out:
             out.sendto(data, ("127.0.0.1", relay))
         text = data.decode("utf-8", "replace")
@@ -258,6 +329,9 @@ def main():
                     help="seconds with no datagram before diagnosing the link")
     ap.add_argument("--auto-rejoin", action="store_true",
                     help="on a stale lease, run the wifi script's down/up")
+    ap.add_argument("--pcap", metavar="IFACE",
+                    help="capture the datagrams on IFACE with tcpdump (sudo -n) instead of "
+                    "binding the port -- for a host whose firewall rejects them")
     args = ap.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -269,7 +343,12 @@ def main():
     print(f"[ready] status:    {status_path}", flush=True)
     print(f"[ready] relay ->   127.0.0.1:{args.relay}" if args.relay else "[ready] relay off",
           flush=True)
-    threading.Thread(target=rx, args=(args.port, args.relay, logf), daemon=True).start()
+    # SIGTERM -> normal exit, so atexit handlers (the capture's tcpdump) run.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    source = pcap_source(args.pcap, args.port) if args.pcap else udp_source(args.port)
+    if args.pcap:
+        print(f"[ready] capture:   tcpdump on {args.pcap}, udp dst port {args.port}", flush=True)
+    threading.Thread(target=rx, args=(source, args.relay, logf), daemon=True).start()
 
     t_start = time.time()
     last_diag = 0.0

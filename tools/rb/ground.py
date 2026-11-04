@@ -127,5 +127,7 @@ def gonogo(watch: bool = False, path: Path = STATUS) -> int:
 
 def monitor(extra: list[str]) -> int:
     """Run the monitor alone (no panel, no Wi-Fi), e.g. on a machine that already has the link."""
+    if extra and extra[0] == "--":
+        extra = extra[1:]
     return subprocess.call([sys.executable, "-u", str(_require(MONITOR)),
                             "--log-dir", str(LOG_DIR), *extra], cwd=ROOT)
