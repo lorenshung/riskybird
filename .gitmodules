@@ -8,6 +8,7 @@
 #   models        ... plus backends/modelblaster  (~143 MiB)
 #   sim           ... plus backends/RoSE (then only the RoSE submodules you
 #                 need; its nested Chipyard is redirected, see below)
+#   board files   git submodule update --init hardware/pcb   (KiCad)
 #
 # Every backend is pinned at a plain upstream commit with no RiskyBird content.
 # RiskyBird's own code lives under hardware/, workloads/ and tools/, and reaches
@@ -22,9 +23,12 @@
 # (e73d9bc) conflict with upstream and cannot ride a working-tree patch, so
 # Chipyard's generators/saturn is redirected to this checkout.
 #
-# hardware/pcb is the board itself (KiCad), checked in as a plain directory.
-# Its one nested submodule, gym-pybullet-drones under riskybird-academy, is
-# listed below and is not part of any tier.
+# hardware/pcb is the board itself (KiCad, the v2 boards, the v3 base and
+# riskybird-academy), a submodule so this repository never contains or pins
+# itself. Nothing in the build reads it; two bench scripts take an OpenOCD
+# config from it (workloads/fc_dronet/scripts/run_fc_dronet.sh,
+# workloads/gemmini_ubench/run.sh). Its own .gitmodules carries the nested
+# gym-pybullet-drones.
 [submodule "backends/zephyr-chipyard-sw"]
 	path = backends/zephyr-chipyard-sw
 	url = https://github.com/ucb-bar/zephyr-chipyard-sw.git
@@ -45,6 +49,7 @@
 	path = backends/RoSE
 	url = https://github.com/ucb-bar/RoSE.git
 	branch = rose-2-dev
-[submodule "hardware/pcb/riskybird-academy/sim/gym-pybullet-drones"]
-	path = hardware/pcb/riskybird-academy/sim/gym-pybullet-drones
-	url = https://github.com/ucb-bar/gym-pybullet-drones.git
+[submodule "hardware/pcb"]
+	path = hardware/pcb
+	url = https://github.com/lorenshung/riskybird.git
+	branch = riskybirdv3-layout
