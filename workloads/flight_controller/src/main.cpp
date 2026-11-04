@@ -2770,6 +2770,64 @@ static float baro_rel_altitude_m(float p_kpa, float p0_kpa)
 }
 #endif
 
+/* ---- RoSE co-sim batched IMU (-DROSE_IMU_BATCH=1, spike_riscv64 only) ----------------------------
+ * The drone's loop runs at ~1 kHz and reads every BMI088 output sample; the co-sim loop is bounded by
+ * its 5 ms grant and runs at ~170 Hz, so it would see one sample in six and none of the averaging the
+ * 1 kHz estimator does. With this flag the IMU arrives like a FIFO drain instead: cmd ROSE_IMU_BATCH_CMD
+ * returns [seq, count, LEN samples of (ax ay az gx gy gz), oldest first] where the env produces samples
+ * at 1 kHz and seq counts them; the read averages every sample since the previous read (at least the
+ * newest one), which is what a loop running at the sample rate integrates. One request per iteration on
+ * the IMU channel replaces the two accel/gyro reads. The sensor model is the same; only the sampling of
+ * it changes. Default 0 = the per-read accel/gyro devices, as before. */
+#if HAVE_ROSE && defined(ROSE_IMU_BATCH) && ROSE_IMU_BATCH
+#ifndef ROSE_IMU_BATCH_CMD
+#define ROSE_IMU_BATCH_CMD 0x17u
+#endif
+#ifndef ROSE_IMU_BATCH_CH
+#define ROSE_IMU_BATCH_CH 2u
+#endif
+#ifndef ROSE_IMU_BATCH_LEN
+#define ROSE_IMU_BATCH_LEN 16
+#endif
+#define ROSE_IMU_BATCH_WORDS (2 + 6 * ROSE_IMU_BATCH_LEN)
+#include <rose/rose_proto.h>   /* rose_request / rose_recv_reqrsp */
+static float imu_batch_last_seq = -1.0f;
+static uint32_t imu_batch_raw[ROSE_IMU_BATCH_WORDS];
+static uint32_t imu_batch_avg_n;   /* samples averaged in the last read, for debugging */
+
+static void imu_rose_request(void)
+{
+	rose_request(rose, ROSE_IMU_BATCH_CMD, 0U);
+}
+
+static bool imu_rose_collect(float a[3], float g[3])
+{
+	int n = rose_recv_reqrsp(rose, ROSE_IMU_BATCH_CH, imu_batch_raw, ROSE_IMU_BATCH_WORDS);
+	if (n < ROSE_IMU_BATCH_WORDS) {
+		return false;
+	}
+	float w[ROSE_IMU_BATCH_WORDS];
+	memcpy(w, imu_batch_raw, sizeof(w));
+	const float seq = w[0];
+	int count = (int)w[1];
+	if (count < 1 || count > ROSE_IMU_BATCH_LEN) {
+		return false;
+	}
+	int k = (imu_batch_last_seq < 0.0f) ? 1 : (int)(seq - imu_batch_last_seq);
+	if (k < 1) k = 1;            /* nothing new since the last read: the register still holds the newest */
+	if (k > count) k = count;    /* more than the ring holds: the oldest were overwritten, as in a FIFO */
+	imu_batch_last_seq = seq;
+	float sa[3] = {0, 0, 0}, sg[3] = {0, 0, 0};
+	for (int j = ROSE_IMU_BATCH_LEN - k; j < ROSE_IMU_BATCH_LEN; j++) {
+		const float *v = &w[2 + 6 * j];
+		for (int i = 0; i < 3; i++) { sa[i] += v[i]; sg[i] += v[3 + i]; }
+	}
+	for (int i = 0; i < 3; i++) { a[i] = sa[i] / (float)k; g[i] = sg[i] / (float)k; }
+	imu_batch_avg_n = (uint32_t)k;
+	return true;
+}
+#endif
+
 static bool read_sensor_frame(struct sensor_frame *f)
 {
 	uint32_t _pf = PF_NOW();
@@ -2793,8 +2851,13 @@ static bool read_sensor_frame(struct sensor_frame *f)
 	PF_ACC(pf_imu_fetch, _pf);
 	f->tof_valid = false;
 #else
+#if HAVE_ROSE && defined(ROSE_IMU_BATCH) && ROSE_IMU_BATCH
+	imu_rose_request();
+	const int rc_a = 0, rc_g = 0;
+#else
 	int rc_a = sensor_sample_fetch(accel_dev);
 	int rc_g = sensor_sample_fetch(gyro_dev);
+#endif
 #if HAVE_FLOW && !(defined(ROSE_FLOW) && ROSE_FLOW)
 	sensor_sample_fetch(flow_dev);   /* RoSE virtual flow: velocity, not counts */
 #elif defined(ROSE_FLOW) && ROSE_FLOW
@@ -2806,6 +2869,11 @@ static bool read_sensor_frame(struct sensor_frame *f)
 		return false;
 	}
 	_pf = PF_NOW();
+#if HAVE_ROSE && defined(ROSE_IMU_BATCH) && ROSE_IMU_BATCH
+	if (!imu_rose_collect(araw, graw)) {
+		return false;
+	}
+#else
 	struct sensor_value av[3], gv[3];
 	sensor_channel_get(accel_dev, SENSOR_CHAN_ACCEL_XYZ, av);
 	sensor_channel_get(gyro_dev,  SENSOR_CHAN_GYRO_XYZ,  gv);
@@ -2813,6 +2881,7 @@ static bool read_sensor_frame(struct sensor_frame *f)
 		araw[i] = (float)sensor_value_to_double(&av[i]);
 		graw[i] = (float)sensor_value_to_double(&gv[i]);
 	}
+#endif
 #endif
 	IMU_REMAP(f->accel, araw);   /* sensor -> drone body frame (no-op on RoSE) */
 	IMU_REMAP(f->gyro,  graw);
