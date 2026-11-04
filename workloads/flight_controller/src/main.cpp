@@ -3169,7 +3169,7 @@ static void keepalive_block(void *a, void *b, void *c)
  * GPIO7 via the ADS7128 set/clear-bit RMW, which never disturbs GPIO6 (ToF XSHUT) or AIN5 (batt).
  * The bus is shared with the control loop, but writes happen only on a pattern EDGE (a few per
  * second) and this thread sits below PRIO_IO, so the worst case is the control loop waiting one
- * ~150 us I2C transfer. Patterns match workloads/status_led (the bench demo). */
+ * ~150 us I2C transfer. Patterns match the status-LED bench demo (never committed). */
 enum led_pattern { LEDP_CAL, LEDP_READY, LEDP_ARMING, LEDP_ARMED, LEDP_FAULT, LEDP_LOWBATT, LEDP_LOCKED };
 
 static inline void status_led_write(bool on)
