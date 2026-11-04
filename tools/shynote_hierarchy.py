@@ -159,7 +159,18 @@ class HierarchicalNotionStore(NotionStore):
             if self._archived(ancestor):
                 raise NotFound("A parent folder is archived.")
 
+    def _children(self, parent_id):
+        # Upstream's (id, title) listing, used when a new note or directory is
+        # created: skip the asset gallery, which carries no path metadata.
+        excluded = set(self.index.get("asset_pages", []))
+        for page_id, title in super()._children(parent_id):
+            if page_id not in excluded:
+                yield page_id, title
+
     def _child_blocks(self, parent):
+        # Raw blocks. Not named _children: upstream NotionStore._children
+        # yields (id, title) pairs for its own _entries, which creating a new
+        # note goes through ("too many values to unpack" when shadowed).
         cursor = None
         seen = set()
         while True:
@@ -176,17 +187,6 @@ class HierarchicalNotionStore(NotionStore):
             if not cursor or cursor in seen:
                 raise ProviderError("Invalid Notion pagination cursor.")
             seen.add(cursor)
-
-    def _children(self, parent):
-        # The store's create/discovery path wants (id, title) pairs of note pages.
-        # Asset pages carry no ShyNote metadata, so they are not notes.
-        excluded = set(self.index.get("asset_pages", []))
-        for block in self._child_blocks(parent):
-            if block["type"] != "child_page" or self._archived(block):
-                continue
-            note_id = self._id(block["id"])
-            if note_id not in excluded:
-                yield note_id, block["child_page"]["title"]
 
     def list_notes(self):
         excluded = set(self.index.get("asset_pages", []))

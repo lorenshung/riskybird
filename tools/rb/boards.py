@@ -718,8 +718,10 @@ WORKLOADS = {
     ),
     # One pass over every peripheral a flight needs, in boot order, ending in a
     # board-ready verdict. Needs the drone periphery for the same reason
-    # sensor_check does; `motors` additionally needs the battery and a shell
-    # that carries pwm0/pwm1.
+    # sensor_check does; `motors` additionally needs the battery, the ESP link
+    # (serial@10021000) and esp_bridge --mode motors on the ESP: the sweep sends
+    # motor_link duty frames, as the flight controller does, and drives no
+    # FPGA pin.
     "bootup_check": _workload(
         "bootup_check",
         modes=("default", "motors"),
@@ -730,7 +732,7 @@ WORKLOADS = {
         # by contract rather than at link time.
         minimum_ram_by_mode=(("default", 0x40000), ("motors", 0x40000)),
         default_configs=DRONE_DEFAULT_CONFIGS,
-        mode_legacy=(("motors", FPGA_PWM_LEGACY),),
+        cppflags_by_mode=(("motors", (("BOOTUP_MOTORS", "1"),)),),
     ),
     # The ESP link lives only in the full drone shells, which are arty200t-only
     # today. Requires a shell that elaborates serial@10021000; rb appends

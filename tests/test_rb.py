@@ -113,8 +113,13 @@ class RegistryTests(unittest.TestCase):
             self.assertIn("F13", fc.legacy_note(mode))
         for mode in ("default", "flow", "esp-motors", "telem"):
             self.assertEqual(fc.legacy_note(mode), "", mode)
-        self.assertIn("F13", WORKLOADS["bootup_check"].legacy_note("motors"))
-        self.assertEqual(WORKLOADS["bootup_check"].legacy_note("default"), "")
+        # bootup_check's sweep moved to the ESP link (2026-11-03): neither mode
+        # drives an FPGA PWM pin, so neither is legacy.
+        for mode in ("default", "motors"):
+            self.assertEqual(WORKLOADS["bootup_check"].legacy_note(mode), "", mode)
+        self.assertEqual(
+            dict(WORKLOADS["bootup_check"].cppflags_for("motors")).get("BOOTUP_MOTORS"), "1")
+        self.assertEqual(dict(WORKLOADS["bootup_check"].cppflags_for("default")), {})
 
     def test_flow_modes_compile_flow_in(self) -> None:
         for name in ("flight_controller", "flight_estimator"):

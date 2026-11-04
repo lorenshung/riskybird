@@ -10,15 +10,22 @@ The flash (S25FL256S, 32 MiB) holds two images:
                      0x800000, so nothing here can damage it.
   0x800000  UPDATE   written by this script; entered with --boot update.
 
+Addresses here are flash byte addresses; the ESP sends WBSTAR = addr >> 8,
+which is what SPI 32-bit addressing (every build) expects.
+
 Both must be ESP-loader bitstreams (RocketArty200T*LoaderConfig), or the drone
 can only be reached again by power-cycling it into golden.
 
   --url socket://192.168.4.1:14552 | --usb /dev/ttyACM0
   --info                    flash ID and status registers
   --write X.bit             erase + program + verify the update slot
-  --verify X.bit [--at A]   compare the flash at A (default: update slot)
+  --verify X.bit [--at A]   compare the flash at A (default: update slot): by
+                            CRC-32 computed on the FPGA (seconds), or by reading
+                            it back (--readback, or a loader without CRC)
   --boot golden|update|HEX  reconfigure the FPGA from that address, then wait
                             for the new image to answer and report its id
+  --boot-mode 1|2|3         ICAP diagnostics (EspLinkIprog): 1 IPROG without a
+                            WBSTAR write, 2 WBSTAR only (no reboot), 3 packed
   --ping                    which image is running now
 
 Each image identifies itself by its USR_ACCESS word (the bitstream's build
@@ -33,6 +40,7 @@ import argparse
 import struct
 import sys
 import time
+import zlib
 
 import serial
 
@@ -51,6 +59,7 @@ ERRS = {0xE1: "refused by the golden-image guard (or misaligned)",
         0xEE: "unknown frame (framing lost)", 0xEF: "FPGA input FIFO overflowed"}
 WINDOW = 8                      # PROG frames in flight: 8 x 261 B < the 4 KiB FIFO
 EXPECT_JEDEC = bytes([0x01, 0x02, 0x19])   # Spansion S25FL256S
+CRC_CHUNK = 1 << 20             # ~0.7 s each on the FPGA: well inside the ESP's 5 s stall limit
 
 
 def bit_payload(path: str) -> bytes:
@@ -68,6 +77,27 @@ def bit_payload(path: str) -> bytes:
         n = struct.unpack(">H", b[i + 1:i + 3])[0]
         i += 3 + n
     raise LoadError(f"{path}: no configuration data")
+
+
+def spi_32bit(payload: bytes) -> bool:
+    """True if the image switches the configuration reads to 4-byte addressing
+    (BSPI = 0x0C, BITSTREAM.CONFIG.SPI_32BIT_ADDR YES) in its header. The ESP
+    turns a boot address into WBSTAR = addr >> 8, which is only right for such
+    images; every build from fpga-shells arty-config.xdc is one."""
+    sync = payload.find(bytes.fromhex("aa995566"))
+    return sync >= 0 and bytes.fromhex("3003e0010000000c") in payload[sync:sync + 64]
+
+
+def watchdog(payload: bytes) -> int:
+    """The TIMER value the image's header arms (BITSTREAM.CONFIG.TIMER_CFG), 0 if
+    none. Without it, a slot cut short by a power loss mid-write leaves the FPGA
+    scanning the flash forever after --boot update instead of falling back."""
+    sync = payload.find(bytes.fromhex("aa995566"))
+    head = payload[sync:sync + 128] if sync >= 0 else b""
+    k = head.find(bytes.fromhex("30022001"))
+    while k >= 0 and k % 4:
+        k = head.find(bytes.fromhex("30022001"), k + 1)
+    return struct.unpack(">I", head[k + 4:k + 8])[0] if k >= 0 else 0
 
 
 def usr_access(payload: bytes) -> int | None:
@@ -133,6 +163,17 @@ class Flash:
             addr += k
             n -= k
         return bytes(out)
+
+    def crc(self, addr: int, n: int) -> int:
+        """zlib.crc32 of n flash bytes at addr, computed by the FPGA."""
+        self.ser.write(struct.pack("<BII", 0x04, addr, n))
+        r = self._read(1, n / 1.2e6 + 1.0)
+        if r[0] in ERRS and r[0] != 0xEE:
+            raise LoadError(f"CRC {addr:#x}+{n}: {ERRS[r[0]]}")
+        r += self._read(4, 0.5)
+        if r[4] != OK:
+            raise LoadError(f"CRC {addr:#x}+{n}: bad reply {r.hex()}")
+        return struct.unpack("<I", r[:4])[0]
 
     def erase(self, addr: int) -> None:
         self.ser.write(struct.pack("<BI", 0x03, addr))
@@ -202,7 +243,11 @@ def main() -> int:
     ap.add_argument("--verify", metavar="BIT")
     ap.add_argument("--at", type=lambda s: int(s, 0), default=None,
                     help="flash address for --verify (default: update slot)")
+    ap.add_argument("--readback", action="store_true",
+                    help="verify by reading the flash back instead of by CRC (slow)")
     ap.add_argument("--boot", metavar="golden|update|HEX")
+    ap.add_argument("--boot-mode", type=int, choices=(0, 1, 2, 3), default=0,
+                    help=argparse.SUPPRESS)
     ap.add_argument("--ping", action="store_true")
     ap.add_argument("--fast", action="store_true",
                     help="921600 baud for flash data (EXPERIMENTAL: dropped bytes on the bench, 2026-11-01)")
@@ -224,6 +269,14 @@ def main() -> int:
                         raise LoadError(f"{args.write}: {len(data)} B does not fit the slot")
                     print(f"{args.write}: {len(data)} B, image id "
                           f"{describe_id(usr_access(data))}")
+                    if not spi_32bit(data):
+                        raise LoadError(f"{args.write} does not use SPI 32-bit addressing "
+                                        "(BITSTREAM.CONFIG.SPI_32BIT_ADDR): booting it, or "
+                                        "booting anything from it, would use the wrong WBSTAR")
+                    if not watchdog(data) & 0x3FFFFFFF:
+                        raise LoadError(f"{args.write} does not arm the configuration watchdog "
+                                        "(BITSTREAM.CONFIG.TIMER_CFG): a write cut short by a "
+                                        "power loss would hang the FPGA at --boot update")
                     t0 = time.monotonic()
                     end = UPDATE + len(data)
                     for a in range(UPDATE, end, SECTOR):
@@ -248,15 +301,48 @@ def main() -> int:
                     at = UPDATE if args.at is None else args.at
                     t0 = time.monotonic()
                     bad = None
-                    for off in range(0, len(data), 64 << 10):
-                        want = data[off:off + (64 << 10)]
-                        got = fl.read(at + off, len(want))
-                        if got != want:
-                            i = next(i for i in range(len(want)) if got[i] != want[i])
-                            bad = at + off + i
-                            break
-                        print(f"\r  verified {off + len(want)}/{len(data)} B",
-                              end="", flush=True)
+                    use_crc = not args.readback
+                    for off in range(0, len(data), CRC_CHUNK):
+                        want = data[off:off + CRC_CHUNK]
+                        if use_crc:
+                            try:
+                                same = fl.crc(at + off, len(want)) == zlib.crc32(want)
+                            except LoadError as exc:
+                                if off:
+                                    raise
+                                # A loader or ESP image from before CRC: the ESP
+                                # drops the session, so start a fresh one.
+                                print(f"  no on-FPGA CRC ({exc}); reading back instead")
+                                fl.end()
+                                ser.close()
+                                time.sleep(2.0)
+                                ser, fl = flash_session(args, fast)
+                                use_crc = False
+                        if use_crc and not same:
+                            # Bisect by CRC to the first bad 4 KiB, read only that.
+                            lo, hi = 0, len(want)
+                            while hi - lo > 4096:
+                                mid = lo + ((hi - lo) // 2 + 4095) // 4096 * 4096
+                                part = want[lo:mid]
+                                if fl.crc(at + off + lo, len(part)) == zlib.crc32(part):
+                                    lo = mid
+                                else:
+                                    hi = mid
+                            got = fl.read(at + off + lo, hi - lo)
+                            i = next((i for i in range(hi - lo) if got[i] != want[lo + i]), None)
+                            if i is not None:
+                                bad = at + off + lo + i
+                                break
+                            same = True
+                        if not use_crc:
+                            got = fl.read(at + off, len(want))
+                            same = got == want
+                            if not same:
+                                i = next(i for i in range(len(want)) if got[i] != want[i])
+                                bad = at + off + i
+                                break
+                        print(f"\r  verified {off + len(want)}/{len(data)} B"
+                              f"{' (CRC)' if use_crc else ''}", end="", flush=True)
                     print()
                     if bad is not None:
                         raise LoadError(f"flash differs from {args.verify} at {bad:#x}")
@@ -277,9 +363,12 @@ def main() -> int:
             time.sleep(3.0)
             ser = open_link(args)
             try:
-                print(f"ESP: RBBOOT OK {handshake(ser, args.timeout, f'RBBOOT1 {addr:x}', 'RBBOOT')}")
+                hello = f"RBBOOT1 {addr:x}" + (f" {args.boot_mode}" if args.boot_mode else "")
+                print(f"ESP: RBBOOT OK {handshake(ser, args.timeout, hello, 'RBBOOT')}")
             finally:
                 ser.close()
+            if args.boot_mode == 2:
+                return 0       # WBSTAR only: the FPGA keeps running
             t0 = time.monotonic()
             new = None
             while time.monotonic() - t0 < 30:
