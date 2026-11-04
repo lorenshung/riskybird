@@ -205,6 +205,15 @@ static uint32_t flow_rose_t_prev;
 
 void flow_rose_request(void)
 {
+	/* Read no faster than the hardware thread does (FLOW_PERIOD_MS): the counts accumulate in the
+	 * sensor between reads, and at a ~1 kHz loop a read every iteration would see 0-1 counts, a far
+	 * coarser angular flow than the drone's 100 Hz reads ever get. */
+	static int64_t next_ms;
+	const int64_t now = k_uptime_get();
+	if (now < next_ms) {
+		return;
+	}
+	next_ms = now + FLOW_PERIOD_MS;
 	rose_request(flow_rose, ROSE_FLOW_BURST_CMD, 0U);
 	flow_rose_pending = true;
 }
