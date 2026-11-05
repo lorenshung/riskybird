@@ -94,6 +94,7 @@
     "workloads/ads7128_test/README.rst": "3ea06b97-ede4-8121-8fd5-ce424a1059e7",
     "workloads/bmi088_test/README.rst": "3ea06b97-ede4-8156-aed4-cbf749676822",
     "workloads/flight_controller/README.rst": "40e06b97-ede4-8140-9558-d9510a05fd36",
+    "workloads/flight_controller/docs/DRONET_NAV.md": "40f06b97-ede4-8124-bdc2-f799d9385352",
     "workloads/flight_controller/docs/FC_RAM_ANALYSIS.md": "40d06b97-ede4-81ad-9f61-f43b0235ca9c",
     "workloads/flight_controller/docs/FLIGHT_BUILD.md": "40d06b97-ede4-8137-a568-dd551a3adb2d",
     "workloads/flight_controller/docs/FLIGHT_TUNING_LOG.md": "40d06b97-ede4-81b9-bf62-d6f990cb5ba9",
