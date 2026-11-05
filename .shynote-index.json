@@ -34,7 +34,6 @@
     "3ea06b97-ede4-8146-b4a6-ca1b187d5958"
   ],
   "documents": {
-    "README.md": "3ea06b97-ede4-81fb-8fd3-de0fbfc12d09",
     "artifacts/modelblaster/README.md": "3ea06b97-ede4-815e-81f4-f68d8e538f98",
     "docs/accel-shells-bringup.md": "3ea06b97-ede4-81e6-914b-f913cb232249",
     "docs/drone-initial-bringup.md": "3ea06b97-ede4-81fb-8320-face1a6a2de1",
@@ -280,13 +279,6 @@
     }
   },
   "headings": {
-    "README.md": {
-      "riskybird": "0c5a5e7fe31947e585fcf9de3ab217ab",
-      "start-here": "1b3cb55484724adc9964db659bc2af3a",
-      "what-is-here": "67de485ee92f4897be721c6d0bb3ecd0",
-      "documentation": "36809f8d6e86420fbcab4df5bbd981c8",
-      "scope": "24ef7f3c8a92413782ffc669d9f53243"
-    },
     "artifacts/modelblaster/README.md": {
       "verified-modelblaster-codegen-published-for-machines-that-cannot-verify": "aa40a6ee4e47483cae9253f01ee71621",
       "four-directories-two-shells": "d9c2cebde63f4be29e89ae3b4ef3c0d1",

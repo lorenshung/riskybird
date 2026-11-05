@@ -62,4 +62,4 @@ Setup, flight, hardware and workload guides are in the
 [RiskyBird Docs notebook](https://www.notion.so/3ea06b97ede480799eb4d570d4d4d4be)
 in Notion; the [integration branch section](https://www.notion.so/3ea06b97ede4817fb997d1c5f607c577)
 covers this branch. Pages follow the repository's directories. To read or edit
-them from a checkout, see [`tools/shynote.md`](../tools/shynote.md).
+them from a checkout, see [`tools/shynote.md`](tools/shynote.md).

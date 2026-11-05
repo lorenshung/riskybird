@@ -52,7 +52,6 @@ results/
 /.rb/
 /.shynote-local/
 /docs/
-/README.md
 /artifacts/modelblaster/README.md
 /hardware/ospi/docs/CHIPYARD_INTEGRATION.md
 /hardware/ospi/docs/OSPI_I2C_INTEGRATION.md
