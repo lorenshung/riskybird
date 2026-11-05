@@ -306,7 +306,7 @@ static float gyro_to_rps(int16_t raw, uint8_t range_reg)
  * state in its own registers, so that survives the program exiting, GDB detaching and the FPGA
  * being reprogrammed -- it is not something killing a host process undoes. Channels 1-4 are the
  * VL53L5CX XSHUT lines (hardware/zephyr/targets/README.md); the rest must be named from the
- * schematic, never swept for. integration/zephyr/tof holds every channel low for the same
+ * schematic, never swept for. workloads/lib/tof holds every channel low for the same
  * reason (rb_tof_hold_all).
  *
  * With the default mask this is also the software recovery from a latched state.

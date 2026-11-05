@@ -1,5 +1,9 @@
-"""Check that every row of prune/moved-to-top.tsv names a blob that exists at
+"""Check that every row of tests/data/provenance.tsv names a blob that exists at
 the named source path in the named commit of the pre-prune clone.
+
+Rows whose destination starts with archive/ were removed from the tree; their
+`note` column says where the originals live (ucb-bar/zephyr-chipyard-sw
+rb-clean), and this test is what keeps that claim checkable.
 
 The clones are not part of this checkout, so the test skips when they are
 absent. Point RB_PRUNE_CLONES at a directory holding zcs-rb-clean and
@@ -25,13 +29,13 @@ EXTRACT = "extract"
 # Copies that must still be byte-identical to the manifest blob.
 UNMODIFIED = ("hardware/rtl/fcrocc/prototype/", "hardware/rtl/fcrocc/sim/",
               "hardware/rtl/fcrocc/vsrc/")
-# Deliberate changes since the move (see prune/pin-clean-proof.txt, section 9): the IMU lever-arm
+# Deliberate changes since the move (see the pin-clean proof log, section 9, docs/history/pin-clean-proof.md in Notion): the IMU lever-arm
 # sign in the boot image (IMU_OFFSET_Y -0.016 -> +0.016). The ROM itself is unchanged.
 CHANGED_ON_PURPOSE = ("hardware/rtl/fcrocc/vsrc/fc_rocc_init.hex",)
 
 
 def rows():
-    with open(ROOT / "prune" / "moved-to-top.tsv", newline="") as f:
+    with open(ROOT / "tests" / "data" / "provenance.tsv", newline="") as f:
         return list(csv.DictReader(f, delimiter="\t"))
 
 

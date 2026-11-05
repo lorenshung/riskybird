@@ -16,7 +16,7 @@
     "docs/upstream-pr": "3ea06b97-ede4-81c3-ae02-d1c1c554830e",
     "hardware/ospi": "3ea06b97-ede4-8182-946e-dab85143f863",
     "hardware/zephyr": "3ea06b97-ede4-8180-8a5d-e310baf963a5",
-    "integration/zephyr": "3ea06b97-ede4-8176-a678-e1ca204a6751",
+    "workloads/lib": "3ea06b97-ede4-8176-a678-e1ca204a6751",
     "tools/flight": "3ea06b97-ede4-8182-95b0-ed1c68b51e22",
     "workloads/ads7128_test": "3ea06b97-ede4-813c-b0f9-cbadea3c9cd8",
     "workloads/bmi088_test": "3ea06b97-ede4-8178-9a31-d84c2426a22b",
@@ -27,7 +27,7 @@
     "workloads/vl35l5cx_test": "3ea06b97-ede4-81d6-a06b-caf306a4fbbe",
     "hardware/ospi/docs": "3ea06b97-ede4-81db-af20-fa7672b2a9a6",
     "hardware/zephyr/targets": "3ea06b97-ede4-81d5-931d-c9002cf421f7",
-    "integration/zephyr/tof": "3ea06b97-ede4-81cf-b729-effd16b12237",
+    "workloads/lib/tof": "3ea06b97-ede4-81cf-b729-effd16b12237",
     "tools/flight/legacy": "3ea06b97-ede4-8108-ad90-e66ff45c4f73"
   },
   "asset_pages": [
@@ -48,6 +48,7 @@
     "docs/history/HANDOFF-ground-station.md": "3ea06b97-ede4-8189-a51f-fb5998920041",
     "docs/history/esp-motor-offload-handoff.md": "3ea06b97-ede4-819d-893c-f7f5121ae675",
     "docs/history/flight-safety-bench-procedure.md": "3ea06b97-ede4-8131-b330-ec026dbcd2e3",
+    "docs/history/pin-clean-proof.md": "40f06b97-ede4-814e-824d-e8d37c7e96aa",
     "docs/history/motor4-remote-investigation.md": "3ea06b97-ede4-810d-a35d-e679d1e2f41e",
     "docs/history/setup-vs-actual-2026-09-09.md": "3ea06b97-ede4-8192-93ca-d77bc3a49eca",
     "docs/history/tethered-flight-attempt.md": "3ea06b97-ede4-81c8-8640-ec8c86c15719",
@@ -83,8 +84,8 @@
     "hardware/ospi/docs/README.md": "3ea06b97-ede4-81bc-b6d1-e27e3389d7f0",
     "hardware/zephyr/targets/README.md": "3ea06b97-ede4-8124-b194-c5e72be52bfa",
     "hardware/zephyr/targets/esp32c6/PROGRAMMING.md": "40d06b97-ede4-8158-89ca-d5df18c0eed8",
-    "integration/README.md": "3ea06b97-ede4-81fe-9516-efbb80a803b0",
-    "integration/zephyr/tof/README.md": "3ea06b97-ede4-819f-a0da-cad92afdac5e",
+    "workloads/lib/README.md": "3ea06b97-ede4-81fe-9516-efbb80a803b0",
+    "workloads/lib/tof/README.md": "3ea06b97-ede4-819f-a0da-cad92afdac5e",
     "tools/bench/groundstation/README.md": "40e06b97-ede4-8199-baa2-f55ccaafe2e9",
     "tools/bench/groundstation/mobile/DESIGN.md": "40e06b97-ede4-814e-81b1-f0cf67bdaa41",
     "tools/flight/esp32c6/README.md": "40e06b97-ede4-81bd-9e41-ef60ae0113f4",
@@ -983,10 +984,10 @@
       "esp32-c6-drone-pcb": "8dd6417769c340d3b75db4576193adcf",
       "fpga-dronelogic-soc": "ce3fefea866f490887850e8e8ebbf297"
     },
-    "integration/README.md": {
+    "workloads/lib/README.md": {
       "riskybird-integration-contracts": "5c767ab59761489a8f1d4a9bc2e22e4f"
     },
-    "integration/zephyr/tof/README.md": {
+    "workloads/lib/tof/README.md": {
       "riskybird-zephyr-tof-contract": "1a450767cff743d293fd4bbe74fd5df1"
     },
     "tools/flight/legacy/README.md": {

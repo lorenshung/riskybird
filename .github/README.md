@@ -27,7 +27,8 @@ submodules under `backends/`.
 |---|---|
 | `rb`, `tools/rb/` | the `rb` command: build, program, load, console, debug, fly |
 | `workloads/` | Zephyr workloads: `flight_controller`, `fc_dronet`, sensor, motor, camera and ESP bring-up |
-| `hardware/chipyard/` | RiskyBird Chipyard configs, IO binders and the FPGA build wrapper |
+| `workloads/lib/` | shared Zephyr libraries the workloads compile in: camera, flightrec, motor link, motor guard (`safety`), ToF |
+| `hardware/chipyard/` | RiskyBird Chipyard configs, IO binders, the FPGA build wrapper, and `patches/`, the patch queue `tools/backend-patches` applies to `backends/chipyard` |
 | `hardware/rtl/` | RiskyBird's own RTL: `fcrocc` (flight-control RoCC and its microcode assembler), `ospi`, `uartdma`, `esplink` |
 | `hardware/zephyr/` | devicetree overlays and Kconfig fragments per FPGA target |
 | `hardware/{gemmini,fpga-shells,firesim,modelblaster}/` | RiskyBird configs and files for those backends |
@@ -36,11 +37,10 @@ submodules under `backends/`.
 | `hardware/{flight,bench}/` | GDB scripts for flight-bench and bench debugging |
 | `hardware/padtest/` | bare-metal FPGA pad tests |
 | `tools/flight/`, `tools/bench/` | flight recording, ESP32-C6 link firmware, ground station |
-| `integration/zephyr/` | shared Zephyr modules: camera, ToF, motor link, motor guard |
+| `workloads/lib/` | shared Zephyr modules: camera, ToF, motor link, motor guard |
 | `backends/` | submodules: chipyard, zephyr-chipyard-sw, modelblaster and RoSE at plain upstream pins; saturn at the Saturn commit RiskyBird's accelerator shells need |
-| `patches/`, `.backend-overlays`, `.submodule-redirects` | what `tools/backend-patches` and `tools/submodule-redirects` put into the backends |
-| `prune/moved-to-top.tsv` | where each file copied out of a backend came from |
-| `tests/` | repository tests |
+| `.backend-overlays`, `.submodule-redirects` | what `tools/backend-patches` and `tools/submodule-redirects` put into the backends |
+| `tests/` | repository tests; `tests/data/provenance.tsv` records where each file copied out of a backend came from |
 
 ## Getting started
 

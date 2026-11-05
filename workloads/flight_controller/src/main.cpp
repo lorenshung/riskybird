@@ -1710,7 +1710,7 @@ static_assert((float)(MOTOR_MAX_DUTY) > 0.0f && (float)(MOTOR_MAX_DUTY) <= 1.0f,
  * output so motor4 could never be driven from here, and every gate is a
  * wired-OR of an FPGA 47R and an ESP 47R into a 10k pulldown, so handing all
  * four to the ESP removes the dual-driver contention instead of working around
- * one pin. See integration/zephyr/motor_link/include/riskybird/motor_link.h. */
+ * one pin. See workloads/lib/motor_link/include/riskybird/motor_link.h. */
 #ifndef ROSE_ESP_MOTORS
 #define ROSE_ESP_MOTORS 0
 #endif

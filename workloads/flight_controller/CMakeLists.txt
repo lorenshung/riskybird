@@ -238,16 +238,16 @@ set(MOTOR_DUTY_CEILING   1.0f  CACHE STRING "collective duty ceiling, differenti
 # The wire format is shared with workloads/esp_motors through the header in
 # ROSE_MOTOR_LINK_DIR, so neither end can drift from the other.
 set(ROSE_ESP_MOTORS 0 CACHE STRING "1=send motor duty frames on uart1 instead of driving PWM")
-set(ROSE_MOTOR_LINK_DIR "" CACHE STRING "riskybird integration/zephyr/motor_link directory")
+set(ROSE_MOTOR_LINK_DIR "" CACHE STRING "riskybird workloads/lib/motor_link directory")
 set(ROSE_ESP_MOTORS_HZ 50 CACHE STRING "motor duty frame rate on the ESP link, Hz")
 
 # One HM01B0 still at the top of an autoflight. The capture sequence is riskybird's
-# integration/zephyr/camera (split prepare/arm/done/finish so the control loop only
+# workloads/lib/camera (split prepare/arm/done/finish so the control loop only
 # ever pays four register writes); the sensor register map is camera_bringup's.
 # Off by default, so every existing preset builds byte-identical.
 set(ROSE_CAMERA 0 CACHE STRING "1=capture one camera frame mid-hover (autoflight)")
 set(ROSE_CAMERA_DIR "" CACHE STRING
-  "riskybird integration/zephyr/camera directory (default: RB_ROOT/integration/zephyr/camera)")
+  "riskybird workloads/lib/camera directory (default: RB_ROOT/workloads/lib/camera)")
 
 # Roll-harness ("rig") tuning build: the drone on a 1-DOF roll pivot, roll gains set over the uplink
 # (src/fc_rig.h). NEVER a free-flight image. It replaces the autoflight profile with its own arm/run
@@ -320,14 +320,14 @@ if(ROSE_CAMERA)
   if(NOT ROSE_CAMERA_DIR)
     if(NOT RB_ROOT)
       message(FATAL_ERROR
-        "ROSE_CAMERA=1 needs -DROSE_CAMERA_DIR=<riskybird>/integration/zephyr/camera (or -DRB_ROOT)")
+        "ROSE_CAMERA=1 needs -DROSE_CAMERA_DIR=<riskybird>/workloads/lib/camera (or -DRB_ROOT)")
     endif()
-    set(ROSE_CAMERA_DIR ${RB_ROOT}/integration/zephyr/camera)
+    set(ROSE_CAMERA_DIR ${RB_ROOT}/workloads/lib/camera)
   endif()
   target_sources(app PRIVATE ${ROSE_CAMERA_DIR}/src/camera.c)
   target_include_directories(app PRIVATE
     ${ROSE_CAMERA_DIR}/include
-    ${ROSE_CAMERA_DIR}/../../../workloads/camera_bringup/src)   # hm01b0.h
+    ${ROSE_CAMERA_DIR}/../../camera_bringup/src)   # hm01b0.h
   # Fail a dead sensor ~150 ms after MODE_SELECT instead of after the 6 s AE settle, so
   # photo_prepare() can reset and retry at boot (see ROSE_PHOTO_TRIES in main.cpp). The
   # 100 ms is camera_photo's proven MODE_SELECT -> PCLK check timing.
@@ -347,12 +347,12 @@ if(ROSE_ESP_MOTORS)
   # here beats a "no such file: riskybird/motor_link.h" 200 lines into main.cpp.
   if(NOT ROSE_MOTOR_LINK_DIR)
     message(FATAL_ERROR
-      "ROSE_ESP_MOTORS=1 needs -DROSE_MOTOR_LINK_DIR=<riskybird>/integration/zephyr/motor_link")
+      "ROSE_ESP_MOTORS=1 needs -DROSE_MOTOR_LINK_DIR=<riskybird>/workloads/lib/motor_link")
   endif()
   target_include_directories(app PRIVATE ${ROSE_MOTOR_LINK_DIR}/include)
 endif()
 
-# DRAM flight recorder (riskybird integration/zephyr/flightrec): every control
+# DRAM flight recorder (riskybird workloads/lib/flightrec): every control
 # tick into a DDR ring, read out over the ESP after the flight with
 # `rb flightlog fetch`. Off by default: RB_CMAKE_ARGS=-DROSE_FLIGHTREC=1.
 # Its sizing knobs (FLIGHTREC_DIV, FLIGHTREC_CAPACITY, FLIGHTREC_TAIL_MS,
@@ -363,8 +363,8 @@ if(ROSE_FLIGHTREC)
   if(NOT RB_ROOT)
     message(FATAL_ERROR "ROSE_FLIGHTREC=1 needs -DRB_ROOT=<riskybird checkout>")
   endif()
-  target_sources(app PRIVATE ${RB_ROOT}/integration/zephyr/flightrec/src/flightrec.c)
-  target_include_directories(app PRIVATE ${RB_ROOT}/integration/zephyr/flightrec/include)
+  target_sources(app PRIVATE ${RB_ROOT}/workloads/lib/flightrec/src/flightrec.c)
+  target_include_directories(app PRIVATE ${RB_ROOT}/workloads/lib/flightrec/include)
   target_compile_definitions(app PRIVATE ROSE_FLIGHTREC=1)
 endif()
 
