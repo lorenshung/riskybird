@@ -8,7 +8,7 @@
 # RiskyBird sub-projects, then includes the stock Makefile, then RiskyBird's
 # area/impl flow. The Scala for these sub-projects reaches Chipyard through the
 # sbt plugin hardware/chipyard/project/RiskyBird.scala; the Vivado board directories
-# through the links in .backend-overlays. -C fpga is required: the stock
+# through the links in backends/overlays. -C fpga is required: the stock
 # Makefile takes base_dir from the working directory.
 #
 # Every assignment is ?=, so a value given on the command line wins, and the

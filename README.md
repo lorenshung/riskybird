@@ -41,7 +41,7 @@ submodules under `backends/`.
 | `tools/bench/` | ground station, bench scripts, bench GDB scripts (`gdb/`) |
 | `workloads/lib/` | shared Zephyr modules: camera, ToF, motor link, motor guard |
 | `backends/` | submodules: chipyard, zephyr-chipyard-sw, modelblaster and RoSE at plain upstream pins; saturn at the Saturn commit RiskyBird's accelerator shells need |
-| `.backend-overlays`, `.submodule-redirects` | what `tools/backend-patches` and `tools/submodule-redirects` put into the backends |
+| `backends/overlays`, `backends/redirects` | what `tools/backend-patches` and `tools/submodule-redirects` put into the backends |
 | `tests/` | repository tests; `tests/data/provenance.tsv` records where each file copied out of a backend came from |
 
 ## Getting started

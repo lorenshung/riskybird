@@ -1,7 +1,7 @@
 // RiskyBird's sbt overlay for a plain Chipyard checkout.
 //
 // tools/backend-patches links this file into backends/chipyard/project/ (see
-// .backend-overlays). An AutoPlugin there is triggered for every project of
+// backends/overlays). An AutoPlugin there is triggered for every project of
 // Chipyard's build and adds the RiskyBird sources under hardware/ to the
 // projects named below, without touching build.sbt. Its settings are applied
 // before each project's own, so the stock definitions keep working on top of

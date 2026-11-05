@@ -13,7 +13,7 @@
 # Every backend is pinned at a plain upstream commit with no RiskyBird content.
 # RiskyBird's own code lives under hardware/, workloads/ and tools/, and reaches
 # the backends only through tools/backend-patches (the overlay links in
-# .backend-overlays, e.g. Chipyard's sbt drop-in, and the generic patch queue
+# backends/overlays, e.g. Chipyard's sbt drop-in, and the generic patch queue
 # in patches/). Run, after initialising a tier:
 #
 #   tools/submodule-redirects apply   # nested duplicates -> top-level backends

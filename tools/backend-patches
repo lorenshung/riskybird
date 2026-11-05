@@ -4,7 +4,7 @@
 Every backend is pinned at a plain upstream commit. What RiskyBird adds lives
 in this repository and reaches the backends two ways:
 
-  overlay links   .backend-overlays lists symlinks to create inside a backend
+  overlay links   backends/overlays lists symlinks to create inside a backend
                   (e.g. Chipyard's sbt plugin, hardware/chipyard/project/
                   RiskyBird.scala, which compiles hardware/** into Chipyard's
                   own projects).
@@ -52,7 +52,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # paths inside the backends/chipyard checkout (patches/fpga/fpga-shells -> backends/chipyard/fpga/fpga-shells).
 QUEUE = ROOT / "hardware/chipyard/patches"
 QUEUE_TARGET = ROOT / "backends/chipyard"
-OVERLAYS = ROOT / ".backend-overlays"
+OVERLAYS = ROOT / "backends" / "overlays"
 
 
 def git(repo: Path, *args: str, check: bool = True, env: dict | None = None) -> str:
