@@ -58,8 +58,8 @@ results/
 /hardware/ospi/docs/OSPI_I2C_INTEGRATION.md
 /hardware/ospi/docs/README.md
 /hardware/zephyr/targets/README.md
-/integration/README.md
-/integration/zephyr/tof/README.md
+/workloads/lib/README.md
+/workloads/lib/tof/README.md
 /tools/flight/legacy/README.md
 /workloads/README.md
 /hardware/zephyr/targets/esp32c6/PROGRAMMING.md
