@@ -5,12 +5,11 @@
   "parent_page_id": "3ea06b97-ede4-817f-b997-d1c5f607c577",
   "folders": {
     "": "3ea06b97-ede4-817f-b997-d1c5f607c577",
-    "artifacts": "3ea06b97-ede4-8137-ad5f-f95fe7e3576d",
     "docs": "3ea06b97-ede4-8146-b2f3-df64f998f226",
     "hardware": "3ea06b97-ede4-8129-9720-e0840c3fbf17",
     "tools": "3ea06b97-ede4-81ff-9e68-f173b7e8c22a",
     "workloads": "3ea06b97-ede4-8106-9d19-e40e599275d3",
-    "artifacts/modelblaster": "3ea06b97-ede4-8176-9b17-ff40da40a729",
+    "workloads/fc_dronet/generated": "3ea06b97-ede4-8176-9b17-ff40da40a729",
     "docs/history": "3ea06b97-ede4-818d-8286-e0a736ecb124",
     "docs/upstream-pr": "3ea06b97-ede4-81c3-ae02-d1c1c554830e",
     "hardware/ospi": "3ea06b97-ede4-8182-946e-dab85143f863",
@@ -33,7 +32,7 @@
     "3ea06b97-ede4-8146-b4a6-ca1b187d5958"
   ],
   "documents": {
-    "artifacts/modelblaster/README.md": "3ea06b97-ede4-815e-81f4-f68d8e538f98",
+    "workloads/fc_dronet/generated/README.md": "3ea06b97-ede4-815e-81f4-f68d8e538f98",
     "docs/accel-shells-bringup.md": "3ea06b97-ede4-81e6-914b-f913cb232249",
     "docs/drone-initial-bringup.md": "3ea06b97-ede4-81fb-8320-face1a6a2de1",
     "docs/dronet-on-accel-socs.md": "3ea06b97-ede4-81a6-ae5c-c43f2f77f2cf",
@@ -279,7 +278,7 @@
     }
   },
   "headings": {
-    "artifacts/modelblaster/README.md": {
+    "workloads/fc_dronet/generated/README.md": {
       "verified-modelblaster-codegen-published-for-machines-that-cannot-verify": "aa40a6ee4e47483cae9253f01ee71621",
       "four-directories-two-shells": "d9c2cebde63f4be29e89ae3b4ef3c0d1",
       "two-more-directories-dimas-recipe-on-the-gemminisaturn-shells": "c41f302f92824b8b95b198cad8859cbf",
