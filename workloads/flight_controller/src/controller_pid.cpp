@@ -306,8 +306,8 @@ static float wall_push(int16_t d_mm)
 }
 
 #if defined(ROSE_RIG) && ROSE_RIG
-/* Roll harness (fc_rig.h): the mixer reads the live MOTOR_TRIM_LEFT gain, so GAIN MOTOR_TRIM_LEFT
- * reaches the motors; the build's value is only its default (fc_rig_gains_default). */
+/* Rig (fc_rig.h): the mixer reads the live MOTOR_TRIM_LEFT gain, so GAIN MOTOR_TRIM_LEFT reaches the
+ * motors (left pair duty[2]/duty[3] on either rig: a locked-roll trim on rig-pitch); build = default. */
 #include "fc_rig.h"
 #undef MOTOR_TRIM_LEFT
 #define MOTOR_TRIM_LEFT (g_rig.trim_left_applied)   /* slewed toward gains.v[MOTOR_TRIM_LEFT] by fc_rig_step */
@@ -324,9 +324,9 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 	float att[3], yaw_tgt;
 	fc_pid_attitude(state, setpoint, att, &yaw_tgt);
 #if defined(ROSE_RIG) && ROSE_RIG
-	/* Roll harness: u = [collective N, roll moment N*m, 0, 0] from fc_rig_roll_law, already scaled
-	 * (NOT by J*ATT_GAIN again); no altitude, velocity or tilt-compensation loop, and no pitch or
-	 * yaw moment -- the rig locks those axes. Into the same mixer and force->duty below. */
+	/* Rig: u = [collective N, roll moment N*m, 0, 0] from fc_rig_roll_law (rig-pitch, RIG_AXIS 1:
+	 * [N, 0, pitch moment, 0]), already scaled (NOT by J*ATT_GAIN again); no altitude, velocity or
+	 * tilt-compensation loop, no moment on the locked axes. Into the same mixer and force->duty below. */
 	float u[4];
 	{
 		struct fc_rig_law_in in;

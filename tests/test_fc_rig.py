@@ -5,8 +5,11 @@ Builds workloads/flight_controller/src/fc_rig.cpp with the host g++, together wi
 driver tests/fc_rig_check.cpp and the firmware's own controller_pid.cpp (ROSE_VEL_LOOP=0), and
 runs one driver group per test. Covered: the strict number parser and printer, the gain
 whitelist and ranges, every uplink verb, the arm/ramp/run/ramp-down state machine and its
-guards, the excitation shapes, and the roll law against the flown PID. No Zephyr SDK or
-hardware: this does not check main.cpp's hooks, timing or the motors.
+guards, the excitation shapes, and the roll law against the flown PID. FcRigPitch runs every
+group again on a pitch build (-DRIG_AXIS=1, rig-pitch: the driver reads pitch, gyro y and u[2]
+there), and the `axis` group checks each build's law against controller_pid.cpp's flown path of
+its own axis, the locked axis' would-be command and the motors a positive moment raises. No
+Zephyr SDK or hardware: this does not check main.cpp's hooks, timing or the motors.
 """
 
 from pathlib import Path
@@ -45,9 +48,16 @@ def _build(compiler, out_dir, name, defines):
     return exe
 
 
+# Non-zero trims on both axes (the `axis` group checks the controlled one is the ROLL_TRIM default
+# and the locked one's would-be command uses the other).
+TRIMS = ["-DROLL_TRIM_RAD=-0.03f", "-DPITCH_TRIM_RAD=0.02f"]
+
+
 class FcRig(unittest.TestCase):
+    AXIS = []          # extra defines selecting the build's axis: [] = RIG_AXIS 0, roll
     exe = None
     exe_tuned = None
+    exe_trims = None
     _tmp = None
 
     @classmethod
@@ -57,8 +67,9 @@ class FcRig(unittest.TestCase):
             raise unittest.SkipTest("host C++ compiler (g++) unavailable")
         cls._tmp = tempfile.TemporaryDirectory(prefix="fc-rig-test-")
         out = Path(cls._tmp.name)
-        cls.exe = _build(compiler, out, "check", [])
-        cls.exe_tuned = _build(compiler, out, "check_tuned", TUNED)
+        cls.exe = _build(compiler, out, "check", cls.AXIS)
+        cls.exe_tuned = _build(compiler, out, "check_tuned", cls.AXIS + TUNED)
+        cls.exe_trims = _build(compiler, out, "check_trims", cls.AXIS + TRIMS)
 
     @classmethod
     def tearDownClass(cls):
@@ -188,6 +199,20 @@ class FcRig(unittest.TestCase):
     def test_rate_exc_cap_scales_with_collective(self):
         for exe in (self.exe, self.exe_tuned):
             self.group("rate_cap", exe)
+
+    # the build's axis
+    def test_axis_law_matches_its_flown_path(self):
+        want = "1" if "-DRIG_AXIS=1" in self.AXIS else "0"
+        name = "pitch" if want == "1" else "roll"
+        for exe in (self.exe, self.exe_tuned, self.exe_trims):
+            out = self.group("axis", exe)
+            self.assertIn("RIG_AXIS=%s g_rig_axis=%s " % (want, want), out)
+            self.assertIn("worst relative error vs the flown %s path" % name, out)
+
+
+class FcRigPitch(FcRig):
+    """Every group on the pitch build (rig-pitch)."""
+    AXIS = ["-DRIG_AXIS=1"]
 
 
 if __name__ == "__main__":

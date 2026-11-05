@@ -112,6 +112,69 @@ static const float rig_l_arm    = 33e-3f;
 static const float rig_tau_yaw  = 0.25f;
 static const float rig_tau_yawrate = 0.05f;
 
+/* ---- the controlled axis (RIG_AXIS) ----------------------------------------------------------
+ * 0 = roll (rig-roll, the default), 1 = pitch (rig-pitch: -DRIG_AXIS=1, the drone turned 90 deg in
+ * the cradle). Compile-time only, so a roll build compiles exactly the roll code it always had. The
+ * interfaces stay PHYSICAL either way (fc_rig_inputs roll_rad/pitch_rad/gyro[3], fc_rig_law_in
+ * roll/pitch/gyro[3], dbg.roll/dbg.pitch); only what the law, the guards and the saturation flags
+ * read and write moves. The names that say "roll" (sp_roll*, roll_tgt, the ROLL_TRIM gain,
+ * fc_rig_roll_law, the guard_active "roll guard") are kept for the host's RBPOKE / recorder / wire
+ * contracts and mean "the controlled axis". In a pitch build:
+ *   - law: angle = pitch, rate = gyro[1], target = setpoint + ROLL_TRIM (default PITCH_TRIM_RAD) +
+ *     exc(att); moment = J[1] * ATT_GAIN * rate_cmd into u[2], u[1] = 0. That is controller_pid.cpp's
+ *     pitch path sign for sign: pitchRate_tgt = -(1/(S*tau_pitch)) * (estPitch - pitch_tgt),
+ *     pitchRate_cmd = -(1/tau_pitchRate) * (gyroY - pitchRate_tgt), u[2] = pitchRate_cmd*J[1]*ATT_GAIN,
+ *     with tau_pitch = TAU_ROLL, tau_pitchRate = TAU_ROLLRATE (so ATT_P/RATE_P defaults are unchanged);
+ *   - dbg.pitch_cmd is the would-be command on the LOCKED axis (roll there: the flown roll path);
+ *   - +u[2] raises duty[1]/duty[2] (rear) and lowers duty[0]/duty[3] (front): M's column 2 is
+ *     {-, -, +, +} on ctrl[0..3] and duty[0..3] <- ctrl[1], ctrl[2], ctrl[3], ctrl[0]. The
+ *     saturation flags (anti-windup) use those pairs;
+ *   - the tilt guard, lift-off band, lift-off timeout and lift-off assist act on pitch;
+ *     RIG_PITCH_MAX_RAD (name kept) is the LOCKED-axis guard, i.e. it guards ROLL;
+ *   - MOTOR_TRIM_LEFT still scales the LEFT pair (duty[2]/duty[3]): one rear and one front motor, so
+ *     on the pitch rig it trims the locked roll axis and adds no pitch moment. */
+#ifndef RIG_AXIS
+#define RIG_AXIS 0
+#endif
+#if RIG_AXIS == 1
+#define RIG_CTL            1            /* gyro[] / rig_J[] index of the controlled axis */
+#define RIG_LOCK           0            /* ... and of the locked one                     */
+#define RIG_CTL_ANG(x)     ((x)->pitch)
+#define RIG_LOCK_ANG(x)    ((x)->roll)
+#define RIG_CTL_RAD(x)     ((x)->pitch_rad)
+#define RIG_LOCK_RAD(x)    ((x)->roll_rad)
+#define RIG_CTL_TRIM_RAD   PITCH_TRIM_RAD
+#define RIG_LOCK_TRIM_RAD  ROLL_TRIM_RAD
+#define RIG_CTL_NAME       "pitch"
+#define RIG_LOCK_NAME      "roll"
+/* duty[] indices of the pair the controlled moment raises (P) and lowers (M) */
+#define RIG_SAT_P0 1
+#define RIG_SAT_P1 2
+#define RIG_SAT_M0 0
+#define RIG_SAT_M1 3
+#elif RIG_AXIS == 0
+#define RIG_CTL            0
+#define RIG_LOCK           1
+#define RIG_CTL_ANG(x)     ((x)->roll)
+#define RIG_LOCK_ANG(x)    ((x)->pitch)
+#define RIG_CTL_RAD(x)     ((x)->roll_rad)
+#define RIG_LOCK_RAD(x)    ((x)->pitch_rad)
+#define RIG_CTL_TRIM_RAD   ROLL_TRIM_RAD
+#define RIG_LOCK_TRIM_RAD  PITCH_TRIM_RAD
+#define RIG_CTL_NAME       "roll"
+#define RIG_LOCK_NAME      "pitch"
+#define RIG_SAT_P0 2
+#define RIG_SAT_P1 3
+#define RIG_SAT_M0 0
+#define RIG_SAT_M1 1
+#else
+#error "RIG_AXIS must be 0 (roll) or 1 (pitch)"
+#endif
+
+/* The build's axis for the host (tools/rb/rig_axis.py reads it from the ELF): external linkage, in
+ * read-only data, and read at run time by main.cpp's RIG line (ax=) so --gc-sections keeps it. */
+extern "C" const uint8_t g_rig_axis = RIG_AXIS;
+
 /* ---- rig knobs (spec defaults; all overridable with -D) ------------------------------------ */
 #ifndef RIG_ARM_MAX_TILT_RAD
 #define RIG_ARM_MAX_TILT_RAD   0.61f    /* 35 deg: may arm resting on a ~30 deg stop */
@@ -260,7 +323,7 @@ void fc_rig_gains_default(struct fc_rig_gains *g)
 	g->v[FC_RIG_ATT_GAIN]        = (float)(ATT_GAIN);
 	g->v[FC_RIG_D_LPF_HZ]        = 30.0f;
 	g->v[FC_RIG_GYRO_LPF_HZ]     = 0.0f;
-	g->v[FC_RIG_ROLL_TRIM]       = RIG_ANGLE((float)(ROLL_TRIM_RAD));
+	g->v[FC_RIG_ROLL_TRIM]       = RIG_ANGLE((float)(RIG_CTL_TRIM_RAD));   /* the controlled axis' trim */
 	g->v[FC_RIG_MOTOR_TRIM_LEFT] = (float)(MOTOR_TRIM_LEFT);
 	/* ATT_I_LIM >= LIFT_I_LIM, or the assist's clamp is ATT_I_LIM. Lift-assist defaults from the
 	 * twin (tools/rig/sim rig_sim.py liftoff-assist): 3-4 mN*m toward the stop needs ~4-7 rad/s
@@ -606,7 +669,7 @@ static float exc_cap(uint8_t target, float coll_thrust, const struct fc_rig_gain
 	switch (target) {
 	case FC_RIG_TGT_ATT:    return RIG_EXC_ATT_MAX_RAD;
 	case FC_RIG_TGT_RATE: {
-		const float per = g->v[FC_RIG_RATE_P] * rig_J[0] * g->v[FC_RIG_ATT_GAIN];   /* > 0 by range */
+		const float per = g->v[FC_RIG_RATE_P] * rig_J[RIG_CTL] * g->v[FC_RIG_ATT_GAIN];   /* > 0 by range */
 		const float c = m_cap / per;
 		return c < RIG_EXC_RATE_MAX_RADPS ? c : RIG_EXC_RATE_MAX_RADPS;
 	}
@@ -685,7 +748,7 @@ void fc_rig_roll_law(struct fc_rig_law_state *ls, const struct fc_rig_gains *g,
 	const float exc_moment = in->exc_target == FC_RIG_TGT_MOMENT ? in->exc_val : 0.0f;
 
 	/* Gyro into the rate loop: optional first-order LPF; its derivative for D, low-passed again. */
-	const float gx = in->gyro[0];
+	const float gx = in->gyro[RIG_CTL];   /* the controlled axis' rate (gyro y on the pitch rig) */
 	if (!ls->seeded) {
 		ls->gx_f = gx;
 		ls->gx_prev = gx;
@@ -704,7 +767,7 @@ void fc_rig_roll_law(struct fc_rig_law_state *ls, const struct fc_rig_gains *g,
 	 * angle) this steps the target in to the bound at ~zero collective; the setpoint itself still
 	 * slews down from the rest angle (fc_rig_step), so dbg.roll_tgt and out.sp_roll differ then. */
 	const float roll_tgt = clampf(in->sp_roll + k[FC_RIG_ROLL_TRIM] + exc_att, -RIG_TGT_MAX_RAD, RIG_TGT_MAX_RAD);
-	const float e = roll_tgt - in->roll;
+	const float e = roll_tgt - RIG_CTL_ANG(in);
 	if (in->int_zero) {
 		ls->att_int = 0.0f;
 		ls->rate_int = 0.0f;
@@ -728,8 +791,8 @@ void fc_rig_roll_law(struct fc_rig_law_state *ls, const struct fc_rig_gains *g,
 	}
 	const float rate_cmd = k[FC_RIG_RATE_P] * rate_err + ls->rate_int - k[FC_RIG_RATE_D] * ls->dgx_f;
 
-	/* controller_pid.cpp: u[1] = rollRate_cmd * J[0] * ATT_GAIN. */
-	float moment = rig_J[0] * k[FC_RIG_ATT_GAIN] * rate_cmd + exc_moment;
+	/* controller_pid.cpp: u[1] = rollRate_cmd * J[0] * ATT_GAIN (pitch: u[2] = pitchRate_cmd * J[1] * ATT_GAIN). */
+	float moment = rig_J[RIG_CTL] * k[FC_RIG_ATT_GAIN] * rate_cmd + exc_moment;
 	/* Finite inputs can still overflow (a 1e37 gyro times RATE_P): never hand the mixer a NaN/Inf. */
 	if (!(fin(moment) && fin(rate_cmd) && fin(ls->att_int) && fin(ls->rate_int) && fin(ls->dgx_f))) {
 		fc_rig_law_reset(ls);
@@ -748,17 +811,23 @@ void fc_rig_roll_law(struct fc_rig_law_state *ls, const struct fc_rig_gains *g,
 		ls->assist_sat_neg = false;
 	}
 
-	/* Pitch and yaw: what the flown cascade WOULD command (build constants, level target), for the
-	 * log only. The rig locks those axes; feeding them would just fight the cradle. */
-	const float pitch_tgt = RIG_ANGLE((float)(PITCH_TRIM_RAD));
-	const float pitchRate_tgt = (-1.0f / (RIG_FLOWN_SCALE * (float)(TAU_ROLL))) * (in->pitch - pitch_tgt);
-	const float pitch_cmd = (-1.0f / (float)(TAU_ROLLRATE)) * (in->gyro[1] - pitchRate_tgt);
+	/* The locked axis (pitch on the roll rig, roll on the pitch rig) and yaw: what the flown cascade
+	 * WOULD command (build constants, level target), for the log only (dbg.pitch_cmd is the locked
+	 * axis'). The rig locks those axes; feeding them would just fight the cradle. */
+	const float pitch_tgt = RIG_ANGLE((float)(RIG_LOCK_TRIM_RAD));
+	const float pitchRate_tgt = (-1.0f / (RIG_FLOWN_SCALE * (float)(TAU_ROLL))) * (RIG_LOCK_ANG(in) - pitch_tgt);
+	const float pitch_cmd = (-1.0f / (float)(TAU_ROLLRATE)) * (in->gyro[RIG_LOCK] - pitchRate_tgt);
 	const float yawRate_tgt = (-1.0f / (RIG_FLOWN_SCALE * rig_tau_yaw)) * in->yaw_err;
 	const float yaw_cmd = (float)(YAW_MIX_SIGN) * (-1.0f / rig_tau_yawrate) * (in->gyro[2] - yawRate_tgt);
 
 	u[0] = in->coll_thrust;
+#if RIG_AXIS == 1
+	u[1] = 0.0f;
+	u[2] = moment;      /* controller_pid.cpp's pitch-moment slot */
+#else
 	u[1] = moment;
 	u[2] = 0.0f;
+#endif
 	u[3] = 0.0f;
 
 	if (dbg != NULL) {
@@ -780,12 +849,14 @@ void fc_rig_roll_law(struct fc_rig_law_state *ls, const struct fc_rig_gains *g,
 void fc_rig_moment_saturation(const float duty[4], float ceiling, bool *sat_pos, bool *sat_neg)
 {
 	/* controller_pid.cpp's mapping: +u[1] raises ctrl[0]/ctrl[3] -> duty[3]/duty[2] (left pair)
-	 * and lowers ctrl[1]/ctrl[2] -> duty[0]/duty[1] (right pair). */
+	 * and lowers ctrl[1]/ctrl[2] -> duty[0]/duty[1] (right pair). Pitch rig: +u[2] raises
+	 * ctrl[2]/ctrl[3] -> duty[1]/duty[2] (rear pair) and lowers ctrl[0]/ctrl[1] -> duty[3]/duty[0]
+	 * (front pair). "left"/"right" below are those "+"/"-" pairs (RIG_SAT_*). */
 	const float eps = 1e-4f;
-	const bool left_hi  = duty[2] >= ceiling - eps || duty[3] >= ceiling - eps;
-	const bool left_lo  = duty[2] <= eps || duty[3] <= eps;
-	const bool right_hi = duty[0] >= ceiling - eps || duty[1] >= ceiling - eps;
-	const bool right_lo = duty[0] <= eps || duty[1] <= eps;
+	const bool left_hi  = duty[RIG_SAT_P0] >= ceiling - eps || duty[RIG_SAT_P1] >= ceiling - eps;
+	const bool left_lo  = duty[RIG_SAT_P0] <= eps || duty[RIG_SAT_P1] <= eps;
+	const bool right_hi = duty[RIG_SAT_M0] >= ceiling - eps || duty[RIG_SAT_M1] >= ceiling - eps;
+	const bool right_lo = duty[RIG_SAT_M0] <= eps || duty[RIG_SAT_M1] <= eps;
 	*sat_pos = left_hi || right_lo;
 	*sat_neg = right_hi || left_lo;
 }
@@ -901,7 +972,8 @@ void fc_rig_step(struct fc_rig_state *s, const struct fc_rig_inputs *in, struct 
 
 	const bool stop = s->stop_req;
 	s->stop_req = false;
-	const float aroll = fabsf(in->roll_rad), apitch = fabsf(in->pitch_rad);
+	/* aroll: the CONTROLLED axis (pitch on the pitch rig), apitch: the LOCKED one (roll there) */
+	const float aroll = fabsf(RIG_CTL_RAD(in)), apitch = fabsf(RIG_LOCK_RAD(in));
 	/* NaN/Inf blinds every comparison below (fabsf(NaN) > lim is false): checked on its own. The
 	 * arm test (`<` comparisons) already refuses them; the armed guards are written as
 	 * !(x <= lim) so a NaN trips them too. */
@@ -937,7 +1009,7 @@ void fc_rig_step(struct fc_rig_state *s, const struct fc_rig_inputs *in, struct 
 			/* The ramp's target is latched here: a COLL during RAMP_UP must not rescale the
 			 * ramp (a step); it is followed from RUN on, through the RIG_COLL_SLEW slew. */
 			s->coll_ramp_to = s->coll_cmd;
-			s->sp_roll = in->roll_rad;     /* start where it rests; slew to the command */
+			s->sp_roll = RIG_CTL_RAD(in);  /* start where it rests; slew to the command */
 			s->guard_active = false;
 			s->rd_reason = NULL;
 			s->tilt_since = s->pitch_since = 0;
@@ -969,13 +1041,13 @@ void fc_rig_step(struct fc_rig_state *s, const struct fc_rig_inputs *in, struct 
 		if (fc_guard_dwell(!(apitch <= RIG_PITCH_MAX_RAD), now, SAFE_DEBOUNCE_MS,
 				   SAFE_DEBOUNCE_MIN_SAMPLES, &s->pitch_since, &s->pitch_count) &&
 		    estop_why == NULL) {
-			estop_why = "rig pitch";
+			estop_why = "rig " RIG_LOCK_NAME;   /* "rig pitch" on the roll rig */
 		}
 		/* The roll guard only goes live once roll has come inside the band since arming: it may
 		 * have armed lying on a stop beyond RIG_MAX_TILT_RAD. */
 		if (!s->guard_active && aroll < RIG_MAX_TILT_RAD - RIG_LIFTOFF_MARGIN_RAD) {
 			s->guard_active = true;
-			out->event = "RIG liftoff: roll guard live";
+			out->event = "RIG liftoff: " RIG_CTL_NAME " guard live";
 		}
 		const bool tilt_trip = s->guard_active &&
 			fc_guard_dwell(!(aroll <= RIG_MAX_TILT_RAD), now, SAFE_DEBOUNCE_MS,

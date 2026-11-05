@@ -38,6 +38,50 @@
 static const float PID_FLOWN_SCALE = 2.0f;   // default build (no PID_TILT_TIGHT / PID_GIBBS_LEGACY)
 static const float J0 = 16e-6f, L_ARM = 33e-3f, GRAV = 9.81f;
 
+// The build's controlled ("AX") and locked ("LK") axis (fc_rig.cpp RIG_AXIS): every group runs on a
+// roll build (RIG_AXIS 0) and on a pitch build (-DRIG_AXIS=1, rig-pitch), where the same checks
+// read pitch, gyro y and u[2]. Fields: fc_rig_inputs *_rad, fc_rig_law_in / fc_rig_dbg angle,
+// gyro[] index, u[] index, controller_pid.cpp state[] (Gibbs angle, body rate), guard names, and
+// the duty[] indices the controlled moment raises (P) and lowers (M).
+#ifndef RIG_AXIS
+#define RIG_AXIS 0
+#endif
+#if RIG_AXIS == 1
+#define AX_RAD pitch_rad
+#define LK_RAD roll_rad
+#define AX_ANG pitch
+#define LK_ANG roll
+#define AX_G 1
+#define LK_G 0
+#define AX_U 2
+#define LK_U 1
+#define AX_ST 4
+#define AX_STG 10
+#define AX_NAME "pitch"
+#define LK_NAME "roll"
+static const int SAT_P[2] = {1, 2}, SAT_M[2] = {0, 3};   // rear pair up, front pair down
+#else
+#define AX_RAD roll_rad
+#define LK_RAD pitch_rad
+#define AX_ANG roll
+#define LK_ANG pitch
+#define AX_G 0
+#define LK_G 1
+#define AX_U 1
+#define LK_U 2
+#define AX_ST 3
+#define AX_STG 9
+#define AX_NAME "roll"
+#define LK_NAME "pitch"
+static const int SAT_P[2] = {2, 3}, SAT_M[2] = {0, 1};   // left pair up, right pair down
+#endif
+#ifndef ROLL_TRIM_RAD
+#define ROLL_TRIM_RAD 0.0f
+#endif
+#ifndef PITCH_TRIM_RAD
+#define PITCH_TRIM_RAD 0.0f
+#endif
+
 static int g_fail;
 #define CHECK(c) do { if (!(c)) { std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); g_fail++; } } while (0)
 #define CHECK_NEAR(a, b, tol) do { double _a = (a), _b = (b); if (!(std::fabs(_a - _b) <= (double)(tol))) { \
@@ -408,8 +452,8 @@ static void t_sm_normal()
 	// arming refusals
 	struct { const char *what; void (*set)(fc_rig_inputs &); } refusals[] = {
 		{"moving", [](fc_rig_inputs &i) { i.gyro[0] = 0.5f; }},
-		{"pitch", [](fc_rig_inputs &i) { i.pitch_rad = 0.2f; }},
-		{"roll 40", [](fc_rig_inputs &i) { i.roll_rad = 0.70f; }},
+		{"locked axis", [](fc_rig_inputs &i) { i.LK_RAD = 0.2f; }},
+		{"controlled axis 40", [](fc_rig_inputs &i) { i.AX_RAD = 0.70f; }},
 		{"battery", [](fc_rig_inputs &i) { i.batt_ok = false; }},
 		{"estop", [](fc_rig_inputs &i) { i.estop = true; }},
 		{"no cal", [](fc_rig_inputs &i) { i.gyro_cal_done = false; }},
@@ -435,7 +479,7 @@ static void t_sm_normal()
 static void t_sm_stop_liftoff()
 {
 	Sim m;
-	m.in.roll_rad = 0.5236f;                 // resting on the 30 deg stop
+	m.in.AX_RAD = 0.5236f;                 // resting on the 30 deg stop
 	m.cmd("COLL 1000");
 	CHECK(m.until(FC_RIG_RAMP_UP, 1100) > 0);
 	CHECK(std::fabs(m.out.sp_roll - 0.5236f) < 1e-6f);   // setpoint starts at the measured roll
@@ -443,13 +487,13 @@ static void t_sm_stop_liftoff()
 	m.run(1500);                             // whole ramp at 30 deg: guard must stay off
 	CHECK(m.out.rs == FC_RIG_RUN && !m.estop_seen && !m.out.guard_active);
 	CHECK(m.out.sp_roll == 0.0f);            // slewed 0.52 -> 0 at 0.5 rad/s within the ramp
-	m.in.roll_rad = 0.40f;                   // inside 0.44 but not inside the 0.39 band
+	m.in.AX_RAD = 0.40f;                   // inside 0.44 but not inside the 0.39 band
 	m.run(50);
 	CHECK(!m.out.guard_active);
-	m.in.roll_rad = 0.30f;                   // lifted off
+	m.in.AX_RAD = 0.30f;                   // lifted off
 	m.tick();
-	CHECK(m.out.guard_active && m.saw("RIG liftoff: roll guard live"));
-	m.in.roll_rad = 0.50f;                   // falls back beyond 25 deg: estop, debounced
+	CHECK(m.out.guard_active && m.saw("RIG liftoff: " AX_NAME " guard live"));
+	m.in.AX_RAD = 0.50f;                   // falls back beyond 25 deg: estop, debounced
 	m.run(100);
 	CHECK(!m.estop_seen);
 	m.run(60);
@@ -460,7 +504,7 @@ static void t_sm_stop_liftoff()
 static void t_sm_liftoff_timeout()
 {
 	Sim m;
-	m.in.roll_rad = -0.52f;
+	m.in.AX_RAD = -0.52f;
 	m.cmd("COLL 1000");
 	CHECK(m.until(FC_RIG_RAMP_UP, 1100) > 0);
 	const int64_t arm_t = m.t;
@@ -499,17 +543,17 @@ static void t_sm_pitch_guard()
 {
 	Sim m;
 	m.to_run();
-	m.in.pitch_rad = -0.2f;
+	m.in.LK_RAD = -0.2f;
 	m.run(100);
 	CHECK(!m.estop_seen);
 	m.run(60);
-	CHECK(m.estop_seen && std::strcmp(m.estop_reason, "rig pitch") == 0);
+	CHECK(m.estop_seen && std::strcmp(m.estop_reason, "rig " LK_NAME) == 0);
 	// a short spike is ridden out
 	Sim n;
 	n.to_run();
-	n.in.pitch_rad = 0.2f;
+	n.in.LK_RAD = 0.2f;
 	n.run(50);
-	n.in.pitch_rad = 0.0f;
+	n.in.LK_RAD = 0.0f;
 	n.run(500);
 	CHECK(!n.estop_seen && n.out.rs == FC_RIG_RUN);
 }
@@ -579,7 +623,7 @@ static void t_sm_rampdown_on_stop()
 	m.cmd("STOP");
 	m.run(500);
 	CHECK(m.out.rs == FC_RIG_RAMP_DOWN);
-	m.in.roll_rad = 0.52f;
+	m.in.AX_RAD = 0.52f;
 	CHECK(m.until(FC_RIG_DONE, 300) > 0);
 	CHECK(!m.estop_seen);
 }
@@ -783,14 +827,29 @@ static fc_rig_law_in law_in(float roll, float gx)
 {
 	fc_rig_law_in in;
 	std::memset(&in, 0, sizeof in);
-	in.roll = roll;
-	in.gyro[0] = gx;
+	in.AX_ANG = roll;
+	in.gyro[AX_G] = gx;
 	in.dt = 0.0012f;
 	in.coll_thrust = (float)(PID_MASS_KG) * GRAV;
 	return in;
 }
 
-// controller_pid.cpp's roll path, transcribed (ROSE_VEL_LOOP=0: desRoll = 0, trim 0).
+// fc_rig_law_input with the controlled angle and rate in their physical slots, the rest 0.
+static void law_input_ax(const fc_rig_state *s, float ang, float rate, float dt, fc_rig_law_in *li)
+{
+	float gyro[3] = {0.0f, 0.0f, 0.0f};
+	gyro[AX_G] = rate;
+#if RIG_AXIS == 1
+	fc_rig_law_input(s, 0.0f, ang, 0.0f, gyro, dt, li);
+#else
+	fc_rig_law_input(s, ang, 0.0f, 0.0f, gyro, dt, li);
+#endif
+}
+
+// controller_pid.cpp's roll path, transcribed (ROSE_VEL_LOOP=0: desRoll = 0, trim 0). The pitch
+// path is the same expression with pitch, gyro y, tau_pitch = TAU_ROLL, tau_pitchRate =
+// TAU_ROLLRATE and J[1] = J0: it serves both rigs (t_law_matches_flown_pitch checks the pitch
+// path against its own transcription).
 static float flown_roll_moment(float estRoll, float gyroX, float roll_tgt)
 {
 	const float rollRate_tgt = (-1.0f / (PID_FLOWN_SCALE * (float)(TAU_ROLL))) * (estRoll - roll_tgt);
@@ -813,17 +872,18 @@ static void t_law_matches_flown()
 		fc_rig_law_state ls;
 		fc_rig_law_reset(&ls);
 		fc_rig_law_in in = law_in(roll, gx);
-		in.pitch = 0.05f; in.gyro[1] = 0.3f; in.gyro[2] = -0.2f; in.yaw_err = 0.3f;   // ignored axes
+		in.LK_ANG = 0.05f; in.gyro[LK_G] = 0.3f; in.gyro[2] = -0.2f; in.yaw_err = 0.3f;   // ignored axes
 		in.integrate = true;                                                  // I = 0 by default
 		float u[4];
 		fc_rig_dbg dbg;
 		fc_rig_roll_law(&ls, &g, &in, u, &dbg);
 		const float ref = flown_roll_moment(roll, gx, 0.0f);
-		const double rel = std::fabs((double)u[1] - ref) / std::fmax(std::fabs((double)ref), 1e-9);
+		const double rel = std::fabs((double)u[AX_U] - ref) / std::fmax(std::fabs((double)ref), 1e-9);
 		if (rel > worst) { worst = rel; worst_i = i; }
-		CHECK(u[0] == in.coll_thrust && u[2] == 0.0f && u[3] == 0.0f);
+		CHECK(u[0] == in.coll_thrust && u[LK_U] == 0.0f && u[3] == 0.0f);
 		CHECK(dbg.pitch_cmd != 0.0f && dbg.yaw_cmd != 0.0f);   // computed, not applied
-		CHECK(dbg.moment == u[1] && dbg.exc_val == 0.0f);
+		CHECK(dbg.moment == u[AX_U] && dbg.exc_val == 0.0f);
+		CHECK(dbg.roll == in.roll && dbg.pitch == in.pitch);   // physical on either rig
 	}
 	std::printf("worst relative error vs flown formula %.3g (sample %d)\n", worst, worst_i);
 	CHECK(worst < 1e-5);
@@ -835,18 +895,18 @@ static void t_law_matches_flown()
 	float u[4];
 	fc_rig_dbg dbg;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-	CHECK(u[1] > 0.0f && flown_roll_moment(-0.1f, 0.0f, 0.0f) > 0.0f);
+	CHECK(u[AX_U] > 0.0f && flown_roll_moment(-0.1f, 0.0f, 0.0f) > 0.0f);
 	// and a positive roll rate is damped
 	fc_rig_law_reset(&ls);
 	in = law_in(0.0f, 1.0f);
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-	CHECK(u[1] < 0.0f && flown_roll_moment(0.0f, 1.0f, 0.0f) < 0.0f);
+	CHECK(u[AX_U] < 0.0f && flown_roll_moment(0.0f, 1.0f, 0.0f) < 0.0f);
 	// the setpoint is a target like the flown roll_tgt
 	fc_rig_law_reset(&ls);
 	in = law_in(0.05f, 0.3f);
 	in.sp_roll = 0.12f;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-	CHECK_NEAR(u[1], flown_roll_moment(0.05f, 0.3f, 0.12f), 1e-5 * std::fabs(flown_roll_moment(0.05f, 0.3f, 0.12f)));
+	CHECK_NEAR(u[AX_U], flown_roll_moment(0.05f, 0.3f, 0.12f), 1e-5 * std::fabs(flown_roll_moment(0.05f, 0.3f, 0.12f)));
 }
 
 // End to end through the real controller_pid.cpp: run HierarchicalPidController::compute at the
@@ -862,8 +922,8 @@ static void t_law_matches_controller_pid()
 	for (float roll : {-0.3f, -0.1f, 0.0f, 0.07f, 0.25f}) {
 		for (float gx : {-1.0f, -0.2f, 0.0f, 0.4f, 1.5f}) {
 			float state[12] = {0}, sp[12] = {0}, uo[4];
-			state[3] = std::tan(0.5f * roll);   // Gibbs, pure roll
-			state[9] = gx;
+			state[AX_ST] = std::tan(0.5f * roll);   // Gibbs, pure roll (pure pitch on the pitch rig)
+			state[AX_STG] = gx;
 			pid.init();
 			pid.compute(state, sp, uo, 0.0012f);
 			float duty[4];
@@ -876,7 +936,11 @@ static void t_law_matches_controller_pid()
 			const float trim = (float)(MOTOR_TRIM_LEFT);
 			const float c0 = force(duty[3]) / (0.9f * trim), c1 = force(duty[0]) / 0.9f;
 			const float c2 = force(duty[1]) / 0.9f, c3 = force(duty[2]) / (0.9f * trim);
+#if RIG_AXIS == 1
+			const float u1_flown = L_ARM * (-c0 - c1 + c2 + c3);   // M's pitch column {-, -, +, +}
+#else
 			const float u1_flown = L_ARM * (c0 - c1 - c2 + c3);
+#endif
 			const float u0_flown = c0 + c1 + c2 + c3;
 
 			fc_rig_law_state ls;
@@ -886,7 +950,7 @@ static void t_law_matches_controller_pid()
 			float u[4];
 			fc_rig_roll_law(&ls, &g, &in, u, nullptr);
 			CHECK_NEAR(u[0], u0_flown, 1e-4 * u0_flown);
-			CHECK_NEAR(u[1], u1_flown, 2e-3 * std::fabs(u1_flown) + 2e-9);
+			CHECK_NEAR(u[AX_U], u1_flown, 2e-3 * std::fabs(u1_flown) + 2e-9);
 			checked++;
 		}
 	}
@@ -940,17 +1004,20 @@ static void t_law_integrators()
 	for (int i = 0; i < 20000; i++) fc_rig_roll_law(&ls, &g, &in, u, &dbg);
 	CHECK(ls.att_int == -g.v[FC_RIG_ATT_I_LIM] && ls.rate_int == -g.v[FC_RIG_RATE_I_LIM]);
 
-	// saturation helper: duty[2]/[3] left pair raises +moment
+	// saturation helper: the SAT_P pair raises +moment (roll: left duty[2]/[3]; pitch: rear
+	// duty[1]/[2]), the SAT_M pair lowers it. Every motor at the ceiling and at zero:
 	bool sp, sn;
-	const float d_left_hi[4] = {0.5f, 0.5f, 0.95f, 0.5f};
-	fc_rig_moment_saturation(d_left_hi, 0.95f, &sp, &sn);
-	CHECK(sp && !sn);
-	const float d_right_zero[4] = {0.0f, 0.5f, 0.5f, 0.5f};
-	fc_rig_moment_saturation(d_right_zero, 0.95f, &sp, &sn);
-	CHECK(sp && !sn);
-	const float d_right_hi[4] = {0.5f, 0.95f, 0.5f, 0.5f};
-	fc_rig_moment_saturation(d_right_hi, 0.95f, &sp, &sn);
-	CHECK(!sp && sn);
+	for (int i = 0; i < 4; i++) {
+		const bool plus = i == SAT_P[0] || i == SAT_P[1], minus = i == SAT_M[0] || i == SAT_M[1];
+		CHECK(plus != minus);
+		float d[4] = {0.5f, 0.5f, 0.5f, 0.5f};
+		d[i] = 0.95f;
+		fc_rig_moment_saturation(d, 0.95f, &sp, &sn);
+		CHECK(sp == plus && sn == minus);
+		d[i] = 0.0f;
+		fc_rig_moment_saturation(d, 0.95f, &sp, &sn);
+		CHECK(sp == minus && sn == plus);
+	}
 	const float d_ok[4] = {0.5f, 0.5f, 0.5f, 0.5f};
 	fc_rig_moment_saturation(d_ok, 0.95f, &sp, &sn);
 	CHECK(!sp && !sn);
@@ -970,7 +1037,7 @@ static void t_law_filters_and_exc()
 	in.exc_val = 0.1f;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
 	CHECK_NEAR(dbg.roll_tgt, 0.1f, 1e-7);
-	CHECK_NEAR(u[1], flown_roll_moment(0.0f, 0.0f, 0.1f), 1e-5 * std::fabs(flown_roll_moment(0.0f, 0.0f, 0.1f)));
+	CHECK_NEAR(u[AX_U], flown_roll_moment(0.0f, 0.0f, 0.1f), 1e-5 * std::fabs(flown_roll_moment(0.0f, 0.0f, 0.1f)));
 	fc_rig_law_reset(&ls);
 	in.exc_target = FC_RIG_TGT_RATE;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
@@ -980,20 +1047,20 @@ static void t_law_filters_and_exc()
 	in.exc_target = FC_RIG_TGT_MOMENT;
 	in.exc_val = 1e-4f;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-	CHECK(u[1] == 1e-4f && dbg.rate_cmd == 0.0f && dbg.exc_val == 1e-4f);
+	CHECK(u[AX_U] == 1e-4f && dbg.rate_cmd == 0.0f && dbg.exc_val == 1e-4f);
 
 	// gyro LPF off: rate loop sees the raw gyro; on: a step is smoothed
 	fc_rig_law_reset(&ls);
 	in = law_in(0.0f, 0.0f);
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-	in.gyro[0] = 1.0f;
+	in.gyro[AX_G] = 1.0f;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
 	CHECK_NEAR(ls.gx_f, 1.0f, 0.0);
 	CHECK(fc_rig_gain_set(&g, "GYRO_LPF_HZ", 10.0f) >= 0);
 	fc_rig_law_reset(&ls);
-	in.gyro[0] = 0.0f;
+	in.gyro[AX_G] = 0.0f;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-	in.gyro[0] = 1.0f;
+	in.gyro[AX_G] = 1.0f;
 	fc_rig_roll_law(&ls, &g, &in, u, &dbg);
 	CHECK(ls.gx_f > 0.0f && ls.gx_f < 0.1f);
 	for (int i = 0; i < 2000; i++) fc_rig_roll_law(&ls, &g, &in, u, &dbg);
@@ -1006,11 +1073,11 @@ static void t_law_filters_and_exc()
 	in = law_in(0.0f, 0.0f);
 	float base = 0.0f;
 	for (int i = 0; i < 200; i++) {
-		in.gyro[0] = 0.001f * (float)i;      // accelerating at 1/0.0012 rad/s^2
+		in.gyro[AX_G] = 0.001f * (float)i;   // accelerating at 1/0.0012 rad/s^2
 		fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-		base = -g.v[FC_RIG_RATE_P] * in.gyro[0] * J0 * g.v[FC_RIG_ATT_GAIN];
+		base = -g.v[FC_RIG_RATE_P] * in.gyro[AX_G] * J0 * g.v[FC_RIG_ATT_GAIN];
 	}
-	CHECK(std::fabs(ls.dgx_f - 0.001f / 0.0012f) < 0.01f && u[1] < base);   // d/dt of the ramp
+	CHECK(std::fabs(ls.dgx_f - 0.001f / 0.0012f) < 0.01f && u[AX_U] < base);   // d/dt of the ramp
 	for (int i = 0; i < 2000; i++) fc_rig_roll_law(&ls, &g, &in, u, &dbg);
 	CHECK(std::fabs(ls.dgx_f) < 1e-3f);
 	in.sp_roll = 0.2f;
@@ -1052,7 +1119,7 @@ static void t_law_input_from_state()
 	float ua[4], ub[4];
 	fc_rig_roll_law(&la, &m.s.gains, &a, ua, nullptr);
 	fc_rig_roll_law(&lb, &m.s.gains, &b, ub, nullptr);
-	CHECK(ua[0] == ub[0] && ua[1] == ub[1] && ua[0] > 0.0f);
+	CHECK(ua[0] == ub[0] && ua[AX_U] == ub[AX_U] && ua[0] > 0.0f);
 	// idle: zero collective, integrators held
 	Sim n;
 	n.run(10);
@@ -1131,7 +1198,7 @@ static void t_tgt_bound()
 		CHECK(dbg.roll_tgt == sign * B);
 		fc_rig_gains g0;
 		fc_rig_gains_default(&g0);
-		CHECK_NEAR(u[1], flown_roll_moment(0.0f, 0.0f, sign * B), 1e-5 * std::fabs(flown_roll_moment(0.0f, 0.0f, B)));
+		CHECK_NEAR(u[AX_U], flown_roll_moment(0.0f, 0.0f, sign * B), 1e-5 * std::fabs(flown_roll_moment(0.0f, 0.0f, B)));
 	}
 
 	// commands: RSP, GAIN ROLL_TRIM, EXC att refused when the worst case exceeds B
@@ -1274,7 +1341,7 @@ static void t_nan()
 			float uf[4];
 			fc_rig_roll_law(&fresh, &g, &in, uf, nullptr);
 			fc_rig_roll_law(&ls, &g, &in, u, &dbg);
-			CHECK(std::isfinite(u[1]) && u[1] == uf[1]);
+			CHECK(std::isfinite(u[AX_U]) && u[AX_U] == uf[AX_U]);
 		}
 	}
 	// a non-finite input only the law sees (yaw error, the estimator gyro): the law zeroes the
@@ -1289,7 +1356,7 @@ static void t_nan()
 				fc_rig_law_input(&r.s, 0.0f, 0.0f, which == 0 ? v : 0.0f, gy, 0.001f, &li);
 				float u[4];
 				fc_rig_roll_law(&r.s.law, &r.s.gains, &li, u, &r.s.dbg);
-				CHECK(u[1] == 0.0f);
+				CHECK(u[AX_U] == 0.0f);
 				r.tick();
 			}
 			CHECK(r.estop_seen && std::strcmp(r.estop_reason, "rig nan") == 0 && !r.out.armed);
@@ -1316,9 +1383,9 @@ static void t_nan()
 			if (which == 1) in.exc_val = INFINITY;
 			if (which == 2) in.dt = NAN;
 			if (which == 3) { in.coll_thrust = NAN; }
-			if (which == 4) in.gyro[0] = 1e37f;      // finite, but RATE_P * it overflows
+			if (which == 4) in.gyro[AX_G] = 1e37f;   // finite, but RATE_P * it overflows
 			fc_rig_roll_law(&ls, &g, &in, u, nullptr);
-			CHECK(u[1] == 0.0f && std::isfinite(u[0]) && ls.nonfinite);
+			CHECK(u[AX_U] == 0.0f && std::isfinite(u[0]) && ls.nonfinite);
 		}
 	}
 }
@@ -1327,7 +1394,7 @@ static void t_nan()
 static void t_liftoff_gate()
 {
 	Sim m;
-	m.in.roll_rad = 0.506f;                      // review P3: resting at 29 deg
+	m.in.AX_RAD = 0.506f;                      // review P3: resting at 29 deg
 	m.cmd("COLL 1000");
 	CHECK(m.until(FC_RIG_RUN, 3000) > 0);
 	CHECK(!m.out.guard_active && !m.out.integrate && !m.out.int_zero);
@@ -1337,11 +1404,10 @@ static void t_liftoff_gate()
 	m.s.gains.v[FC_RIG_ATT_I] = 20.0f;
 	m.s.gains.v[FC_RIG_RATE_I] = 100.0f;
 	m.s.gains.v[FC_RIG_LIFT_I] = 0.0f;
-	const float gyro[3] = {0, 0, 0};
 	for (int i = 0; i < 300; i++) {
 		m.tick();
 		fc_rig_law_in li;
-		fc_rig_law_input(&m.s, m.in.roll_rad, 0.0f, 0.0f, gyro, 0.001f, &li);
+		law_input_ax(&m.s, m.in.AX_RAD, 0.0f, 0.001f, &li);
 		float u[4];
 		fc_rig_roll_law(&m.s.law, &m.s.gains, &li, u, &m.s.dbg);
 	}
@@ -1350,11 +1416,11 @@ static void t_liftoff_gate()
 	CHECK(m.s.nak_reason && std::strcmp(m.s.nak_reason, "EXC: not lifted off yet") == 0);
 	CHECK(m.s.exc_id == 0);
 	// lifts off: integration and EXC allowed
-	m.in.roll_rad = 0.2f;
+	m.in.AX_RAD = 0.2f;
 	m.tick();
 	CHECK(m.out.guard_active && m.out.integrate);
 	fc_rig_law_in li;
-	fc_rig_law_input(&m.s, m.in.roll_rad, 0.0f, 0.0f, gyro, 0.001f, &li);
+	law_input_ax(&m.s, m.in.AX_RAD, 0.0f, 0.001f, &li);
 	float u[4];
 	fc_rig_roll_law(&m.s.law, &m.s.gains, &li, u, &m.s.dbg);
 	CHECK(m.s.law.att_int != 0.0f);
@@ -1367,9 +1433,8 @@ struct AssistSim : Sim {
 	float u[4] = {0, 0, 0, 0};
 	void law(float gx = 0.0f)
 	{
-		const float gyro[3] = {gx, 0.0f, 0.0f};
 		fc_rig_law_in li;
-		fc_rig_law_input(&s, in.roll_rad, 0.0f, 0.0f, gyro, 0.001f, &li);
+		law_input_ax(&s, in.AX_RAD, gx, 0.001f, &li);
 		fc_rig_roll_law(&s.law, &s.gains, &li, u, &s.dbg);
 	}
 	void step(int n) { for (int i = 0; i < n; i++) { tick(); law(); } }
@@ -1387,7 +1452,7 @@ static void t_lift_assist()
 		fc_rig_gain_range(FC_RIG_LIFT_I_LIM, &lo, &hi);
 		fc_rig_gain_range(FC_RIG_ATT_I_LIM, &alo, &ahi);
 		CHECK(hi <= ahi);                                // the hand-off fits ATT_I_LIM's range
-		m.in.roll_rad = 0.506f;
+		m.in.AX_RAD = 0.506f;
 		m.cmd("COLL 1000");
 		CHECK(m.until(FC_RIG_RUN, 3000) > 0);
 		CHECK(m.out.lift_assist && !m.out.integrate && !m.out.guard_active);
@@ -1400,12 +1465,12 @@ static void t_lift_assist()
 		CHECK(m.s.dbg.att_int == m.s.law.att_int);       // recorded as att_int
 		// the moment never exceeds RIG_LIFT_MOMENT_FRAC (1.0) x the authority
 		const float cap = fc_rig_moment_authority(m.out.coll_frac * (float)(PID_MASS_KG) * GRAV);
-		CHECK(std::fabs(m.u[1]) <= cap * (1.0f + 1e-6f));
+		CHECK(std::fabs(m.u[AX_U]) <= cap * (1.0f + 1e-6f));
 	}
 	// limits: ATT_I_LIM below LIFT_I_LIM bounds the assist; lowering LIFT_I_LIM clamps at once
 	{
 		AssistSim m;
-		m.in.roll_rad = 0.506f;
+		m.in.AX_RAD = 0.506f;
 		m.cmd("COLL 1000");
 		CHECK(m.cmd("GAIN LIFT_I 10") && m.cmd("GAIN ATT_I_LIM 0.5"));
 		CHECK(m.until(FC_RIG_RUN, 3000) > 0);
@@ -1422,13 +1487,13 @@ static void t_lift_assist()
 	// the moment clamp is anti-windup too: mixer unsaturated, clamp binding -> integration stops
 	{
 		AssistSim m;
-		m.in.roll_rad = 0.506f;
+		m.in.AX_RAD = 0.506f;
 		m.cmd("COLL 300");                               // small collective: small authority
 		CHECK(m.cmd("GAIN LIFT_I 10") && m.cmd("GAIN ATT_P 1"));   // P alone well inside it
 		CHECK(m.until(FC_RIG_RUN, 3000) > 0);
 		m.step(1000);
 		const float cap = fc_rig_moment_authority(m.out.coll_frac * (float)(PID_MASS_KG) * GRAV);
-		CHECK(m.u[1] == -cap && m.s.law.assist_sat_neg && !m.s.law.assist_sat_pos);
+		CHECK(m.u[AX_U] == -cap && m.s.law.assist_sat_neg && !m.s.law.assist_sat_pos);
 		CHECK(!m.s.sat_pos && !m.s.sat_neg);             // (no mixer in this driver)
 		const float held = m.s.law.att_int;
 		CHECK(held > -m.s.gains.v[FC_RIG_LIFT_I_LIM]);   // stopped short of the limit
@@ -1439,11 +1504,11 @@ static void t_lift_assist()
 	// hand-off: the value is kept as ATT_I's initial state; ATT_I 0 holds it; no moment clamp after
 	{
 		AssistSim m;
-		m.in.roll_rad = 0.506f;
+		m.in.AX_RAD = 0.506f;
 		m.cmd("COLL 1000");
 		CHECK(m.until(FC_RIG_RUN, 3000) > 0);
 		m.step(1500);
-		m.in.roll_rad = 0.18f;                           // inside the lift-off band (0.39)
+		m.in.AX_RAD = 0.18f;                           // inside the lift-off band (0.39)
 		m.tick();
 		CHECK(m.out.guard_active && m.out.integrate && !m.out.lift_assist);
 		const float trim = m.s.law.att_int;
@@ -1453,17 +1518,16 @@ static void t_lift_assist()
 		CHECK(!m.s.law.assist_sat_pos && !m.s.law.assist_sat_neg);
 		// moment continuity across the hand-off: the same law tick with and without the flag
 		fc_rig_law_state a = m.s.law, b = m.s.law;
-		const float gyro[3] = {0, 0, 0};
 		fc_rig_law_in li;
-		fc_rig_law_input(&m.s, 0.18f, 0.0f, 0.0f, gyro, 0.001f, &li);
+		law_input_ax(&m.s, 0.18f, 0.0f, 0.001f, &li);
 		float ua[4], ub[4];
 		fc_rig_roll_law(&a, &m.s.gains, &li, ua, nullptr);
 		li.integrate = false; li.lift_assist = true;
 		fc_rig_roll_law(&b, &m.s.gains, &li, ub, nullptr);
-		CHECK(std::fabs(ua[1] - ub[1]) < 1e-3f * std::fabs(ua[1]));   // one tick's LIFT_I increment
+		CHECK(std::fabs(ua[AX_U] - ub[AX_U]) < 1e-3f * std::fabs(ua[AX_U]));   // one tick's LIFT_I increment
 		// overshoot: swings past level to the other side -> ATT_I unwinds, never winds further
 		m.s.gains.v[FC_RIG_ATT_I] = 2.0f;
-		m.in.roll_rad = -0.10f;
+		m.in.AX_RAD = -0.10f;
 		float prev = m.s.law.att_int;
 		for (int i = 0; i < 300; i++) {
 			m.tick();
@@ -1476,14 +1540,14 @@ static void t_lift_assist()
 	// LIFT_I 0: off, exactly the old law (no clamp, no build-up)
 	{
 		AssistSim m;
-		m.in.roll_rad = 0.506f;
+		m.in.AX_RAD = 0.506f;
 		m.cmd("COLL 100");
 		CHECK(m.cmd("GAIN LIFT_I 0"));
 		CHECK(m.until(FC_RIG_RUN, 3000) > 0);
 		CHECK(!m.out.lift_assist);
 		m.step(500);
 		const float cap = fc_rig_moment_authority(m.out.coll_frac * (float)(PID_MASS_KG) * GRAV);
-		CHECK(m.s.law.att_int == 0.0f && m.u[1] < -cap);   // P alone, unclamped
+		CHECK(m.s.law.att_int == 0.0f && m.u[AX_U] < -cap);   // P alone, unclamped
 	}
 }
 
@@ -1523,7 +1587,7 @@ static void t_bumpless()
 		fc_rig_law_in in = law_in(0.0f, 0.0f);   // frozen (integrate false), so the state is read only
 		float u[4];
 		fc_rig_roll_law(&ls, &c.s.gains, &in, u, nullptr);
-		return u[1];
+		return u[AX_U];
 	};
 	const float m0 = moment();
 	CHECK(m0 != 0.0f);
@@ -1609,6 +1673,104 @@ static void t_rate_cap()
 }
 
 // ---------------------------------------------------------------------------------------------
+
+// The build's axis (RIG_AXIS): g_rig_axis; the ROLL_TRIM default (the controlled axis' trim); the
+// law against controller_pid.cpp's flown path OF THAT AXIS, transcribed on its own (pitch:
+// pitchRate_tgt / pitchRate_cmd / J[1] into u[2], roll: the roll path into u[1]) to 1e-5, with
+// the build's trims; the would-be command on the LOCKED axis in dbg.pitch_cmd; and, through the
+// real controller_pid.cpp, which motors a positive moment on each axis raises.
+static float flown_axis_cmd(float est, float gyro, float trim_rad)
+{
+	const float tgt = 0.0f + 2.0f * std::atan(trim_rad);   // desX (ROSE_VEL_LOOP=0) + PID_ANGLE(trim)
+	const float rate_tgt = (-1.0f / (PID_FLOWN_SCALE * (float)(TAU_ROLL))) * (est - tgt);   // tau_pitch = TAU_ROLL
+	return (-1.0f / (float)(TAU_ROLLRATE)) * (gyro - rate_tgt);                      // tau_pitchRate = TAU_ROLLRATE
+}
+
+static void t_axis()
+{
+	std::printf("RIG_AXIS=%d g_rig_axis=%d ROLL_TRIM_RAD=%g PITCH_TRIM_RAD=%g\n", RIG_AXIS,
+		    (int)g_rig_axis, (double)ROLL_TRIM_RAD, (double)PITCH_TRIM_RAD);
+	CHECK(g_rig_axis == RIG_AXIS);
+	const float J[3] = {16e-6f, 16e-6f, 29e-6f};   // controller_pid.cpp's J
+#if RIG_AXIS == 1
+	const float ax_trim = PITCH_TRIM_RAD, lk_trim = ROLL_TRIM_RAD;
+#else
+	const float ax_trim = ROLL_TRIM_RAD, lk_trim = PITCH_TRIM_RAD;
+#endif
+	fc_rig_gains g;
+	fc_rig_gains_default(&g);
+	CHECK(g.v[FC_RIG_ROLL_TRIM] == 2.0f * std::atan(ax_trim));
+	uint32_t lcg = 4242u;
+	auto rnd = [&](float lo, float hi) {
+		lcg = lcg * 1664525u + 1013904223u;
+		return lo + (hi - lo) * (float)(lcg >> 8) / 16777216.0f;
+	};
+	double worst = 0.0, worst_lk = 0.0;
+	for (int i = 0; i < 2000; i++) {
+		fc_rig_law_in in;
+		std::memset(&in, 0, sizeof in);
+		in.roll = rnd(-0.4f, 0.4f);
+		in.pitch = rnd(-0.4f, 0.4f);
+		in.gyro[0] = rnd(-2.0f, 2.0f);
+		in.gyro[1] = rnd(-2.0f, 2.0f);
+		in.gyro[2] = rnd(-1.0f, 1.0f);
+		in.yaw_err = rnd(-0.3f, 0.3f);
+		in.dt = 0.0012f;
+		in.coll_thrust = (float)(PID_MASS_KG) * GRAV;
+		in.integrate = true;
+		fc_rig_law_state ls;
+		fc_rig_law_reset(&ls);
+		float u[4];
+		fc_rig_dbg dbg;
+		fc_rig_roll_law(&ls, &g, &in, u, &dbg);
+#if RIG_AXIS == 1
+		const float ref = flown_axis_cmd(in.pitch, in.gyro[1], ax_trim) * J[1] * (float)(ATT_GAIN);   // u[2]
+		const float ref_lk = flown_axis_cmd(in.roll, in.gyro[0], lk_trim);                         // rollRate_cmd
+#else
+		const float ref = flown_axis_cmd(in.roll, in.gyro[0], ax_trim) * J[0] * (float)(ATT_GAIN);    // u[1]
+		const float ref_lk = flown_axis_cmd(in.pitch, in.gyro[1], lk_trim);                        // pitchRate_cmd
+#endif
+		worst = std::fmax(worst, std::fabs((double)u[AX_U] - ref) / std::fmax(std::fabs((double)ref), 1e-9));
+		worst_lk = std::fmax(worst_lk, std::fabs((double)dbg.pitch_cmd - ref_lk) /
+					       std::fmax(std::fabs((double)ref_lk), 1e-6));
+		CHECK(u[LK_U] == 0.0f && u[3] == 0.0f && u[0] == in.coll_thrust);
+		CHECK(dbg.roll == in.roll && dbg.pitch == in.pitch && dbg.moment == u[AX_U]);
+		CHECK(dbg.roll_tgt == g.v[FC_RIG_ROLL_TRIM]);
+	}
+	std::printf("worst relative error vs the flown %s path %.3g, locked-axis would-be cmd %.3g\n",
+		    AX_NAME, worst, worst_lk);
+	CHECK(worst < 1e-5 && worst_lk < 1e-5);
+
+	// controller_pid.cpp (flown, ROSE_RIG=0): a positive moment on an axis raises exactly the pair
+	// the rig's saturation flags call "+" for it. Pitch: rear duty[1]/duty[2] up, front
+	// duty[0]/duty[3] down (+pitch is nose down); roll: left duty[2]/duty[3] up.
+	HierarchicalPidController pid;
+	float lvl[4];
+	{
+		float state[12] = {0}, sp[12] = {0}, uo[4];
+		pid.init();
+		pid.compute(state, sp, uo, 0.0012f);   // level: the reference duties
+		for (int k = 0; k < 4; k++) lvl[k] = uo[k] + 0.583f;
+	}
+	for (int axis = 0; axis < 2; axis++) {
+		float state[12] = {0}, sp[12] = {0}, uo[4], dd[4];
+		state[3 + axis] = std::tan(0.5f * -0.2f);   // 0.2 rad below its target: positive moment
+		pid.init();
+		pid.compute(state, sp, uo, 0.0012f);
+		for (int k = 0; k < 4; k++) dd[k] = uo[k] + 0.583f - lvl[k];
+		std::printf("flown %s -0.2 rad: duty change %+.4f %+.4f %+.4f %+.4f\n", axis ? "pitch" : "roll",
+			    (double)dd[0], (double)dd[1], (double)dd[2], (double)dd[3]);
+		if (axis == 1) {
+			CHECK(dd[1] > 0.0f && dd[2] > 0.0f && dd[0] < 0.0f && dd[3] < 0.0f);   // rear up, front down
+		} else {
+			CHECK(dd[2] > 0.0f && dd[3] > 0.0f && dd[0] < 0.0f && dd[1] < 0.0f);   // left up, right down
+		}
+		if (axis == RIG_AXIS) {
+			CHECK(dd[SAT_P[0]] > 0.0f && dd[SAT_P[1]] > 0.0f && dd[SAT_M[0]] < 0.0f && dd[SAT_M[1]] < 0.0f);
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct { const char *name; void (*fn)(); } groups[] = {
@@ -1622,7 +1784,7 @@ int main(int argc, char **argv)
 		{"law_integrators", t_law_integrators}, {"law_input", t_law_input_from_state}, {"law_filters_and_exc", t_law_filters_and_exc},
 		{"ramp_latch", t_ramp_latch}, {"tgt_bound", t_tgt_bound}, {"nan", t_nan}, {"liftoff_gate", t_liftoff_gate},
 		{"reset_stop", t_reset_stop}, {"bumpless", t_bumpless}, {"rate_cap", t_rate_cap},
-		{"lift_assist", t_lift_assist},
+		{"lift_assist", t_lift_assist}, {"axis", t_axis},
 	};
 	const char *want = argc > 1 ? argv[1] : "all";
 	bool found = false;

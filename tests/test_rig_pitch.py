@@ -293,7 +293,7 @@ class RunnerPitch(unittest.TestCase):
         trial recording is a P recording, and pitch (not roll) followed the step."""
         with tempfile.TemporaryDirectory() as tmp:
             spec = R.validate_spec(self._raw())
-            clock = R.SimClock(20.0)
+            clock = R.VirtualClock(20.0)
             link = R.FakeDrone(clock, seed=1, mass_kg=spec["mass_kg"], axis=1)
             (Path(tmp) / "b").mkdir()
             r = R.Runner(spec, Path(tmp) / "b", link, clock, approval="test", mode="rig-pitch",
@@ -503,17 +503,39 @@ class TwinPitch(unittest.TestCase):
         for k in ("overshoot_pct", "settle_ms", "rms_err_deg", "steady_err_deg"):
             self.assertAlmostEqual(js[k], roll[k], places=6, msg=k)
 
-    def test_axis_aware_switch_compiles_and_matches_on_roll(self):
-        """TWIN_FW_AXIS_AWARE=1 (the branch for an axis-aware fc_rig.cpp) builds, and with axis 0
-        reduces to the roll path: the same run, number for number."""
-        ex = self.rs.build(extra={"TWIN_FW_AXIS_AWARE": "1"}, out_dir=self.d / "build-aware")
-        a = self.rs.run_twin(ex["twin"], self.level, {})
-        b = self.rs.run_twin(self.exes["twin"], self.level, {})
+    def test_firmware_pitch_path_matches_the_transcription(self):
+        """The twin's pitch runs use the REAL pitch firmware (rig_twin_pitch: fc_rig.cpp with
+        RIG_AXIS=1, TWIN_FW_AXIS_AWARE=1). Cross-check against the earlier transcription
+        (TWIN_FW_AXIS_AWARE=0: a ROLL build fed the pitch view, its moment moved to u[2], the
+        saturation on the pitch pairs): the same run, number for number, CSV included."""
+        self.assertTrue(self.exes["twin_pitch"].name.endswith("_pitch"))
+        self.assertEqual(self.rs.twin_for(self.exes["twin"], 1), self.exes["twin_pitch"])
+        self.assertEqual(self.rs.twin_for(self.exes["twin_pitch"], 0), self.exes["twin"])
+        old = self.rs.build(extra={"TWIN_FW_AXIS_AWARE": "0"}, out_dir=self.d / "build-transcribed")
+        self.assertNotIn("twin_pitch", old)
+        params = {"axis": 1, "imbalance": 0.03, "cg_x_mm": 0.5, "gains": {"ATT_I": 2, "RATE_D": 0.3}}
+        pa, pb = self.d / "fw.csv", self.d / "tr.csv"
+        a = self.rs.run_twin(self.exes["twin_pitch"], self.level, params, csv_path=pa)
+        b = subprocess.run([str(old["twin"]), "scenario=%s" % self.level, *self.rs._kv(params),
+                            "csv=%s" % pb], capture_output=True, text=True)
+        self.assertEqual(b.returncode, 0, b.stdout + b.stderr)
+        b = json.loads(b.stdout.strip().splitlines()[-1])
+        self.assertEqual(a["status"], "ok", a)
+        self.assertIn("RIG liftoff: pitch guard live", " ".join(a["events"]))   # the pitch build's text
+        b["events"] = [e.replace("roll guard live", "pitch guard live") for e in b["events"]]
+        self.maxDiff = None
         self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True))
-        bad = subprocess.run([str(ex["twin"]), "scenario=%s" % self.level, "axis=1"],
-                             capture_output=True, text=True)
-        self.assertNotEqual(bad.returncode, 0)          # built with RIG_AXIS 0: axis=1 refused
-        self.assertIn("RIG_AXIS=0", bad.stdout)
+        self.assertEqual(pa.read_bytes(), pb.read_bytes())
+        # each binary is one firmware axis and refuses the other
+        for exe, axis, built in ((self.exes["twin"], 1, 0), (self.exes["twin_pitch"], 0, 1)):
+            bad = subprocess.run([str(exe), "scenario=%s" % self.level, "axis=%d" % axis],
+                                 capture_output=True, text=True)
+            self.assertNotEqual(bad.returncode, 0)
+            self.assertIn("RIG_AXIS=%d" % built, bad.stdout)
+        # the pitch binary defaults to pitch
+        js = subprocess.run([str(self.exes["twin_pitch"]), "scenario=%s" % self.level],
+                            capture_output=True, text=True)
+        self.assertEqual(json.loads(js.stdout.strip().splitlines()[-1])["axis"], "pitch")
 
     def test_campaign_scenario_and_com_offset(self):
         """tools/rig/sim/scenarios/pitch_hold_600.txt (the first_hold_pitch_600 campaign); a CoM

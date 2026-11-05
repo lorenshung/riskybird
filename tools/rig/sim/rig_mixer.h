@@ -101,9 +101,10 @@ static const int SIDE_LEFT[4] = {0, 0, 1, 1};
 static const int SIDE_REAR[4] = {0, 1, 1, 0};
 
 /* controller_pid.cpp `J[3]` (static there): the roll / pitch inertias the moments are scaled by.
- * The twin's pitch path reuses the roll law's moment (rig_J[0] * ATT_GAIN * rate_cmd), which is
- * the flight PID's pitch moment only while J[1] == J[0]; tests/test_rig_sim.py checks both values
- * (and tau_pitch == TAU_ROLL, tau_pitchRate == TAU_ROLLRATE) against controller_pid.cpp. */
+ * fc_rig.cpp's pitch build scales by its own J[1] copy; the TWIN_FW_AXIS_AWARE=0 transcription
+ * reuses the roll law's moment (J[0]), which is the flight PID's pitch moment only while J[1] ==
+ * J[0]. tests/test_rig_pitch.py checks both values (and tau_pitch == TAU_ROLL, tau_pitchRate ==
+ * TAU_ROLLRATE) against controller_pid.cpp. */
 static const float J_ROLL  = 16e-6f;
 static const float J_PITCH = 16e-6f;
 

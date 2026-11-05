@@ -16,6 +16,13 @@
  *
  * Units on this side are honest: radians from fc_pid_attitude(), rad/s, N, N*m. See fc_rig.cpp for
  * how the default gains reproduce the flown PID and how to convert a tuned rig back to a preset.
+ *
+ * PITCH RIG (rig-pitch, -DRIG_AXIS=1: the drone turned 90 deg in the cradle). Same interfaces, same
+ * names: everything that says "roll" below (sp_roll*, roll_tgt, the ROLL_TRIM gain, the roll guard,
+ * fc_rig_roll_law) means "the controlled axis", pitch in that build, and "pitch" in the guards and
+ * pitch_cmd means "the locked axis", roll there. Inputs (roll_rad/pitch_rad, roll/pitch, gyro[3])
+ * and dbg.roll/dbg.pitch stay PHYSICAL. The law writes its moment to u[2] (u[1] = 0) and the
+ * saturation flags use the rear/front pairs. Details: fc_rig.cpp "the controlled axis (RIG_AXIS)".
  */
 #ifndef ROSE_FC_RIG_H
 #define ROSE_FC_RIG_H
@@ -40,9 +47,12 @@ enum fc_rig_gain_id {
 	FC_RIG_ATT_GAIN,         /* [-]       moment scale (the mixer's J*ATT_GAIN)          */
 	FC_RIG_D_LPF_HZ,         /* [Hz]      low-pass on the D term's derivative            */
 	FC_RIG_GYRO_LPF_HZ,      /* [Hz]      first-order LPF on the rate-loop gyro, 0 = off */
-	FC_RIG_ROLL_TRIM,        /* [rad]     added to the roll angle target                 */
+	FC_RIG_ROLL_TRIM,        /* [rad]     added to the roll angle target; on the pitch rig the
+				  *           PITCH target (the controlled axis), default
+				  *           PITCH_TRIM_RAD there. Name kept for the gain tables */
 	FC_RIG_MOTOR_TRIM_LEFT,  /* [-]       left-pair thrust factor (commanded; the mixer applies
-				  *           fc_rig_state.trim_left_applied, slewed toward it)  */
+				  *           fc_rig_state.trim_left_applied, slewed toward it). Still
+				  *           left/right on the pitch rig: a trim of its locked roll */
 	FC_RIG_ATT_I_LIM,        /* [rad/s]   clamp on the ATT_I contribution                */
 	FC_RIG_RATE_I_LIM,       /* [rad/s^2] clamp on the RATE_I contribution               */
 	/* Lift-off assist (RUN before lift-off; see fc_rig.cpp "LIFT-OFF ASSIST"). Appended: the
@@ -138,7 +148,7 @@ struct fc_rig_law_state {
 
 /* What the law publishes for telemetry and the recorder. */
 struct fc_rig_dbg {
-	float roll, pitch;          /* rad, as used                                              */
+	float roll, pitch;          /* rad, as used; PHYSICAL on either rig                      */
 	float roll_tgt;             /* rad: setpoint + trim + exc(att)                           */
 	float rate_tgt;             /* rad/s                                                     */
 	float rate_cmd;             /* rad/s^2                                                   */
@@ -146,7 +156,8 @@ struct fc_rig_dbg {
 	float exc_val;              /* the injected value, in its target's unit                  */
 	float coll_thrust;          /* N                                                         */
 	float att_int, rate_int;    /* integrator contributions                                  */
-	float pitch_cmd, yaw_cmd;   /* rad/s^2 the flown PID would command; NOT sent to motors   */
+	float pitch_cmd, yaw_cmd;   /* rad/s^2 the flown PID would command; NOT sent to motors.
+				     * pitch_cmd is the LOCKED axis' (roll on the pitch rig)    */
 };
 
 struct fc_rig_law_in {
@@ -165,13 +176,15 @@ struct fc_rig_law_in {
 				 * to RIG_LIFT_MOMENT_FRAC of the authority; never with integrate      */
 	/* Anti-windup. sat_pos: the mixer cannot give MORE positive roll moment (a left motor,
 	 * duty[2]/duty[3], is at the ceiling or a right motor, duty[0]/duty[1], is at 0); sat_neg the
-	 * mirror. Usually last tick's duties via fc_rig_moment_saturation(). */
+	 * mirror. Pitch rig: positive PITCH moment, rear pair duty[1]/duty[2] vs front duty[0]/duty[3].
+	 * Usually last tick's duties via fc_rig_moment_saturation(). */
 	bool  sat_pos, sat_neg;
 };
 
 /* u[0] = collective thrust (N), u[1] = roll moment (N*m), u[2] = u[3] = 0: the [thrust, moments]
  * vector controller_pid.cpp feeds its mixer matrix M directly (already scaled; do NOT multiply by
- * J*ATT_GAIN again). Sign conventions are controller_pid.cpp's. */
+ * J*ATT_GAIN again). Sign conventions are controller_pid.cpp's. Pitch rig (RIG_AXIS 1): u[1] = 0,
+ * u[2] = the pitch moment (controller_pid.cpp's pitch path: angle = pitch, rate = gyro[1], J[1]). */
 void fc_rig_roll_law(struct fc_rig_law_state *ls, const struct fc_rig_gains *g,
 		     const struct fc_rig_law_in *in, float u[4], struct fc_rig_dbg *dbg);
 void fc_rig_law_reset(struct fc_rig_law_state *ls);
@@ -263,6 +276,11 @@ struct fc_rig_state {
 
 /* The one instance, defined in main.cpp (rig builds only); controller_pid.cpp reads it. */
 extern struct fc_rig_state g_rig;
+
+/* The build's controlled axis, RIG_AXIS: 0 roll (rig-roll), 1 pitch (rig-pitch). Defined in
+ * fc_rig.cpp, in read-only data with external linkage: the host (tools/rb/rig_axis.py) reads it
+ * from the ELF, and main.cpp's RIG line prints it (ax=R|P). */
+extern const uint8_t g_rig_axis;
 
 void fc_rig_init(struct fc_rig_state *s);
 
