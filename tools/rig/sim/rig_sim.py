@@ -10,7 +10,7 @@ code, runs scenarios, sweeps gains across a plant-uncertainty box and does the l
     $PY tools/rig/sim/rig_sim.py margins [--coll 1000]
     $PY tools/rig/sim/rig_sim.py map [--coll 1000] [--grid quick|full]
     $PY tools/rig/sim/rig_sim.py liftoff
-    $PY tools/rig/sim/rig_sim.py liftoff-assist       # LIFT_I / LIFT_I_LIM vs a steady torque to the stop
+    $PY tools/rig/sim/rig_sim.py liftoff-assist [--axis pitch]   # LIFT_I / LIFT_I_LIM vs a steady torque to the stop
     $PY tools/rig/sim/rig_sim.py report               # everything above -> results/rig-sim/<stamp>/
 
 `run` writes rec.csv in EXACTLY the recorder's rig columns (flightrec_fetch.RIG_COLUMNS), at
@@ -51,8 +51,11 @@ theta is pitch, I is Iyy (the same prior: controller_pid.cpp's J = diag(16, 16, 
 Iyy = Ixx), the moment is M's pitch column through the real permutation (rear pair duty[1]/duty[2]
 minus front duty[0]/duty[3]), gravity uses h_mm and cg_x_mm (CoM forward = nose-down torque),
 imbalance splits rear/front, and ext_mNm (the USB cable) defaults to 0: it now runs along the pivot.
-The FC side is the real rig code in the pitch build's frame (rig_twin.cpp TWIN_FW_AXIS_AWARE).
-The CSV's ang_deg / ang_tgt_deg / ang_rate_dps are the controlled axis either way.
+The FC side is the real pitch build: fc_rig.cpp compiled with rig-pitch's defines (RIG_AXIS=1),
+fed the physical roll/pitch/gyro (rig_twin.cpp TWIN_FW_AXIS_AWARE). build() makes one twin per
+axis, rig_twin (rig-roll) and rig_twin_pitch (rig-pitch), and run_twin / run_batch pick the one
+matching the run's `axis` parameter (twin_for). The CSV's ang_deg / ang_tgt_deg / ang_rate_dps
+are the controlled axis either way.
 NOT MODELLED: the attitude estimator's dynamics (roll = truth + bias/noise; on a pivot the angular
 acceleration also corrupts an accelerometer tilt reference), rotor gyroscopics, the brushed motors'
 low-duty dead band, the stop's compliance (so the impact guard's 40 ms dwell is not meaningful).
@@ -83,7 +86,7 @@ RB = ROOT / "tools/rb"
 
 # The rig-roll mode's compile definitions; rig_defines() reads them from tools/rb/boards.py and
 # tests/test_rig_sim.py asserts this fallback still matches it on TWIN_KEYS, the values that change
-# the twin's behaviour.
+# the twin's behaviour. rig-pitch is the same plus RIG_AXIS=1 (RIG_PITCH_EXTRA; checked the same way).
 RIG_DEFINES_FALLBACK = {
     "ROSE_RIG": "1", "ROSE_AUTOFLIGHT": "1", "ROSE_UART_CMD": "1", "ROSE_FLIGHT_COMMIT": "1",
     "ROSE_COMMIT_MAX_MS": "900000", "ROSE_ARM_NO_GESTURE": "1", "PID_MASS_KG": "0.050f",
@@ -91,12 +94,17 @@ RIG_DEFINES_FALLBACK = {
     "ROSE_FLIGHTREC": "1", "ROSE_FLOW": "0", "ROSE_VEL_LOOP": "0", "ROSE_TELEM_CONSOLE": "0",
     "FLIGHTREC_DIV": "4", "ATT_GAIN": "0.85f", "MOTOR_TRIM_LEFT": "1.0f", "IMU_OFFSET_Y": "0.016f",
     "RIG_MAX_TILT_RAD": "0.227f", "RIG_TGT_MAX_RAD": "0.14f", "BATT_CUTOFF_V": "3.0f",
+    "RIG_LIFTOFF_TIMEOUT_MS": "8000",
 }
+
+RIG_PITCH_EXTRA = {"RIG_AXIS": "1"}
+RIG_MODE_BY_AXIS = {0: "rig-roll", 1: "rig-pitch"}
 
 TWIN_KEYS = ("ROSE_RIG", "ROSE_VEL_LOOP", "PID_MASS_KG", "ATT_GAIN", "MOTOR_TRIM_LEFT",
              "AUTOFLIGHT_MAX_DUTY", "FLIGHTREC_DIV", "ROSE_BATT_REPORT_ONLY", "TAU_ROLL",
-             "TAU_ROLLRATE", "ROLL_TRIM_RAD", "BATT_CUTOFF_V", "BATT_NOMINAL_V", "SAFE_MAX_RATE_RADPS",
-             "RIG_SP_SLEW_RADPS", "RIG_RAMP_MS", "RIG_MAX_TILT_RAD")
+             "TAU_ROLLRATE", "ROLL_TRIM_RAD", "PITCH_TRIM_RAD", "BATT_CUTOFF_V", "BATT_NOMINAL_V",
+             "SAFE_MAX_RATE_RADPS", "RIG_SP_SLEW_RADPS", "RIG_RAMP_MS", "RIG_MAX_TILT_RAD",
+             "RIG_TGT_MAX_RAD", "RIG_LIFTOFF_TIMEOUT_MS", "RIG_AXIS")
 
 # controller_pid.cpp / fc_rig.cpp constants the linear model needs
 J0 = 16e-6
@@ -127,16 +135,17 @@ BOX = {  # name -> (lo, hi); "tau" sets tau_up and tau_down together
 # Build
 # =============================================================================================
 
-def rig_defines() -> dict:
-    """The rig-roll mode's -D values from tools/rb/boards.py (CMake + preprocessor tuples)."""
+def rig_defines(axis: int = 0) -> dict:
+    """The rig-roll (axis 0) or rig-pitch (axis 1) mode's -D values from tools/rb/boards.py (CMake +
+    preprocessor tuples)."""
     try:
         sys.path.insert(0, str(ROOT))
         from tools.rb import boards  # noqa: PLC0415
-        mode = next(m for m in boards.RIG_MODES if m[0] == "rig-roll")
+        mode = next(m for m in boards.RIG_MODES if m[0] == RIG_MODE_BY_AXIS[axis])
         # CONFIG_* entries are Kconfig, not preprocessor macros: not for the host compile
         return {k: v for k, v in (*mode[2], *mode[3]) if not k.startswith("CONFIG_")}
     except Exception:  # noqa: BLE001 - boards.py mid-edit elsewhere: the asserted fallback
-        return dict(RIG_DEFINES_FALLBACK)
+        return dict(RIG_DEFINES_FALLBACK, **(RIG_PITCH_EXTRA if axis else {}))
     finally:
         if sys.path and sys.path[0] == str(ROOT):
             sys.path.pop(0)
@@ -146,29 +155,46 @@ def _compiler() -> str | None:
     return shutil.which("g++") or shutil.which("c++")
 
 
-def build(extra: dict | None = None, out_dir: str | os.PathLike | None = None) -> dict:
-    """Compile rig_twin and mixer_check (cached by source+flag hash). Returns {twin, mixer_check}."""
+def build(extra: dict | None = None, out_dir: str | os.PathLike | None = None,
+          axes: tuple | None = None) -> dict:
+    """Compile rig_twin and mixer_check per axis (cached by source+flag hash): axis 0 with the
+    rig-roll mode's defines -> {twin, mixer_check}, axis 1 with rig-pitch's (RIG_AXIS=1) ->
+    {twin_pitch, mixer_check_pitch}. Both by default; only roll when extra sets
+    TWIN_FW_AXIS_AWARE=0 (the transcription, which remaps axis=1 onto a roll build)."""
     cxx = _compiler()
     if cxx is None:
         raise RuntimeError("no host C++ compiler (g++)")
-    defs = rig_defines()
-    defs.update(extra or {})
-    flags = ["-std=c++17", "-O2", "-Wall", "-Wextra", "-ffp-contract=off",
-             *[f"-D{k}={v}" for k, v in sorted(defs.items())], f"-I{SRC}", f"-I{HERE}"]
+    aware = str((extra or {}).get("TWIN_FW_AXIS_AWARE", "1")) != "0"
+    if axes is None:
+        axes = (0, 1) if aware else (0,)
+    if not aware and 1 in axes:
+        raise ValueError("TWIN_FW_AXIS_AWARE=0 builds the roll twin only (axis=1 is remapped onto it)")
+    flags_by_axis = {}
+    for axis in axes:
+        defs = rig_defines(axis)
+        defs.update(extra or {})
+        flags_by_axis[axis] = ["-std=c++17", "-O2", "-Wall", "-Wextra", "-ffp-contract=off",
+                               *[f"-D{k}={v}" for k, v in sorted(defs.items())], f"-I{SRC}", f"-I{HERE}"]
     srcs = [HERE / "rig_twin.cpp", HERE / "mixer_check.cpp", HERE / "rig_mixer.h",
             SRC / "fc_rig.cpp", SRC / "fc_rig.h", SRC / "fc_shared_math.h",
             SRC / "controller_pid.cpp", SRC / "controller_pid.hpp"]
-    h = hashlib.sha1(" ".join([cxx, *flags]).encode())
+    h = hashlib.sha1(" ".join([cxx, *(f for a in axes for f in [str(a), *flags_by_axis[a]])]).encode())
     for s in srcs:
         h.update(s.read_bytes())
     d = Path(out_dir) if out_dir else Path(tempfile.gettempdir()) / f"rig_twin-{h.hexdigest()[:12]}"
     d.mkdir(parents=True, exist_ok=True)
-    out = {"twin": d / "rig_twin", "mixer_check": d / "mixer_check"}
-    jobs = [
-        (out["twin"], [HERE / "rig_twin.cpp", SRC / "fc_rig.cpp"]),
-        (out["mixer_check"], [HERE / "mixer_check.cpp", SRC / "fc_rig.cpp", SRC / "controller_pid.cpp"]),
-    ]
-    for exe, files in jobs:
+    out = {}
+    jobs = []
+    for axis in axes:
+        sfx = "_pitch" if axis else ""
+        out["twin" + sfx] = d / ("rig_twin" + sfx)
+        out["mixer_check" + sfx] = d / ("mixer_check" + sfx)
+        jobs += [
+            (out["twin" + sfx], flags_by_axis[axis], [HERE / "rig_twin.cpp", SRC / "fc_rig.cpp"]),
+            (out["mixer_check" + sfx], flags_by_axis[axis],
+             [HERE / "mixer_check.cpp", SRC / "fc_rig.cpp", SRC / "controller_pid.cpp"]),
+        ]
+    for exe, flags, files in jobs:
         if exe.exists():
             continue
         tmp = exe.with_suffix(f".tmp{os.getpid()}")
@@ -180,12 +206,40 @@ def build(extra: dict | None = None, out_dir: str | os.PathLike | None = None) -
     return out
 
 
+def _axis_of(params: dict | None):
+    """The run's `axis` parameter as 0/1, None when it does not set one."""
+    v = (params or {}).get("axis")
+    if v is None:
+        return None
+    return 1 if float(v) != 0.0 else 0
+
+
+def twin_for(twin, axis):
+    """The twin binary for `axis` (0 roll, 1 pitch). Each binary is ONE firmware axis (fc_rig.cpp's
+    RIG_AXIS) and refuses the other: rig_twin is rig-roll, rig_twin_pitch (next to it) rig-pitch.
+    `twin` may be either path or build()'s dict; axis None keeps it (the binary's own axis)."""
+    if isinstance(twin, dict):
+        return Path(twin["twin_pitch" if axis == 1 else "twin"])
+    p = Path(twin)
+    if axis is None:
+        return p
+    base = p.name[:-len("_pitch")] if p.name.endswith("_pitch") else p.name
+    want = p.with_name(base + ("_pitch" if axis == 1 else ""))
+    return want if want.exists() else p
+
+
 def mixer_check(exes: dict | None = None) -> str:
+    """mixer_check of every axis built (roll, and pitch: RIG_AXIS=1, u[2] through M's column 2)."""
     exes = exes or build()
-    r = subprocess.run([str(exes["mixer_check"])], capture_output=True, text=True, timeout=120)
-    if r.returncode != 0:
-        raise AssertionError(r.stdout + r.stderr)
-    return r.stdout.strip()
+    outs = []
+    for key in ("mixer_check", "mixer_check_pitch"):
+        if key not in exes:
+            continue
+        r = subprocess.run([str(exes[key])], capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            raise AssertionError(r.stdout + r.stderr)
+        outs.append(r.stdout.strip())
+    return "\n".join(outs)
 
 
 # =============================================================================================
@@ -252,6 +306,9 @@ def _kv(params: dict) -> list[str]:
 
 
 def run_twin(twin, scenario: Path, params: dict | None = None, csv_path=None, truth=None) -> dict:
+    """One run. The binary follows params' `axis` (twin_for): rig_twin for roll, rig_twin_pitch for
+    pitch."""
+    twin = twin_for(twin, _axis_of(params))
     args = [str(twin), f"scenario={scenario}", *_kv(params or {})]
     if csv_path:
         args.append(f"csv={csv_path}")
@@ -265,7 +322,12 @@ def run_twin(twin, scenario: Path, params: dict | None = None, csv_path=None, tr
 
 def run_batch(twin, scenario: Path, param_list: list[dict], jobs: int | None = None,
               workdir: Path | None = None) -> list[dict]:
-    """Many runs of one scenario, split over `jobs` twin processes. Results in input order."""
+    """Many runs of one scenario, split over `jobs` twin processes. Results in input order. All
+    runs share one axis (the binary follows it, twin_for)."""
+    axes = {_axis_of(p) for p in param_list} - {None}
+    if len(axes) > 1:
+        raise ValueError("run_batch: one axis per batch (the twin binary is per axis)")
+    twin = twin_for(twin, axes.pop() if axes else None)
     jobs = jobs or min(os.cpu_count() or 4, 48)
     tmp = tempfile.TemporaryDirectory(prefix="rig-batch-", dir=workdir)
     chunks = [list(range(i, len(param_list), jobs)) for i in range(min(jobs, len(param_list)))]
@@ -747,13 +809,22 @@ HW_1104 = {"ATT_P": 5.0, "ATT_I": 1.0, "RATE_P": 40.0, "RATE_D": 1.0, "ATT_GAIN"
 # axis; m g y = 2.7 mN m at 55 g, 5 mm) plus a tethered cable (ext_mNm), resting on the +30 stop.
 ASSIST_PLANT = {"theta0_deg": 30.0, "stop_deg": 30.0, "cg_y_mm": -5.0, "ext_mNm": 0.8,
                 "lipo": 1, "ocv": 4.15}
+# The same torque on the pitch rig (rig-pitch, the drone turned 90 deg): the CoM 5 mm FORWARD of the
+# pivot (cg_x_mm > 0, nose-down = toward +pitch; the twin's offset is -cg_x) plus the same 0.8 mN m,
+# resting on the +30 deg stop. (The cable runs along the pivot there, so 0.8 is a pessimistic stand-in
+# for whatever else loads it.)
+ASSIST_PLANT_PITCH = {"theta0_deg": 30.0, "stop_deg": 30.0, "cg_x_mm": 5.0, "ext_mNm": 0.8,
+                      "lipo": 1, "ocv": 4.15, "axis": 1}
 
 
-def study_liftoff_assist(exes, out=print, workdir=None, sweep=True) -> dict:
+def study_liftoff_assist(exes, out=print, workdir=None, sweep=True, axis=0) -> dict:
     """The lift-off assist (fc_rig.cpp LIFT-OFF ASSIST) against a steady 3-4 mN m torque toward
     the +30 deg stop: without it (LIFT_I 0) it never leaves the stop, as on hardware; with the
     defaults it lifts off at COLL 600 and 800. Then LIFT_I x LIFT_I_LIM at the nominal plant, and
-    the defaults over the plant box (thrust 0.7-1.3, tau, I, delay, h, imbalance; LiPo and PSU)."""
+    the defaults over the plant box (thrust 0.7-1.3, tau, I, delay, h, imbalance; LiPo and PSU).
+    axis=1: the same on the pitch rig (rig-pitch twin, ASSIST_PLANT_PITCH)."""
+    plant = ASSIST_PLANT_PITCH if axis else ASSIST_PLANT
+    ax = "pitch" if axis else "roll"
     scen_path = HERE / "scenarios/liftoff_assist.txt"
     base = scen_path.read_text()
     tmp = Path(tempfile.mkdtemp(prefix="rig-assist-", dir=workdir))
@@ -761,22 +832,23 @@ def study_liftoff_assist(exes, out=print, workdir=None, sweep=True) -> dict:
     keys = ("status", "liftoff_ms", "liftoff_att_int", "att_int_peak", "guard_margin_live_deg",
             "roll_min_live_deg", "settle_level_ms", "peak_duty")
     rep = {"nominal": {}, "sweep": [], "box": {}}
-    out("\n== lift-off assist: +30 deg stop, 3.5 mN m toward it (cg_y -5 mm + cable 0.8), LiPo ==")
+    out(f"\n== lift-off assist, {ax.upper()} rig: +30 deg stop, 3.5 mN m toward it "
+        f"({'cg_x +5' if axis else 'cg_y -5'} mm + cable 0.8), LiPo ==")
     for coll in (600, 800):
         for name, g in (("no assist", dict(HW_1104, LIFT_I=0)), ("assist", dict(HW_1104)),
                         ("assist ATT_I 2", dict(HW_1104, ATT_I=2.0)),
                         ("ATT_I_LIM 1", dict(HW_1104, ATT_I_LIM=1.0))):
-            js = run_twin(exes["twin"], scens[coll], dict(ASSIST_PLANT, gains=g))
+            js = run_twin(exes["twin"], scens[coll], dict(plant, gains=g))
             r = {k: js.get(k) for k in keys}
             rep["nominal"][f"{coll} {name}"] = r
             out(f"  COLL {coll} {name:<15} {r['status']:<30} lift-off {_fmt(r['liftoff_ms'], 0)} ms, "
                 f"att_int {_fmt(r['liftoff_att_int'], 2)} -> {_fmt(r['att_int_peak'], 2)} rad/s, past level "
-                f"{_fmt(r['roll_min_live_deg'])} deg (min roll), guard margin {_fmt(r['guard_margin_live_deg'])} "
-                f"deg, |roll| < 2 deg {_fmt(r['settle_level_ms'], 0)} ms after lift-off")
+                f"{_fmt(r['roll_min_live_deg'])} deg (min {ax}), guard margin {_fmt(r['guard_margin_live_deg'])} "
+                f"deg, |{ax}| < 2 deg {_fmt(r['settle_level_ms'], 0)} ms after lift-off")
     if sweep:
         grid = [(li, ll, coll, tq) for li in (1, 2, 4, 6, 8, 10) for ll in (4, 6, 8)
                 for coll in (600, 800) for tq in (0.3, 1.3)]
-        plist = [dict(ASSIST_PLANT, ext_mNm=tq, gains=dict(HW_1104, LIFT_I=li, LIFT_I_LIM=ll))
+        plist = [dict(plant, ext_mNm=tq, gains=dict(HW_1104, LIFT_I=li, LIFT_I_LIM=ll))
                  for li, ll, coll, tq in grid]
         res = []
         for coll in (600, 800):
@@ -784,7 +856,7 @@ def study_liftoff_assist(exes, out=print, workdir=None, sweep=True) -> dict:
             for i, js in zip(idx, run_batch(exes["twin"], scens[coll], [plist[i] for i in idx])):
                 res.append((grid[i], js))
         out("  sweep (hw gains, 3.0 and 4.0 mN m, COLL 600/800): LIFT_I LIFT_I_LIM -> ok/n, worst "
-            "lift-off ms, min roll after lift-off, min guard margin")
+            f"lift-off ms, min {ax} after lift-off, min guard margin")
         for li in (1, 2, 4, 6, 8, 10):
             for ll in (4, 6, 8):
                 rs = [js for gr, js in res if gr[0] == li and gr[1] == ll]
@@ -800,7 +872,7 @@ def study_liftoff_assist(exes, out=print, workdir=None, sweep=True) -> dict:
                     f"{_fmt(row['roll_min_live_deg']):>6}  {_fmt(row['guard_margin_live_deg']):>5}")
         pts = box_points()
         for coll in (600, 800):
-            plist = [dict(p, **ASSIST_PLANT, gains=dict(HW_1104)) for p in pts]
+            plist = [dict(p, **plant, gains=dict(HW_1104)) for p in pts]
             rs = run_batch(exes["twin"], scens[coll], plist)
             ok = [js for js in rs if js["status"] == "ok"]
             bad = [p for p, js in zip(pts, rs) if js["status"] != "ok"]
@@ -810,7 +882,7 @@ def study_liftoff_assist(exes, out=print, workdir=None, sweep=True) -> dict:
                                 "guard_margin_live_deg": _min_none(j["guard_margin_live_deg"] for j in ok),
                                 "not_ok_thrust_scale": sorted({p["thrust_scale"] for p in bad})}
             b = rep["box"][coll]
-            out(f"  box, defaults, COLL {coll}: {b['ok']}/{b['n']} ok, lift-off {b['liftoff_ms']} ms, min roll "
+            out(f"  box, defaults, COLL {coll}: {b['ok']}/{b['n']} ok, lift-off {b['liftoff_ms']} ms, min {ax} "
                 f"after lift-off {_fmt(b['roll_min_live_deg'])} deg, guard margin >= "
                 f"{_fmt(b['guard_margin_live_deg'])} deg; not ok at thrust_scale {b['not_ok_thrust_scale']}")
     shutil.rmtree(tmp, ignore_errors=True)
@@ -946,7 +1018,7 @@ def run_one(args, exes):
     params["gains"] = dict(kv.split("=", 1) for kv in (args.gain or []))
     if getattr(args, "axis", "roll") == "pitch":
         params.setdefault("axis", 1)
-    js = run_twin(exes["twin"], scen, params, csv_path=args.csv, truth=args.truth)
+    js = run_twin(exes, scen, params, csv_path=args.csv, truth=args.truth)   # twin per axis
     print(json.dumps(js, indent=1))
     if args.csv and args.step_mdeg:
         m = analyze_csv(args.csv, {"type": "step", "target": "att", "amp": args.step_mdeg,
@@ -978,7 +1050,10 @@ def main(argv=None):
     mp.add_argument("--coll", type=int, default=1000)
     mp.add_argument("--grid", default="quick", help="quick | full | JSON {NAME: [values]}")
     sub.add_parser("liftoff")
-    sub.add_parser("liftoff-assist")
+    la = sub.add_parser("liftoff-assist")
+    la.add_argument("--axis", choices=("roll", "pitch"), default="roll",
+                    help="pitch: the rig-pitch twin, CoM forward of the pivot (ASSIST_PLANT_PITCH)")
+    la.add_argument("--no-sweep", action="store_true", help="nominal runs only (no LIFT_I sweep / box)")
     sub.add_parser("unstable-h")
     sub.add_parser("noise")
     rp = sub.add_parser("report")
@@ -1003,7 +1078,7 @@ def main(argv=None):
     elif args.cmd == "liftoff":
         study_liftoff(exes)
     elif args.cmd == "liftoff-assist":
-        study_liftoff_assist(exes)
+        study_liftoff_assist(exes, sweep=not args.no_sweep, axis=1 if args.axis == "pitch" else 0)
     elif args.cmd == "unstable-h":
         study_unstable_h(exes)
     elif args.cmd == "noise":

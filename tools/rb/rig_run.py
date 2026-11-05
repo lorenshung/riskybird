@@ -1119,7 +1119,10 @@ class RealClock:
 
 
 class SimClock:
-    """Virtual seconds running `speed` times faster than real time (dry runs, tests)."""
+    """Virtual seconds running `speed` times faster than real time. Any host stall (GC pause, CPU
+    load) is multiplied by `speed` into virtual time that no thread got to use: at 10x a 30 ms
+    stall of the heartbeat thread reads as a 300 ms HB gap to the fake FC. Dry runs and the
+    tests use VirtualClock; this one stays for callers that want plain scaled wall time."""
 
     def __init__(self, speed=10.0, wall0=None):
         self.speed = float(speed)
@@ -1138,6 +1141,140 @@ class SimClock:
 
     def wait(self, event, s):
         return event.wait(max(0.0, s) / self.speed)
+
+
+class VirtualClock:
+    """Discrete virtual time for dry runs and tests, shared by the fake drone and the runner's
+    threads (the thread in Runner.run, the heartbeat, the stat poller: the participants).
+
+    Time moves only while every live participant is parked in a clock call (sleep, wait, or one
+    of the hooks below), and then jumps to the earliest wake-up; participants due at the same
+    instant leave one at a time, in enrolment order. So nothing a participant computes, and no
+    host stall (GC pause, CPU load), costs virtual time: the fake FC sees the HB gaps and the
+    run times the runner asked for, whatever the machine is doing. `speed` caps virtual time at
+    that many times real time, so threads outside the clock (the TUI, a test helper writing
+    control.json) still get real time to act, as with SimClock.
+
+    The hooks are what a participant would otherwise block on outside the clock. RealClock and
+    SimClock do not have them; the callers then do exactly what they did before (see _hook):
+      cv_wait(cv, s, ready)  TxPacer's Condition wait (released while parked)
+      join_thread(t, s)      Heartbeat.stop / StatPoller.stop
+      locked(lock)           StatPoller's session_lock (held by the runner across a sleep)
+      enroll(t)              a participant from before its first clock call"""
+
+    POLL_S = 0.002          # real-time poll for conditions changed outside the clock
+    STALL_S = 120.0         # one park longer than this (real s) is a deadlock: raise, do not hang
+    CATCH_UP_S = 0.05       # real s of lag the speed cap lets virtual time make up in one jump
+
+    def __init__(self, speed=10.0, wall0=None):
+        self.speed = float(speed)
+        self.w0 = time.time() if wall0 is None else wall0
+        self.t = 0.0
+        self._cv = threading.Condition(threading.Lock())
+        self._threads = []          # participants, in enrolment order
+        self._parked = {}           # thread -> (virtual deadline, ready() or None)
+        self._v_anchor, self._r_anchor = 0.0, time.monotonic()
+
+    def now(self):
+        return self.t
+
+    def wall(self):
+        return self.w0 + self.t
+
+    def sleep(self, s):
+        if s > 0:
+            self._park(self.t + s)
+
+    def wait(self, event, s):
+        if not event.is_set():
+            self._park(self.t + max(0.0, s), event.is_set)
+        return event.is_set()
+
+    def cv_wait(self, cv, s, ready):
+        cv.release()
+        try:
+            self._park(self.t + max(0.0, s), ready)
+        finally:
+            cv.acquire()
+        return ready()
+
+    def join_thread(self, thread, s):
+        if thread is not threading.current_thread():
+            self._park(self.t + max(0.0, s), lambda: not thread.is_alive())
+
+    @contextlib.contextmanager
+    def locked(self, lock):
+        while not lock.acquire(blocking=False):
+            self._park(math.inf, lambda: not lock.locked())
+        try:
+            yield
+        finally:
+            lock.release()
+
+    def enroll(self, thread=None):
+        thread = thread or threading.current_thread()
+        with self._cv:
+            if thread not in self._threads:
+                self._threads.append(thread)
+
+    def _due(self, entry):
+        deadline, ready = entry
+        return self.t >= deadline or (ready is not None and ready())
+
+    def _next(self):
+        """With _cv held: (the parked participant that may run now or None, real s to wait)."""
+        # not started yet counts as running (enrolled at construction); dead ones drop out
+        self._threads = [th for th in self._threads if th.ident is None or th.is_alive()]
+        if any(th not in self._parked for th in self._threads):
+            return None, self.POLL_S
+        for th in self._threads:
+            if self._due(self._parked[th]):
+                return th, 0.0
+        deadline = min(d for d, _ in self._parked.values())
+        if deadline == math.inf:
+            return None, self.POLL_S            # every participant waits on a condition
+        r = time.monotonic()
+        allowed = self._v_anchor + (r - self._r_anchor) * self.speed
+        if deadline > allowed:
+            return None, min(self.POLL_S, (deadline - allowed) / self.speed)
+        self._r_anchor = max(self._r_anchor + (deadline - self._v_anchor) / self.speed,
+                             r - self.CATCH_UP_S)
+        self._v_anchor = self.t = deadline
+        self._cv.notify_all()
+        for th in self._threads:
+            if self._due(self._parked[th]):
+                return th, 0.0
+        return None, self.POLL_S
+
+    def _park(self, deadline, ready=None):
+        me = threading.current_thread()
+        with self._cv:
+            if me not in self._threads:
+                self._threads.append(me)
+            self._parked[me] = (deadline, ready)
+            self._cv.notify_all()               # a participant just parked: someone may run
+            t0 = time.monotonic()
+            try:
+                while True:
+                    th, wait_s = self._next()
+                    if th is me:
+                        return
+                    if th is not None:
+                        self._cv.notify_all()
+                    if time.monotonic() - t0 > self.STALL_S:
+                        running = [x.name for x in self._threads if x not in self._parked]
+                        raise RuntimeError("VirtualClock: %s parked %.0f s real at t=%.3f; running "
+                                           "outside the clock: %s" % (me.name, self.STALL_S,
+                                                                      self.t, running or "none"))
+                    self._cv.wait(max(wait_s, 1e-4))
+            finally:
+                self._parked.pop(me, None)
+
+
+def _hook(clock, name):
+    """A VirtualClock-only hook, or None: RealClock (hardware) and SimClock have none, and every
+    caller then runs the code it ran before the hook existed."""
+    return getattr(clock, name, None)
 
 
 # =============================================================================
@@ -1164,12 +1301,17 @@ class TxPacer:
 
     @contextlib.contextmanager
     def slot(self, priority=False):
+        cv_wait = _hook(self.clock, "cv_wait")
         with self.cv:
             if priority:
                 self.prio_waiting += 1
             try:
                 while self.busy or (not priority and self.prio_waiting):
-                    self.cv.wait(0.05)
+                    if cv_wait is None:
+                        self.cv.wait(0.05)
+                    else:
+                        cv_wait(self.cv, 0.05,
+                                lambda: not (self.busy or (not priority and self.prio_waiting)))
                 self.busy = True
             finally:
                 if priority:
@@ -2260,6 +2402,9 @@ class Heartbeat(threading.Thread):
         super().__init__(name="rig-hb", daemon=True)
         self.link, self.clock = link, clock
         self.stop_evt = threading.Event()
+        enroll = _hook(clock, "enroll")
+        if enroll is not None:
+            enroll(self)
         self.count = 0
         self.errors = 0
         self.max_gap = 0.0
@@ -2289,7 +2434,11 @@ class Heartbeat(threading.Thread):
     def stop(self):
         self.stop_evt.set()
         if self.is_alive() and threading.current_thread() is not self:
-            self.join(timeout=2.0)
+            join = _hook(self.clock, "join_thread")
+            if join is None:
+                self.join(timeout=2.0)
+            else:
+                join(self, 2.0)
 
 
 class StatPoller(threading.Thread):
@@ -2309,11 +2458,15 @@ class StatPoller(threading.Thread):
         self.last_error = None
         self.enabled = threading.Event()
         self.enabled.set()
+        enroll = _hook(clock, "enroll")
+        if enroll is not None:
+            enroll(self)
 
     def run(self):
+        locked = _hook(self.clock, "locked")
         while not self.stop_evt.is_set():
             if self.enabled.is_set():
-                with self.session_lock:
+                with self.session_lock if locked is None else locked(self.session_lock):
                     try:
                         line = self.link.stat()
                         parsed = T.parse_rblink(line)
@@ -2349,7 +2502,11 @@ class StatPoller(threading.Thread):
         self.stop_evt.set()
         self.kick.set()
         if self.is_alive():
-            self.join(timeout=5.0)
+            join = _hook(self.clock, "join_thread")
+            if join is None:
+                self.join(timeout=5.0)
+            else:
+                join(self, 5.0)
 
 
 class StatusWriter(threading.Thread):
@@ -2569,7 +2726,7 @@ class Runner:
 
     # ---- waiting: the one place control.json, the TUI's estops and the drone are watched ----
     def poll_control(self):
-        now = time.monotonic()
+        now = self.clock.now()          # RealClock: time.monotonic()
         if now < self.ctl_next:
             return
         self.ctl_next = now + 0.1
@@ -2663,6 +2820,9 @@ class Runner:
 
     def run(self):
         """-> batch status string. Exceptions are recorded, ESTOPped and re-raised."""
+        enroll = _hook(self.clock, "enroll")     # VirtualClock: this thread is a participant
+        if enroll is not None:
+            enroll(threading.current_thread())
         self.write_batch_json()
         self.j("batch_start", n_trials=self.n_trials, dry_run=self.dry_run, axis=AX.name(self.axis),
                mode=self.mode)
@@ -3462,7 +3622,7 @@ def cmd_run(a):
     name = spec["name"] + ("-dryrun" if a.dry_run else "")
     bdir = make_batch_dir(a.out_dir, name)
     if a.dry_run:
-        clock = SimClock(a.speed)
+        clock = VirtualClock(a.speed)
         link = FakeDrone(clock, seed=a.seed, mass_kg=spec["mass_kg"], axis=axis)
         approval = a.i_have_approval or "dry run: fake drone, no hardware"
     else:
@@ -3558,7 +3718,7 @@ def add_run_arguments(p):
                    help="required for hardware: who approved this campaign, recorded in batch.json")
     p.add_argument("--dry-run", action="store_true",
                    help="fake drone in-process (state machine, timing, roll model); no sockets")
-    p.add_argument("--speed", type=float, default=5.0, help="dry run: virtual time speed-up")
+    p.add_argument("--speed", type=float, default=5.0, help="dry run: virtual time runs at most this many times real time")
     p.add_argument("--seed", type=int, default=1, help="dry run: noise seed")
     p.add_argument("--check", action="store_true", help="validate and print the spin plan; send nothing")
     p.add_argument("--elf", help="the running rig ELF (fetch, --verify-poke, batch.json sha1)")

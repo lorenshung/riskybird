@@ -1,5 +1,5 @@
 """tools/rb/rig_run.py: spec validation, the firmware mirror, segmentation, and whole dry-run
-batches against the in-process fake drone (FakeDrone + SimClock).
+batches against the in-process fake drone (FakeDrone + VirtualClock).
 
 Nothing here opens a socket to the drone: the dry-run tests run under a socket guard that
 fails any send or connect to 192.168.4.1, and RealLink is never constructed. Metrics need numpy
@@ -91,7 +91,7 @@ class Batch:
     def __init__(self, raw, committed=True, analyze=None, fake_kw=None, speed=SPEED, **runner_kw):
         self.tmp = tempfile.TemporaryDirectory()
         self.spec = R.validate_spec(raw)
-        self.clock = R.SimClock(speed)
+        self.clock = R.VirtualClock(speed)
         self.fake = R.FakeDrone(self.clock, committed=committed, **(fake_kw or {}))
         self.dir = R.make_batch_dir(self.tmp.name, self.spec["name"])
         self.runner = R.Runner(self.spec, self.dir, self.fake, self.clock, approval="unit test",

@@ -71,7 +71,8 @@ class RigSim(unittest.TestCase):
     # ---- the transcription -------------------------------------------------------------------
     def test_mixer_matches_controller_pid(self):
         out = rig_sim.mixer_check(self.exes)
-        self.assertIn("ok mixer", out)
+        self.assertIn("ok mixer roll", out)
+        self.assertIn("ok mixer pitch", out)   # rig-pitch: u[2] through M's column 2, rear pair up
 
     # ---- the recorder contract ----------------------------------------------------------------
     def test_csv_columns_match_recorder(self):
@@ -187,6 +188,11 @@ class RigSim(unittest.TestCase):
         self.assertEqual({k: live.get(k) for k in rig_sim.TWIN_KEYS},
                          {k: fallback.get(k) for k in rig_sim.TWIN_KEYS})
         self.assertFalse([k for k in live if k.startswith("CONFIG_")])
+        # rig-pitch = rig-roll + RIG_AXIS=1, in boards.py and in the fallback
+        pitch = rig_sim.rig_defines(1)
+        self.assertEqual(pitch, dict(live, **rig_sim.RIG_PITCH_EXTRA))
+        self.assertEqual({k: pitch.get(k) for k in rig_sim.TWIN_KEYS},
+                         {k: dict(fallback, **rig_sim.RIG_PITCH_EXTRA).get(k) for k in rig_sim.TWIN_KEYS})
 
     def test_plant_defaults_match_twin(self):
         out = subprocess.run([str(self.exes["twin"]), "help"], capture_output=True, text=True).stdout

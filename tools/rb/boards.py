@@ -1416,53 +1416,62 @@ def _with_photo_modes(workload: Workload, table=PHOTO_MODES) -> Workload:
 # uses no flow, and the build only notes that the flow-spi alias is unused. The rig gains default
 # to the build's ATT_GAIN / MOTOR_TRIM_LEFT, i.e. esp-motors' 1.0 / 0.87, not t21's 0.85 / 1.0:
 # set them with GAIN before the first run.
+# (CMake -D, preprocessor -D) shared by rig-roll and rig-pitch: one copy, so the two cannot drift.
+_RIG_CMAKE = (
+    ("ROSE_RIG", "1"),
+    ("ROSE_AUTOFLIGHT", "1"),
+    ("ROSE_UART_CMD", "1"),
+    ("ROSE_FLIGHT_COMMIT", "1"),
+    ("ROSE_COMMIT_MAX_MS", "900000"),   # 15 min from the first spin: one batch per load
+    ("ROSE_ARM_NO_GESTURE", "1"),
+    ("PID_MASS_KG", "0.050f"),
+    ("AUTOFLIGHT_MAX_DUTY", "0.95f"),
+    ("ROSE_BATT_REPORT_ONLY", "0"),
+    ("ROSE_TELEM_DIV", "50"),
+    ("ROSE_FLIGHTREC", "1"),
+    ("ROSE_FLOW", "0"),
+    # uart1 RX from its interrupt (main.cpp uart1_rx_isr, fc_uart_rx.h): polled once a
+    # tick, the 8-byte RX FIFO overflowed and uplink lines were lost. A -DCONFIG_ here, like
+    # the workload's CONFIG_UART_SIFIVE_PORT_1, because a derived mode builds with its base's
+    # .conf fragments (layout_mode) and a flight_controller-rig-roll.conf would never be
+    # read. TX stays polled; uart0 (console) only gains an unused, disabled IRQ hookup.
+    ("CONFIG_UART_INTERRUPT_DRIVEN", "y"),
+)
+_RIG_CPPFLAGS = (
+    ("ROSE_VEL_LOOP", "0"),
+    ("ROSE_TELEM_CONSOLE", "0"),
+    ("FLIGHTREC_DIV", "4"),
+    # Start from the gains t21-hover-1.0m flew (its preset), not esp-motors' bench
+    # defaults: MOTOR_TRIM_LEFT 0.87 there was measured as a -6 deg bank.
+    ("ATT_GAIN", "0.85f"),
+    ("MOTOR_TRIM_LEFT", "1.0f"),
+    ("IMU_OFFSET_Y", "0.016f"),
+    # v2 stand: rigid blockers at ~15 deg; raise for a 30 deg stop. fc_rig.cpp's own
+    # defaults (0.44f / tilt - 0.09f) are sized for the 30 deg stop.
+    ("RIG_MAX_TILT_RAD", "0.227f"),   # 13 deg tilt guard, inside the ~15 deg blockers
+    ("RIG_TGT_MAX_RAD", "0.14f"),     # 8 deg roll-target clamp
+    # LiPo on the rig: t21's cutoff. The 3.2 V default estops on normal sag at hover
+    # collective (sim twin, R0 ~0.18 ohm); the bench PSU browns the ESP out above ~0.45 duty.
+    ("BATT_CUTOFF_V", "3.0f"),
+    # Time allowed from the end of RAMP_UP to come off the stop before ramping down. 8 s
+    # while a tethered USB cable loads one side; the 2 s default is for an untethered drone.
+    ("RIG_LIFTOFF_TIMEOUT_MS", "8000"),
+)
+_RIG_NOTE = (
+    "NOT A FLIGHT BUILD -- %s harness only: the drone on the 1-DOF %s pivot%s, arming over the "
+    "uplink (RESET + HB + COLL), %s gains set live; it has no altitude, velocity or free-fall "
+    "protection and must NEVER be flown free"
+)
+# rig-pitch: the same build with RIG_AXIS=1 -- the drone turned 90 deg in the cradle, so the pivot
+# is PITCH. fc_rig.cpp then controls pitch (gyro y, u[2], the rear/front pairs), guards roll as the
+# locked axis, and its RIG line ends ax=P (RIG-SPEC "Pitch axis"). A cppflag, so it lands on the
+# build record's cppflags: line, which tools/rb/rig_axis.py falls back to when the ELF has no
+# g_rig_axis symbol. The roll-named tuning (RIG_MAX_TILT_RAD, RIG_TGT_MAX_RAD, ROLL_TRIM) applies to
+# the controlled axis, so the v2 stand's values carry over to the turned drone unchanged.
 RIG_MODES = (
-    (
-        "rig-roll", "esp-motors",
-        (
-            ("ROSE_RIG", "1"),
-            ("ROSE_AUTOFLIGHT", "1"),
-            ("ROSE_UART_CMD", "1"),
-            ("ROSE_FLIGHT_COMMIT", "1"),
-            ("ROSE_COMMIT_MAX_MS", "900000"),   # 15 min from the first spin: one batch per load
-            ("ROSE_ARM_NO_GESTURE", "1"),
-            ("PID_MASS_KG", "0.050f"),
-            ("AUTOFLIGHT_MAX_DUTY", "0.95f"),
-            ("ROSE_BATT_REPORT_ONLY", "0"),
-            ("ROSE_TELEM_DIV", "50"),
-            ("ROSE_FLIGHTREC", "1"),
-            ("ROSE_FLOW", "0"),
-            # uart1 RX from its interrupt (main.cpp uart1_rx_isr, fc_uart_rx.h): polled once a
-            # tick, the 8-byte RX FIFO overflowed and uplink lines were lost. A -DCONFIG_ here, like
-            # the workload's CONFIG_UART_SIFIVE_PORT_1, because a derived mode builds with its base's
-            # .conf fragments (layout_mode) and a flight_controller-rig-roll.conf would never be
-            # read. TX stays polled; uart0 (console) only gains an unused, disabled IRQ hookup.
-            ("CONFIG_UART_INTERRUPT_DRIVEN", "y"),
-        ),
-        (
-            ("ROSE_VEL_LOOP", "0"),
-            ("ROSE_TELEM_CONSOLE", "0"),
-            ("FLIGHTREC_DIV", "4"),
-            # Start from the gains t21-hover-1.0m flew (its preset), not esp-motors' bench
-            # defaults: MOTOR_TRIM_LEFT 0.87 there was measured as a -6 deg bank.
-            ("ATT_GAIN", "0.85f"),
-            ("MOTOR_TRIM_LEFT", "1.0f"),
-            ("IMU_OFFSET_Y", "0.016f"),
-            # v2 stand: rigid blockers at ~15 deg; raise for a 30 deg stop. fc_rig.cpp's own
-            # defaults (0.44f / tilt - 0.09f) are sized for the 30 deg stop.
-            ("RIG_MAX_TILT_RAD", "0.227f"),   # 13 deg tilt guard, inside the ~15 deg blockers
-            ("RIG_TGT_MAX_RAD", "0.14f"),     # 8 deg roll-target clamp
-            # LiPo on the rig: t21's cutoff. The 3.2 V default estops on normal sag at hover
-            # collective (sim twin, R0 ~0.18 ohm); the bench PSU browns the ESP out above ~0.45 duty.
-            ("BATT_CUTOFF_V", "3.0f"),
-            # Time allowed from the end of RAMP_UP to come off the stop before ramping down. 8 s
-            # while a tethered USB cable loads one side; the 2 s default is for an untethered drone.
-            ("RIG_LIFTOFF_TIMEOUT_MS", "8000"),
-        ),
-        "NOT A FLIGHT BUILD -- roll harness only: the drone on the 1-DOF roll pivot, arming over "
-        "the uplink (RESET + HB + COLL), roll gains set live; it has no altitude, velocity or "
-        "free-fall protection and must NEVER be flown free",
-    ),
+    ("rig-roll", "esp-motors", _RIG_CMAKE, _RIG_CPPFLAGS, _RIG_NOTE % ("roll", "roll", "", "roll")),
+    ("rig-pitch", "esp-motors", _RIG_CMAKE, _RIG_CPPFLAGS + (("RIG_AXIS", "1"),),
+     _RIG_NOTE % ("pitch", "pitch", " (turned 90 deg in the cradle)", "pitch")),
 )
 
 

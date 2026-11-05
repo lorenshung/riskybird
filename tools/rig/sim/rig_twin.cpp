@@ -30,7 +30,7 @@
 // duty[1]/duty[2]), gravity acts through h_mm and cg_x_mm (CoM forward = nose-down torque), and
 // `imbalance` splits rear/front. ext_mNm (the tethered USB cable) acts about the pivot whatever the
 // axis; with the cable routed along the pitch pivot it is ~0, its default. The FC side is
-// "the law in the pitch build's frame": see TWIN_FW_AXIS_AWARE below.
+// the REAL pitch build (fc_rig.cpp compiled with -DRIG_AXIS=1): see TWIN_FW_AXIS_AWARE below.
 #include "fc_rig.h"
 #include "fc_shared_math.h"
 #include "rig_mixer.h"
@@ -97,17 +97,23 @@
 #endif
 
 // ---- the controlled axis on the FC side ---------------------------------------------------------
-// TWIN_FW_AXIS_AWARE is THE switch for the pitch rig. fc_rig.cpp does not know RIG_AXIS yet, so for
-// axis=1 the twin (0) feeds the REAL fc_rig_step / fc_rig_roll_law the pitch build's view: the
-// controlled angle and rate in the roll slots, the locked roll in the pitch slot (so the tilt guard
-// guards pitch and RIG_PITCH_MAX_RAD guards roll), and moves the law's moment to u[2] -- the flight
-// PID's pitch path, u[2] = pitchRate_cmd * J[1] * ATT_GAIN, is the roll path with J[1] == J[0]
-// (rig_mixer.h J_PITCH, checked by the tests) -- and takes the saturation on the pitch pairs.
-// Once fc_rig.cpp handles -DRIG_AXIS itself (physical roll/pitch/gyro in, u[1] or u[2] and
-// physical dbg.roll/pitch out, its own saturation pairs), set this to 1 and build the pitch twin
-// with -DRIG_AXIS=1 (rig_sim.build(extra={"RIG_AXIS": "1"})).
+// TWIN_FW_AXIS_AWARE=1 (the default): fc_rig.cpp selects its axis itself (-DRIG_AXIS, rig-pitch),
+// so the twin hands the REAL fc_rig_step / fc_rig_roll_law / fc_rig_moment_saturation the PHYSICAL
+// roll, pitch and gyro[3] exactly as main.cpp and controller_pid.cpp do, and the firmware puts the
+// pitch moment in u[2], guards roll as the locked axis and takes the saturation on the rear/front
+// pairs. One axis per binary: rig_sim.py builds rig_twin (rig-roll's defines) and rig_twin_pitch
+// (rig-pitch's: RIG_AXIS=1), and `axis` defaults to the binary's RIG_AXIS.
+// TWIN_FW_AXIS_AWARE=0 is the earlier transcription, kept as a cross-check of the firmware's pitch
+// path: a ROLL build (RIG_AXIS 0) fed the pitch build's view for axis=1 -- the controlled angle and
+// rate in the roll slots, the locked roll in the pitch slot, the law's moment moved to u[2] (the
+// flight PID's pitch path is the roll path with J[1] == J[0], rig_mixer.h J_PITCH) and the
+// saturation on the pitch pairs. tests/test_rig_pitch.py runs both on one scenario and requires the
+// same numbers.
 #ifndef TWIN_FW_AXIS_AWARE
-#define TWIN_FW_AXIS_AWARE 0
+#define TWIN_FW_AXIS_AWARE 1
+#endif
+#if !TWIN_FW_AXIS_AWARE && RIG_AXIS != 0
+#error "TWIN_FW_AXIS_AWARE=0 remaps axis=1 onto a ROLL build: compile it with RIG_AXIS 0"
 #endif
 
 // fc_rig_step inputs: (angle into roll_rad, angle into pitch_rad, gyro[]) for the build's axis.
@@ -184,7 +190,7 @@ static const ParamInfo PARAMS[] = {
 	{"h_mm", 1.0, "mm, CoM below the pivot axis (negative = above: unstable)"},
 	{"cg_y_mm", 0.0, "mm, CoM lateral offset (+ = left: a torque toward -roll)"},
 	{"ext_mNm", 0.0, "mN m, constant external torque, + = toward +roll (right wing down): a tethered cable"},
-	{"axis", 0.0, "0 = roll rig (rig-roll), 1 = pitch rig (rig-pitch: pivot turned 90 deg; I = Iyy, same prior)"},
+	{"axis", (double)RIG_AXIS, "0 = roll rig (rig-roll), 1 = pitch rig (rig-pitch: pivot turned 90 deg; I = Iyy, same prior); default: the build's RIG_AXIS"},
 	{"cg_x_mm", 0.0, "mm, CoM front/back offset (+ = forward: a torque toward +pitch, nose down); pitch rig"},
 	{"tau_up", 0.070, "s, thrust lag time constant, rising"},
 	{"tau_down", 0.070, "s, thrust lag time constant, falling"},

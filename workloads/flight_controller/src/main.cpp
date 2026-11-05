@@ -565,14 +565,14 @@ static inline const char *telem_batt_state(void)
  * format is a host contract (RIG-SPEC "Host-side contracts"; tools/rb rig parses it): st= keeps
  * the FC bit meanings, rs= adds the rig state (ESTOP while g_estop is latched), angles in mdeg,
  * gx in mrad/s, coll in per-mille of MASS*g, exc in milli-units of its target, duty in 1/10000.
- * rxo= and rxd= trail the line (parsers ignore fields they do not know): uart1 RX-ring overrun
- * bytes and dropped uplink lines since boot -- see g_uart1_* below. */
+ * rxo=/rxd=: uart1 RX-ring overrun bytes, dropped uplink lines (g_uart1_* below). ax= LAST: R|P,
+ * the controlled axis (g_rig_axis, read here so the ELF keeps it); r= p= gx= physical, sp= tgt= it. */
 #undef TELEM_LINE_FMT
 #undef TELEM_LINE_ARGS
 #define RIG_MDEG(rad) ((int)((rad) * 57295.78f))
 #define TELEM_LINE_FMT \
 	"RIG it=%u st=%d rs=%s r=%d p=%d gx=%d sp=%d tgt=%d coll=%d exc=%d ex=%u gs=%u " \
-	"d=[%d %d %d %d] vb=%d rxo=%u rxd=%u\n"
+	"d=[%d %d %d %d] vb=%d rxo=%u rxd=%u ax=%c\n"
 #define TELEM_LINE_ARGS \
 	(unsigned)iter, \
 	(g_armed ? 1 : 0) | (g_estop ? 2 : 0) | (g_arming ? 4 : 0) | (g_gyro_cal_done ? 8 : 0), \
@@ -584,7 +584,7 @@ static inline const char *telem_batt_state(void)
 	(int)(g_last_duty[0] * 10000.0f), (int)(g_last_duty[1] * 10000.0f), \
 	(int)(g_last_duty[2] * 10000.0f), (int)(g_last_duty[3] * 10000.0f), \
 	(int)(g_vbat * 1000.0f), \
-	(unsigned)g_uart1_rx_overruns, (unsigned)g_uart1_lines_bad
+	(unsigned)g_uart1_rx_overruns, (unsigned)g_uart1_lines_bad, g_rig_axis ? 'P' : 'R'
 #endif
 
 /* ---- Sensor devices (Zephyr sensor API; bound per board overlay) ---- */
