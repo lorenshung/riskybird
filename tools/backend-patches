@@ -10,7 +10,7 @@ in this repository and reaches the backends two ways:
                   own projects).
                   Each link is also written to the owning repository's
                   info/exclude, so it never shows as untracked there.
-  patch queue     patches/<path of the checkout>/NNNN-*.patch, applied in name
+  patch queue     hardware/chipyard/patches/<path inside backends/chipyard>/NNNN-*.patch, applied in name
                   order, for the few edits that must change a backend's own
                   files. Only generic infrastructure goes here: each patch is a
                   candidate upstream pull request, deleted from the queue once
@@ -48,7 +48,10 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-QUEUE = ROOT / "patches"
+# The queue sits beside the Chipyard configs it patches; the directories under it mirror the
+# paths inside the backends/chipyard checkout (patches/fpga/fpga-shells -> backends/chipyard/fpga/fpga-shells).
+QUEUE = ROOT / "hardware/chipyard/patches"
+QUEUE_TARGET = ROOT / "backends/chipyard"
 OVERLAYS = ROOT / ".backend-overlays"
 
 
@@ -63,7 +66,7 @@ def git(repo: Path, *args: str, check: bool = True, env: dict | None = None) -> 
 def queues() -> list[tuple[Path, list[Path]]]:
     out = []
     for d in sorted({p.parent for p in QUEUE.rglob("*.patch")}):
-        out.append((ROOT / d.relative_to(QUEUE), sorted(d.glob("*.patch"))))
+        out.append((QUEUE_TARGET / d.relative_to(QUEUE), sorted(d.glob("*.patch"))))
     return out
 
 
