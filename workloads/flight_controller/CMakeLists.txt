@@ -327,7 +327,7 @@ if(ROSE_CAMERA)
   target_sources(app PRIVATE ${ROSE_CAMERA_DIR}/src/camera.c)
   target_include_directories(app PRIVATE
     ${ROSE_CAMERA_DIR}/include
-    ${ROSE_CAMERA_DIR}/../../camera_bringup/src)   # hm01b0.h
+    ${ROSE_CAMERA_DIR}/../../bringup/camera_bringup/src)   # hm01b0.h
   # Fail a dead sensor ~150 ms after MODE_SELECT instead of after the 6 s AE settle, so
   # photo_prepare() can reset and retry at boot (see ROSE_PHOTO_TRIES in main.cpp). The
   # 100 ms is camera_photo's proven MODE_SELECT -> PCLK check timing.
