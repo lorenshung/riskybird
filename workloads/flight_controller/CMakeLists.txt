@@ -78,7 +78,7 @@ set(ROSE_ACTUATE_TIMEOUT_MS 0 CACHE STRING "stop motor actuation N ms after boot
 # ROSE_FLIGHT_COMMIT is the BUILD-TIME half of a two-part interlock and is deliberately NOT set by
 # any --mode in tools/rb/boards.py: no mode name may quietly imply permission to fly. It has to be
 # typed, as RB_CMAKE_ARGS="-DROSE_FLIGHT_COMMIT=1". With it at 0 the run-time commit variable is not
-# compiled into the image at all, so hardware/flight/commit.gdb fails with "No symbol" -- the
+# compiled into the image at all, so tools/flight/gdb/commit.gdb fails with "No symbol" -- the
 # absence of that symbol is the proof that the image cannot be made to fly.
 #
 # The RUN-TIME half is the operator writing the key from a debugger, on the bench. Neither act alone

@@ -25,7 +25,7 @@
  * this is software on the Rocket core. The SiFive PWM block is separate
  * hardware and keeps driving whatever its comparators hold, so a halted, reset
  * or crashed CPU is NOT covered -- the comparators must still be zeroed before
- * the core is halted, exactly as hardware/flight/stop.gdb does. It also cannot
+ * the core is halted, exactly as tools/flight/gdb/stop.gdb does. It also cannot
  * outrun a fault faster than its sample period. It is a guard, not an interlock,
  * and the battery is still the only real kill switch.
  *
