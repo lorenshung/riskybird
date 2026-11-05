@@ -3,7 +3,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode autoflight \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/battery.gdb
+#       --gdb-script tools/flight/gdb/battery.gdb
 #
 # g_vbat is the smoothed pack voltage in volts, derived from ADS7128 AIN5
 # through the R30/R31 divider (Vbat = Vadc * 3, VREF = AVDD = 3V3, 12-bit).
@@ -26,7 +26,7 @@ printf "  arm floor     = 3.40 V (BATT_ARM_MIN_V -- refuses to ARM below)\n"
 printf "  in-flight cut = 3.20 V (BATT_CUTOFF_V  -- latches estop below)\n"
 
 printf "\n=== arming state ===\n"
-printf "  g_arm_enabled = %d  (0 = locked; hardware/flight/arm-enable.gdb sets it)\n", g_arm_enabled
+printf "  g_arm_enabled = %d  (0 = locked; tools/flight/gdb/arm-enable.gdb sets it)\n", g_arm_enabled
 printf "  g_estop       = %d\n", g_estop
 
 monitor resume

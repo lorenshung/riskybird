@@ -2,7 +2,7 @@
 #
 #   ./rb debug dronet --target arty200t --config <Config> --ram-console \
 #       --usb-location <debug-usb> --no-load --no-run \
-#       --gdb-script hardware/bench/dronet-where.gdb
+#       --gdb-script tools/bench/gdb/dronet-where.gdb
 #
 # The companion of hardware/modelblaster/dronet-capture.gdb for a run that hit
 # neither of its breakpoints. Attaches without loading, halts, and reports pc,

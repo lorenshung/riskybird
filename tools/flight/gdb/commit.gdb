@@ -6,7 +6,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode esp-motors \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/commit.gdb
+#       --gdb-script tools/flight/gdb/commit.gdb
 #
 # RUN THIS ONLY WHEN YOU ARE STANDING AT THE DRONE AND READY TO FLY.
 #

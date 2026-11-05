@@ -2,7 +2,7 @@
 #
 #   ./rb debug <workload> --target arty200t --config <Config> \
 #       --usb-location <debug-usb> --no-load --no-run \
-#       --gdb-script hardware/bench/accel-regs.gdb
+#       --gdb-script tools/bench/gdb/accel-regs.gdb
 #
 # Covers the OSPI capture core and its DMA block, uart0 (console), uart1 (ESP)
 # and the uart1 TX-DMA block. Use it after hardware/ospi/bootup-capture-halt.gdb

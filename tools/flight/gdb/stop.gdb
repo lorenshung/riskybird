@@ -3,7 +3,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode autoflight \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/stop.gdb
+#       --gdb-script tools/flight/gdb/stop.gdb
 #
 # `rb debug` with boot.gdb deliberately resumes the core and detaches, so the
 # drone keeps flying after GDB exits -- that is the point of it, and it means

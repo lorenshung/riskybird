@@ -3,7 +3,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode autoflight \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/arm-enable.gdb
+#       --gdb-script tools/flight/gdb/arm-enable.gdb
 #
 # PROPELLERS OFF unless the bench thrust test has already passed.
 #

@@ -2,7 +2,7 @@
 #
 #   ./rb debug <workload> --target arty200t --config <Config> \
 #       --usb-location <debug-usb> --no-load --no-run \
-#       --gdb-script hardware/bench/csr-dump.gdb
+#       --gdb-script tools/bench/gdb/csr-dump.gdb
 #
 # Used to compare what one image leaves behind against another: trap state,
 # translation (satp), PMP, delegation. Leaves the hart halted.

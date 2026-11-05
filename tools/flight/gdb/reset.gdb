@@ -4,7 +4,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode autoflight \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/reset.gdb
+#       --gdb-script tools/flight/gdb/reset.gdb
 #
 # After a completed flight the controller latches flight_done ("one-shot: don't
 # auto re-arm") and, if anything tripped, g_estop stays set until reset. Neither
@@ -45,7 +45,7 @@ set var g_reset_gen = g_reset_gen + 1
 printf "\n=== soft reset issued ===\n"
 printf "  latches cleared on the next control iteration; watch for:\n"
 printf "    flight_controller: SOFT RESET -- estop cleared, disarmed\n"
-printf "  arming left DISABLED -- run hardware/flight/arm-enable.gdb when ready,\n"
+printf "  arming left DISABLED -- run tools/flight/gdb/arm-enable.gdb when ready,\n"
 printf "  and expect it to arm ~1.5 s later without a new lift.\n"
 
 monitor resume

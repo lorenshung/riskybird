@@ -3,7 +3,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode autoflight \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/estop.gdb
+#       --gdb-script tools/flight/gdb/estop.gdb
 #
 # g_estop is the same latch the safety limits and the IMU-loss watchdog set.
 # Once latched, send_control() forces every motor to zero and the flight

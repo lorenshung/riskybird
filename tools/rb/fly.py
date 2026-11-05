@@ -43,7 +43,7 @@ from pathlib import Path
 
 from .boards import ROOT
 
-FLIGHT_GDB = ROOT / "hardware" / "flight"
+FLIGHT_GDB = ROOT / "tools" / "flight" / "gdb"
 FREERUN = FLIGHT_GDB / "freerun.gdb"
 STOP = FLIGHT_GDB / "stop.gdb"
 HALT = FLIGHT_GDB / "halt.gdb"
@@ -640,7 +640,7 @@ def gdb_step(args, script: Path) -> int:
 
 
 # ---------------------------------------------------------------------------------------------
-# Camera photo at the top of a flight (hardware/flight/photo.gdb)
+# Camera photo at the top of a flight (tools/flight/gdb/photo.gdb)
 # ---------------------------------------------------------------------------------------------
 
 _PHOTO_RE = re.compile(r"PHOTO-GDB state=(-?\d+) count=(\d+) width=(\d+) height=(\d+)")

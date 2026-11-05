@@ -2,9 +2,9 @@
 #
 #   ./rb debug flight_controller --target arty200t --config <Config> \
 #       --mode default --usb-location <debug-usb> --no-load --no-run \
-#       --gdb-script hardware/flight/tof-cal.gdb
+#       --gdb-script tools/flight/gdb/tof-cal.gdb
 #
-# Stop the image first with hardware/flight/stop.gdb, which zeroes the PWM
+# Stop the image first with tools/flight/gdb/stop.gdb, which zeroes the PWM
 # comparators before it halts the hart. Prints the control loop's cached height
 # (g_tof_h / g_tof_valid, which exist in hardware builds with the down-ToF, i.e.
 # the `tof` alias of flight_controller.overlay) and the ST driver's own state:

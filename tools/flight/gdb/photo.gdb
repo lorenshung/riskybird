@@ -4,7 +4,7 @@
 #
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode t21-hover-1.0m-photo \
-#       --usb-location <debug> --no-load --gdb-script hardware/flight/photo.gdb
+#       --usb-location <debug> --no-load --gdb-script tools/flight/gdb/photo.gdb
 #
 # The image is a photo build (--mode t21-hover-1.0m-photo, or photo-bench on the bench). It
 # captures one HM01B0 frame mid-hover, drains it into rose_photo_pixels[] once the motors are off, and

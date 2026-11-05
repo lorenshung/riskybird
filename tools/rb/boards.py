@@ -1350,7 +1350,7 @@ def flight_presets() -> dict[str, tuple[tuple[tuple[str, str], ...], tuple[tuple
 # change to t21-hover-1.0m.env reaches the photo build instead of silently forking from it.
 # The firmware side is workloads/lib/camera (ROSE_CAMERA; the sample's CMakeLists points
 # ROSE_CAMERA_DIR there by default). `rb fly photo` reads the frame back over JTAG after landing
-# (hardware/flight/photo.gdb).
+# (tools/flight/gdb/photo.gdb).
 PHOTO_CPPFLAGS = (
     ("RB_CAMERA_STATUS_LED", "0"),     # the LED pin belongs to the flight image
     ("RB_CAMERA_FRAME_LEN", "1000"),

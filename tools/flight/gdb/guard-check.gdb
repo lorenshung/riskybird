@@ -3,7 +3,7 @@
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --mode esp-motors \
 #       --usb-location <debug> --no-load --no-run \
-#       --gdb-script hardware/flight/guard-check.gdb
+#       --gdb-script tools/flight/gdb/guard-check.gdb
 #
 # THIS IS THE ANSWER TO "did it not trip, or is it not looking?" -- the question
 # that could not be answered on 2026-09-21, when a hand rotation to ~90 degrees

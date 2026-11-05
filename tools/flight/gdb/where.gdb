@@ -2,7 +2,7 @@
 #
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --usb-location 7-1.1.4.3 \
-#       --no-load --gdb-script hardware/flight/where.gdb
+#       --no-load --gdb-script tools/flight/gdb/where.gdb
 #
 # Attaching halts the hart, so this reports and then detaches (which resumes).
 # Use it to tell "the image is running and just not printing" from "the image
