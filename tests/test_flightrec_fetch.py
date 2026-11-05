@@ -3,7 +3,7 @@
 No hardware: esp_tsi_load (the ESP link) is replaced by a stub whose Tsi.read serves a
 header, a main ring and two preroll rings packed in memory, as the FC would hold them.
 Both layouts: v2 (flight) and v3/rig (ROSE_RIG=1, with the gain snapshot and change ring).
-FlightrecHostSim also compiles integration/zephyr/flightrec/src/flightrec.c on the host,
+FlightrecHostSim also compiles workloads/lib/flightrec/src/flightrec.c on the host,
 runs a scenario through it and reads its memory back through fetch().
 """
 
@@ -123,7 +123,7 @@ class FlightrecFetch(unittest.TestCase):
         F = _import_fetch(_stub_link({}))
         self.assertEqual(F.HDR_SIZE, 64)       # BUILD_ASSERTs in flightrec.c
         self.assertEqual(F.SAMPLE_SIZE, 84)
-        h = (ROOT / "integration/zephyr/flightrec/include/riskybird/flightrec.h").read_text()
+        h = (ROOT / "workloads/lib/flightrec/include/riskybird/flightrec.h").read_text()
         self.assertEqual(int(re.search(r"FLIGHTREC_MAGIC\s+(0x[0-9a-fA-F]+)u", h).group(1), 16),
                          F.MAGIC)
         self.assertEqual(int(re.search(r"FLIGHTREC_VERSION\s+(\d+)u", h).group(1)), F.VERSION)
@@ -172,7 +172,7 @@ RIG_CONTRACT_COLUMNS = (  # RIG-SPEC "Recorder v3 (rig) <-> runner contract", ve
     "pitch_cmd,yaw_cmd,accel_y,accel_z,vbat,duty0,duty1,duty2,duty3,"
     "axis,ang_deg,ang_tgt_deg,ang_rate_dps").split(",")   # + RIG-SPEC "Pitch axis", appended
 FC_SRC = ROOT / "workloads" / "flight_controller" / "src"
-FR_DIR = ROOT / "integration" / "zephyr" / "flightrec"
+FR_DIR = ROOT / "workloads" / "lib" / "flightrec"
 
 
 def _rig_header(F, *, cap, div, preroll, count, seg_start, seg_end, segments, frozen,

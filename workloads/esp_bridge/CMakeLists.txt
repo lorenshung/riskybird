@@ -17,11 +17,11 @@ target_sources(app PRIVATE src/main.c src/load_link.c src/persist.c)
 # mean the two builds disagree about their include paths, which is exactly the
 # kind of difference that turns "works in the bridge build" into a link error in
 # the one that drives motors.
-set(RB_MOTOR_LINK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../integration/zephyr/motor_link/include)
+set(RB_MOTOR_LINK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../lib/motor_link/include)
 if(NOT EXISTS ${RB_MOTOR_LINK_DIR}/riskybird/motor_link.h)
   message(FATAL_ERROR
     "esp_bridge: the shared motor-link header is missing at ${RB_MOTOR_LINK_DIR}. "
-    "It comes from integration/zephyr/motor_link/ -- the same directory "
+    "It comes from workloads/lib/motor_link/ -- the same directory "
     "flight_controller --mode esp-motors passes as ROSE_MOTOR_LINK_DIR.")
 endif()
 target_include_directories(app PRIVATE ${RB_MOTOR_LINK_DIR})

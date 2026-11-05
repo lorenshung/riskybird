@@ -12,7 +12,7 @@ target_sources(app PRIVATE src/main.c)
 # keeping a copy that can drift. The FPGA side reaches it through
 # ROSE_MOTOR_LINK_DIR (see the flight_controller workload registration).
 target_include_directories(app PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../integration/zephyr/motor_link/include)
+  ${CMAKE_CURRENT_SOURCE_DIR}/../lib/motor_link/include)
 
 # ---- the two knobs a flight test has to be able to reach ---------------------
 #

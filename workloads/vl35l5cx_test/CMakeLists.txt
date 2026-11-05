@@ -7,8 +7,8 @@ project(vl35l5cx_test)
 
 target_sources(app PRIVATE
   src/main.c
-  ${RB_ROOT}/integration/zephyr/tof/src/tof.c
+  ${RB_ROOT}/workloads/lib/tof/src/tof.c
 )
 target_include_directories(app PRIVATE
-  ${RB_ROOT}/integration/zephyr/tof/include
+  ${RB_ROOT}/workloads/lib/tof/include
 )

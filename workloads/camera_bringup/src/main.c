@@ -200,7 +200,7 @@ static int cam_reg_write(uint16_t reg, uint8_t val)
  * reprogrammed; killing every process on the host changes nothing. Only a power cycle or an
  * explicit write clears it.
  *
- * The rest of this repository already had the rule and wrote down why: integration/zephyr/tof
+ * The rest of this repository already had the rule and wrote down why: workloads/lib/tof
  * drives every channel low at start (rb_tof_hold_all) rather than preserving or raising
  * channels whose function it does not know. See docs/directory-changelog.md.
  *

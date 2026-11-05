@@ -392,8 +392,8 @@ class ContractTests(unittest.TestCase):
 
         tof_api = (
             ROOT
-            / "integration"
-            / "zephyr"
+            / "workloads"
+            / "lib"
             / "tof"
             / "include"
             / "riskybird"

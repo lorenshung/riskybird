@@ -1001,7 +1001,7 @@ WORKLOADS = {
                     # the build outright if it is missing.
                     (
                         "ROSE_MOTOR_LINK_DIR",
-                        str(ROOT / "integration" / "zephyr" / "motor_link"),
+                        str(ROOT / "workloads" / "lib" / "motor_link"),
                     ),
                     # ---- the stack that has actually flown this airframe ----
                     #
@@ -1348,7 +1348,7 @@ def flight_presets() -> dict[str, tuple[tuple[tuple[str, str], ...], tuple[tuple
 # its knobs are recorded in rb-build.txt like every other flight's. Built on a flown preset
 # through mode_bases rather than as a copied .env: the flight knobs stay exactly t21's, and a
 # change to t21-hover-1.0m.env reaches the photo build instead of silently forking from it.
-# The firmware side is integration/zephyr/camera (ROSE_CAMERA; the sample's CMakeLists points
+# The firmware side is workloads/lib/camera (ROSE_CAMERA; the sample's CMakeLists points
 # ROSE_CAMERA_DIR there by default). `rb fly photo` reads the frame back over JTAG after landing
 # (hardware/flight/photo.gdb).
 PHOTO_CPPFLAGS = (

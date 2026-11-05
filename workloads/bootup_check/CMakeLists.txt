@@ -14,20 +14,20 @@ project(bootup_check)
 target_sources(app PRIVATE
   src/main.c
   ../pmw3901_test/src/pmw3901.c
-  ${RB_ROOT}/integration/zephyr/tof/src/tof.c
-  ${RB_ROOT}/integration/zephyr/camera/src/camera.c
+  ${RB_ROOT}/workloads/lib/tof/src/tof.c
+  ${RB_ROOT}/workloads/lib/camera/src/camera.c
   # Attitude watchdog. Shared rather than copied: a safety guard that
   # exists in one workload's private copy is a guard the next workload
   # silently lacks.
-  ${RB_ROOT}/integration/zephyr/safety/src/motor_guard.c
+  ${RB_ROOT}/workloads/lib/safety/src/motor_guard.c
 )
 target_include_directories(app PRIVATE
   ../pmw3901_test/src
-  ${RB_ROOT}/integration/zephyr/tof/include
-  ${RB_ROOT}/integration/zephyr/camera/include
-  ${RB_ROOT}/integration/zephyr/safety/include
+  ${RB_ROOT}/workloads/lib/tof/include
+  ${RB_ROOT}/workloads/lib/camera/include
+  ${RB_ROOT}/workloads/lib/safety/include
   # motor_link frames for the --mode motors sweep (the ESP owns the gates).
-  ${RB_ROOT}/integration/zephyr/motor_link/include
+  ${RB_ROOT}/workloads/lib/motor_link/include
   # The HM01B0 register map is camera_bringup's, not a second copy of it, for
   # the reason camera_photo's CMakeLists gives: two copies drift silently.
   ${CMAKE_CURRENT_SOURCE_DIR}/../camera_bringup/src

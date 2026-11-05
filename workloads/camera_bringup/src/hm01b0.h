@@ -80,7 +80,7 @@
 
 /*
  * Readout-mode registers. Read-only unless RB_CAMERA_FULL_READOUT is defined
- * (see integration/zephyr/camera/src/camera.c), so by default whatever the
+ * (see workloads/lib/camera/src/camera.c), so by default whatever the
  * sensor powers up with is what it runs, and these exist so a capture can
  * REPORT its readout mode rather than assume it.
  *

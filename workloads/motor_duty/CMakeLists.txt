@@ -12,4 +12,4 @@ target_sources(app PRIVATE src/main.c)
 # than keeping copies that can drift; this one can name the path directly
 # because, unlike the flight controller, it lives inside this repository.
 target_include_directories(app PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../integration/zephyr/motor_link/include)
+  ${CMAKE_CURRENT_SOURCE_DIR}/../lib/motor_link/include)

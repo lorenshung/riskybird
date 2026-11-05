@@ -3,7 +3,7 @@
 
     rb flightlog fetch --port socket://192.168.4.1:14552 --mode <preset>
 
-(runs this in the zephyr env). The recorder is integration/zephyr/flightrec: a
+(runs this in the zephyr env). The recorder is workloads/lib/flightrec: a
 ring of samples in DDR, one per control tick (or every div-th), frozen
 FLIGHTREC_TAIL_MS after the motors stop so the last flight stays put. This
 opens an RBPOKE1 session -- TSI reads under the running program, no reset --
