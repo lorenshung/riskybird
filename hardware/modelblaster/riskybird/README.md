@@ -9,8 +9,8 @@ belong in `workloads/` and `hardware/zephyr`, and Scala hardware configs belong 
 ## Preserved histories and outputs
 
 The migration merges lab `riskybird-fps-repro` (`aaf0d44`), the fork's Arty support
-(`1293334`), and opt-in placement (`66da197`). `artifacts/` preserves all 79 tracked
-files from the integration repository's `artifacts/modelblaster/`, including the
+(`1293334`), and opt-in placement (`66da197`). `workloads/fc_dronet/generated/` (in the integration repository) preserves all 79 tracked
+files from its former `artifacts/modelblaster/`, including the
 three measured Arty baselines and their verification metadata. These sources
 were copied without regeneration; moving them is not a fresh hardware test.
 

@@ -108,7 +108,7 @@ class PublishedCodegenTests(unittest.TestCase):
     def test_each_directory_is_complete_and_verified(self) -> None:
         for name, (target, _config) in PUBLISHED.items():
             with self.subTest(name=name):
-                gen = ROOT / "artifacts" / "modelblaster" / "dronet" / "int8" / name
+                gen = ROOT / "workloads" / "fc_dronet" / "generated" / name
                 for required in ("model.c", "kernels.c", "weights.c", "kernel_picks.json",
                                  mb.CODEGEN_MARKER):
                     self.assertTrue((gen / required).is_file(), required)
@@ -121,7 +121,7 @@ class PublishedCodegenTests(unittest.TestCase):
         # Paths from the codegen host would not resolve on a clean install.
         for name in PUBLISHED:
             with self.subTest(name=name):
-                gen = ROOT / "artifacts" / "modelblaster" / "dronet" / "int8" / name
+                gen = ROOT / "workloads" / "fc_dronet" / "generated" / name
                 picks = json.loads((gen / "kernel_picks.json").read_text())["picks"]
                 for op, pick in picks.items():
                     path = pick.get("path")
@@ -129,7 +129,7 @@ class PublishedCodegenTests(unittest.TestCase):
                         self.assertTrue(path.startswith("kernels/"), f"{op}: {path}")
 
     def test_nopermute_directory_keeps_linear_on_the_scalar_reference(self) -> None:
-        gen = ROOT / "artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_zve64x-gray-nhwc"
+        gen = ROOT / "workloads/fc_dronet/generated/gemmini_q31_rvv_zve64x-gray-nhwc"
         picks = json.loads((gen / "kernel_picks.json").read_text())["picks"]
         self.assertEqual(picks["linear_s8"]["source"], "reference")
 

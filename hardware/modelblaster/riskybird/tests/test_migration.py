@@ -19,7 +19,7 @@ import _paths
 
 class MigrationTests(unittest.TestCase):
     def test_artifact_assembly_uses_movable_basenames(self):
-        for p in (RB_ROOT / "artifacts/modelblaster").rglob("test_io.S"):
+        for p in (RB_ROOT / "workloads/fc_dronet/generated").rglob("test_io.S"):
             for line in p.read_text().splitlines():
                 if '.incbin "' in line:
                     self.assertNotIn('/', line.split('"')[1], str(p))

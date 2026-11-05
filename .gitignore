@@ -52,7 +52,7 @@ results/
 /.rb/
 /.shynote-local/
 /docs/
-/artifacts/modelblaster/README.md
+/workloads/fc_dronet/generated/README.md
 /hardware/ospi/docs/CHIPYARD_INTEGRATION.md
 /hardware/ospi/docs/OSPI_I2C_INTEGRATION.md
 /hardware/ospi/docs/README.md
