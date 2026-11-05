@@ -26,7 +26,9 @@ submodules under `backends/`.
 | Path | What it holds |
 |---|---|
 | `rb`, `tools/rb/` | the `rb` command: build, program, load, console, debug, fly |
-| `workloads/` | Zephyr workloads: `flight_controller`, `fc_dronet`, sensor, motor, camera and ESP bring-up |
+| `workloads/` | Zephyr workloads: `flight_controller`, `fc_dronet`, `bootup_check`, motor and ESP applications |
+| `workloads/bringup/` | sensor, camera and actuator bring-up and test workloads |
+| `workloads/probes/` | RVV (vector unit) probe workloads |
 | `workloads/lib/` | shared Zephyr libraries the workloads compile in: camera, flightrec, motor link, motor guard (`safety`), ToF |
 | `hardware/chipyard/` | RiskyBird Chipyard configs, IO binders, the FPGA build wrapper, and `patches/`, the patch queue `tools/backend-patches` applies to `backends/chipyard` |
 | `hardware/rtl/` | RiskyBird's own RTL: `fcrocc` (flight-control RoCC and its microcode assembler), `ospi`, `uartdma`, `esplink` |

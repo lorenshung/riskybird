@@ -10,6 +10,6 @@ config RB_VL53L5CX_RANGING
 	  validates ADS7128 XSHUT sequencing and sensor identities using only
 	  the public I2C API.
 
-rsource "../../hardware/zephyr/Kconfig.fpga"
+rsource "../../../hardware/zephyr/Kconfig.fpga"
 
 source "Kconfig.zephyr"

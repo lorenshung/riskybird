@@ -13,7 +13,7 @@ project(bootup_check)
 # knowledge and belongs in exactly one place.
 target_sources(app PRIVATE
   src/main.c
-  ../pmw3901_test/src/pmw3901.c
+  ../bringup/pmw3901_test/src/pmw3901.c
   ${RB_ROOT}/workloads/lib/tof/src/tof.c
   ${RB_ROOT}/workloads/lib/camera/src/camera.c
   # Attitude watchdog. Shared rather than copied: a safety guard that
@@ -22,7 +22,7 @@ target_sources(app PRIVATE
   ${RB_ROOT}/workloads/lib/safety/src/motor_guard.c
 )
 target_include_directories(app PRIVATE
-  ../pmw3901_test/src
+  ../bringup/pmw3901_test/src
   ${RB_ROOT}/workloads/lib/tof/include
   ${RB_ROOT}/workloads/lib/camera/include
   ${RB_ROOT}/workloads/lib/safety/include

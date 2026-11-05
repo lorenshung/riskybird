@@ -18,7 +18,7 @@
  * frame buffer through DATA, so the drain rate is the ceiling for sustained (streaming) capture.
  *
  * Build (DroneFullDDR shell):
- *   west build -b chipyard_riscv64 -d build_camimg workloads/camera_image_fpga -- \
+ *   west build -b chipyard_riscv64 -d build_camimg workloads/bringup/camera_image_fpga -- \
  *     -DDTC_OVERLAY_FILE="<elf>/overlays/fpga-common.overlay;<elf>/overlays/arty200t.overlay" \
  *     -DCONFIG_UART_HTIF=n -DCONFIG_UART_SIFIVE=y -DCONFIG_UART_SIFIVE_PORT_0=y \
  *     -DCONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC=50000

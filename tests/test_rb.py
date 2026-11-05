@@ -378,7 +378,7 @@ class ContractTests(unittest.TestCase):
             self.assertIn(mapping, fpga_motor)
 
         tof_source = (
-            ROOT / "workloads" / "vl35l5cx_test" / "src" / "main.c"
+            ROOT / "workloads" / "bringup" / "vl35l5cx_test" / "src" / "main.c"
         ).read_text()
         # Channels 1, 2, 3 and 6 -- not 1..4. Measured with rb_tof_scan_xshut,
         # which releases each unclaimed ADS7128 channel on its own and probes

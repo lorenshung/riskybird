@@ -582,6 +582,15 @@ class Workload:
         )
 
 
+def _workload_dir(name: str) -> Path:
+    """workloads/<name>, or workloads/bringup|probes/<name> for the grouped ones."""
+    for group in ("", "bringup", "probes"):
+        path = ROOT / "workloads" / group / name
+        if path.is_dir():
+            return path
+    return ROOT / "workloads" / name
+
+
 def _workload(
     name: str,
     *,
@@ -607,7 +616,7 @@ def _workload(
 ) -> Workload:
     return Workload(
         name=name,
-        source_dir=source_dir if source_dir is not None else ROOT / "workloads" / name,
+        source_dir=source_dir if source_dir is not None else _workload_dir(name),
         modes=modes,
         default_mode=default_mode,
         targets=targets,

@@ -18,13 +18,13 @@
     "hardware/zephyr": "3ea06b97-ede4-8180-8a5d-e310baf963a5",
     "workloads/lib": "3ea06b97-ede4-8176-a678-e1ca204a6751",
     "tools/flight": "3ea06b97-ede4-8182-95b0-ed1c68b51e22",
-    "workloads/ads7128_test": "3ea06b97-ede4-813c-b0f9-cbadea3c9cd8",
-    "workloads/bmi088_test": "3ea06b97-ede4-8178-9a31-d84c2426a22b",
-    "workloads/i2c_scanner": "3ea06b97-ede4-81ed-ba12-cdb9e331383c",
+    "workloads/bringup/ads7128_test": "3ea06b97-ede4-813c-b0f9-cbadea3c9cd8",
+    "workloads/bringup/bmi088_test": "3ea06b97-ede4-8178-9a31-d84c2426a22b",
+    "workloads/bringup/i2c_scanner": "3ea06b97-ede4-81ed-ba12-cdb9e331383c",
     "workloads/mpc": "3ea06b97-ede4-814d-bba9-dbde60e6f5ce",
-    "workloads/pmw3901_test": "3ea06b97-ede4-8122-9654-d0bc1a955009",
+    "workloads/bringup/pmw3901_test": "3ea06b97-ede4-8122-9654-d0bc1a955009",
     "workloads/state": "3ea06b97-ede4-818d-a1e2-fea08f29811b",
-    "workloads/vl35l5cx_test": "3ea06b97-ede4-81d6-a06b-caf306a4fbbe",
+    "workloads/bringup/vl35l5cx_test": "3ea06b97-ede4-81d6-a06b-caf306a4fbbe",
     "hardware/ospi/docs": "3ea06b97-ede4-81db-af20-fa7672b2a9a6",
     "hardware/zephyr/targets": "3ea06b97-ede4-81d5-931d-c9002cf421f7",
     "workloads/lib/tof": "3ea06b97-ede4-81cf-b729-effd16b12237",
@@ -91,9 +91,9 @@
     "tools/flight/esp32c6/README.md": "40e06b97-ede4-81bd-9e41-ef60ae0113f4",
     "tools/flight/legacy/README.md": "3ea06b97-ede4-8187-8e01-f0ed732742d7",
     "workloads/README.md": "3ea06b97-ede4-81b7-ae95-d419e41468f7",
-    "workloads/actuator_bringup/README.rst": "40d06b97-ede4-81e8-a4c4-e0f19176940f",
-    "workloads/ads7128_test/README.rst": "3ea06b97-ede4-8121-8fd5-ce424a1059e7",
-    "workloads/bmi088_test/README.rst": "3ea06b97-ede4-8156-aed4-cbf749676822",
+    "workloads/bringup/actuator_bringup/README.rst": "40d06b97-ede4-81e8-a4c4-e0f19176940f",
+    "workloads/bringup/ads7128_test/README.rst": "3ea06b97-ede4-8121-8fd5-ce424a1059e7",
+    "workloads/bringup/bmi088_test/README.rst": "3ea06b97-ede4-8156-aed4-cbf749676822",
     "workloads/flight_controller/README.rst": "40e06b97-ede4-8140-9558-d9510a05fd36",
     "workloads/flight_controller/docs/DRONET_NAV.md": "40f06b97-ede4-8124-bdc2-f799d9385352",
     "workloads/flight_controller/docs/FC_RAM_ANALYSIS.md": "40d06b97-ede4-81ad-9f61-f43b0235ca9c",
@@ -102,12 +102,12 @@
     "workloads/flight_controller/docs/MOTOR_MUSIC.md": "40d06b97-ede4-8162-a8a2-d93667db13da",
     "workloads/flight_controller/docs/TELEMETRY_BRINGUP.md": "40d06b97-ede4-8117-9c2b-fed5e7b1827b",
     "workloads/flight_controller/docs/TELEMETRY_PLAN.md": "40d06b97-ede4-81ba-9cf0-ee128206b104",
-    "workloads/i2c_scanner/README.rst": "3ea06b97-ede4-81a6-b9ac-cc78f93a61ff",
+    "workloads/bringup/i2c_scanner/README.rst": "3ea06b97-ede4-81a6-b9ac-cc78f93a61ff",
     "workloads/mpc/README.md": "3ea06b97-ede4-817d-9f93-f8e56822470e",
-    "workloads/pmw3901_test/README.rst": "3ea06b97-ede4-81d5-bda5-ff08a757cefd",
-    "workloads/sensor_bringup/README.rst": "40d06b97-ede4-81fd-9bbc-ce0e765de9db",
+    "workloads/bringup/pmw3901_test/README.rst": "3ea06b97-ede4-81d5-bda5-ff08a757cefd",
+    "workloads/bringup/sensor_bringup/README.rst": "40d06b97-ede4-81fd-9bbc-ce0e765de9db",
     "workloads/state/README.md": "3ea06b97-ede4-8175-8dd7-f816a03d6c95",
-    "workloads/vl35l5cx_test/README.rst": "3ea06b97-ede4-810c-9a3e-dbe67ba35f1f"
+    "workloads/bringup/vl35l5cx_test/README.rst": "3ea06b97-ede4-810c-9a3e-dbe67ba35f1f"
   },
   "assets": {
     "docs/figures/accel_camera_per_shell.png": {
@@ -1003,19 +1003,19 @@
       "the-tof-array": "91137fdeb5fa474fb32ce098b3ecc503",
       "motor-safety": "bf7f243b38ce4e3ab7d1834ee3c51245"
     },
-    "workloads/ads7128_test/README.rst": {
+    "workloads/bringup/ads7128_test/README.rst": {
       "ads7128-diagnostic": "bd4939403d2043c3b9827305dbc97f89"
     },
-    "workloads/bmi088_test/README.rst": {
+    "workloads/bringup/bmi088_test/README.rst": {
       "bmi088-diagnostic": "95bb11ebec5e4913b143837af8633b6d"
     },
-    "workloads/i2c_scanner/README.rst": {
+    "workloads/bringup/i2c_scanner/README.rst": {
       "i2c-scanner": "e9c22274c10645908724b7a6fdb13d7e"
     },
     "workloads/mpc/README.md": {
       "riskybird-mpc": "964ed30973c4425b85997fdc9f5e3174"
     },
-    "workloads/pmw3901_test/README.rst": {
+    "workloads/bringup/pmw3901_test/README.rst": {
       "pmw3901-optical-flow-diagnostic-and-flow-calibration-capture": "b8c717f59ec54a328d2578ed61382916",
       "console-keys": "dbcee8d114e64ab98a488d4126085deb",
       "build-and-run": "0dc640b958804d4e9aab128032da9562",
@@ -1025,7 +1025,7 @@
     "workloads/state/README.md": {
       "riskybird-state-estimation": "2d037ed5cb244159b370716d1f0ac7eb"
     },
-    "workloads/vl35l5cx_test/README.rst": {
+    "workloads/bringup/vl35l5cx_test/README.rst": {
       "four-vl53l5cx-diagnostic": "36c382a3c31042b19cf419d7d95a1510"
     }
   },

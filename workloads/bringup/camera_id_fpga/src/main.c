@@ -13,7 +13,7 @@
  * model-ID readback does.
  *
  * Build (scratchpad OSPI shell):
- *   west build -b chipyard_riscv64 -d build_camid workloads/camera_id_fpga -- \
+ *   west build -b chipyard_riscv64 -d build_camid workloads/bringup/camera_id_fpga -- \
  *     -DDTC_OVERLAY_FILE="<elf>/overlays/fpga-common.overlay;<elf>/overlays/arty200t-scratchpad.overlay" \
  *     -DCONFIG_UART_HTIF=n -DCONFIG_UART_SIFIVE=y -DCONFIG_UART_SIFIVE_PORT_0=y \
  *     -DCONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC=50000
