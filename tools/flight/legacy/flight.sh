@@ -136,7 +136,7 @@ load)
 dryrun)
 	echo "PACK MUST BE OUT. Enabling arming; it arms ~3 s after it is level+still, then runs"
 	echo "the profile on the wire for ~7 s. Nothing can turn without the pack."
-	rbdebug "$R/hardware/flight/arm-enable.gdb" --no-load || exit 1
+	rbdebug "$R/tools/flight/gdb/arm-enable.gdb" --no-load || exit 1
 	sleep 16
 	echo; echo "---- autoflight / gate events ----"
 	clean "$FC" | grep -a "AUTOFLIGHT\|MOTOR GATE\|ENVELOPE\|ESTOP\|estop" | grep -v "ENVELOPE GUARD --" | cut -c1-200
@@ -162,7 +162,7 @@ commit)
 	fresh_boot || { echo "NOT committing: no banner/fresh telemetry from THIS load (see $SP/rbdebug-freerun.log)."; exit 1; }
 	[ "$(elfsum)" = "$loaded" ] || { echo "NOT committing: ELF changed since it was loaded ($loaded -> $(elfsum))."; exit 1; }
 	echo; echo "---- committing ----"
-	rbdebug "$R/hardware/flight/commit.gdb" --no-load || exit 1
+	rbdebug "$R/tools/flight/gdb/commit.gdb" --no-load || exit 1
 	sleep 2
 	clean "$FC" | grep -a "MOTOR GATE" | tail -3
 	echo; echo "If that says *** COMMITTED TO A FLIGHT TEST ***: plug the pack in, then hand over to the Mac."

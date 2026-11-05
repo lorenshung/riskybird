@@ -2,7 +2,7 @@
 #
 #   ./rb debug flight_controller --target arty200t \
 #       --config RocketArty200TDroneFullDDRConfig --usb-location 7-1.1.4.3 \
-#       --gdb-script hardware/flight/freerun.gdb
+#       --gdb-script tools/flight/gdb/freerun.gdb
 #
 # WHAT THIS IS FOR. The ground stations need a live telemetry stream to show
 # anything, and the only thing that emits one is the flight controller itself.
@@ -18,7 +18,7 @@
 # have been written -- and nothing writes one, because arming needs the
 # lift-and-place gesture and `g_arm_enabled` is false at boot.
 #
-# STOP: hardware/flight/stop.gdb over the same JTAG link, or pull USB.
+# STOP: tools/flight/gdb/stop.gdb over the same JTAG link, or pull USB.
 
 set pagination off
 set confirm off
@@ -46,7 +46,7 @@ printf "\n=== free-run ===\n"
 monitor resume
 
 printf "  core resumed; telemetry now goes to the console\n"
-printf "  stop with hardware/flight/stop.gdb, or pull USB\n\n"
+printf "  stop with tools/flight/gdb/stop.gdb, or pull USB\n\n"
 
 detach
 quit

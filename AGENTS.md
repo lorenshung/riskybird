@@ -28,6 +28,6 @@ remain in their upstream repositories.
 - Agents share remote pages. Read current content before changing it, coordinate
   edits to the same note, and reconcile conflicts instead of forcing overwrites.
 
-Keep this file, `CLAUDE.md`, `.github/README.md`, `tools/shynote.md`, and the ShyNote configuration tracked as
+Keep this file, `CLAUDE.md`, `README.md`, `tools/shynote.md`, and the ShyNote configuration tracked as
 bootstrap instructions. Migrated docs, `.rb/`, and `.shynote-local/` are ignored.
 See `tools/shynote.md` for setup, source archives, and sync limitations.

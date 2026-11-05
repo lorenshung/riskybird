@@ -43,7 +43,7 @@
 	};
 
 	/* Motor PWM (low-side SI2302 gates): M1=GPIO21/CH0 M2=GPIO20/CH1
-	 * M3=GPIO23/CH2 M4=GPIO22/CH3 (mirrors workloads/actuator_bringup). */
+	 * M3=GPIO23/CH2 M4=GPIO22/CH3 (mirrors workloads/bringup/actuator_bringup). */
 	ledc0_default: ledc0_default {
 		group1 {
 			pinmux = <LEDC_CH0_GPIO21>, <LEDC_CH1_GPIO20>,

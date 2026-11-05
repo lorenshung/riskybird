@@ -5,26 +5,24 @@
   "parent_page_id": "3ea06b97-ede4-817f-b997-d1c5f607c577",
   "folders": {
     "": "3ea06b97-ede4-817f-b997-d1c5f607c577",
-    "artifacts": "3ea06b97-ede4-8137-ad5f-f95fe7e3576d",
     "docs": "3ea06b97-ede4-8146-b2f3-df64f998f226",
     "hardware": "3ea06b97-ede4-8129-9720-e0840c3fbf17",
-    "integration": "3ea06b97-ede4-81e0-aabc-e4151a5cd733",
     "tools": "3ea06b97-ede4-81ff-9e68-f173b7e8c22a",
     "workloads": "3ea06b97-ede4-8106-9d19-e40e599275d3",
-    "artifacts/modelblaster": "3ea06b97-ede4-8176-9b17-ff40da40a729",
+    "workloads/fc_dronet/generated": "3ea06b97-ede4-8176-9b17-ff40da40a729",
     "docs/history": "3ea06b97-ede4-818d-8286-e0a736ecb124",
     "docs/upstream-pr": "3ea06b97-ede4-81c3-ae02-d1c1c554830e",
     "hardware/ospi": "3ea06b97-ede4-8182-946e-dab85143f863",
     "hardware/zephyr": "3ea06b97-ede4-8180-8a5d-e310baf963a5",
     "workloads/lib": "3ea06b97-ede4-8176-a678-e1ca204a6751",
     "tools/flight": "3ea06b97-ede4-8182-95b0-ed1c68b51e22",
-    "workloads/ads7128_test": "3ea06b97-ede4-813c-b0f9-cbadea3c9cd8",
-    "workloads/bmi088_test": "3ea06b97-ede4-8178-9a31-d84c2426a22b",
-    "workloads/i2c_scanner": "3ea06b97-ede4-81ed-ba12-cdb9e331383c",
+    "workloads/bringup/ads7128_test": "3ea06b97-ede4-813c-b0f9-cbadea3c9cd8",
+    "workloads/bringup/bmi088_test": "3ea06b97-ede4-8178-9a31-d84c2426a22b",
+    "workloads/bringup/i2c_scanner": "3ea06b97-ede4-81ed-ba12-cdb9e331383c",
     "workloads/mpc": "3ea06b97-ede4-814d-bba9-dbde60e6f5ce",
-    "workloads/pmw3901_test": "3ea06b97-ede4-8122-9654-d0bc1a955009",
+    "workloads/bringup/pmw3901_test": "3ea06b97-ede4-8122-9654-d0bc1a955009",
     "workloads/state": "3ea06b97-ede4-818d-a1e2-fea08f29811b",
-    "workloads/vl35l5cx_test": "3ea06b97-ede4-81d6-a06b-caf306a4fbbe",
+    "workloads/bringup/vl35l5cx_test": "3ea06b97-ede4-81d6-a06b-caf306a4fbbe",
     "hardware/ospi/docs": "3ea06b97-ede4-81db-af20-fa7672b2a9a6",
     "hardware/zephyr/targets": "3ea06b97-ede4-81d5-931d-c9002cf421f7",
     "workloads/lib/tof": "3ea06b97-ede4-81cf-b729-effd16b12237",
@@ -34,8 +32,7 @@
     "3ea06b97-ede4-8146-b4a6-ca1b187d5958"
   ],
   "documents": {
-    "README.md": "3ea06b97-ede4-81fb-8fd3-de0fbfc12d09",
-    "artifacts/modelblaster/README.md": "3ea06b97-ede4-815e-81f4-f68d8e538f98",
+    "workloads/fc_dronet/generated/README.md": "3ea06b97-ede4-815e-81f4-f68d8e538f98",
     "docs/accel-shells-bringup.md": "3ea06b97-ede4-81e6-914b-f913cb232249",
     "docs/drone-initial-bringup.md": "3ea06b97-ede4-81fb-8320-face1a6a2de1",
     "docs/dronet-on-accel-socs.md": "3ea06b97-ede4-81a6-ae5c-c43f2f77f2cf",
@@ -49,6 +46,7 @@
     "docs/history/esp-motor-offload-handoff.md": "3ea06b97-ede4-819d-893c-f7f5121ae675",
     "docs/history/flight-safety-bench-procedure.md": "3ea06b97-ede4-8131-b330-ec026dbcd2e3",
     "docs/history/pin-clean-proof.md": "40f06b97-ede4-814e-824d-e8d37c7e96aa",
+    "docs/history/firesim-dronet-20260811.md": "40f06b97-ede4-81a0-b7e7-dc88fc5fef36",
     "docs/history/motor4-remote-investigation.md": "3ea06b97-ede4-810d-a35d-e679d1e2f41e",
     "docs/history/setup-vs-actual-2026-09-09.md": "3ea06b97-ede4-8192-93ca-d77bc3a49eca",
     "docs/history/tethered-flight-attempt.md": "3ea06b97-ede4-81c8-8640-ec8c86c15719",
@@ -91,9 +89,9 @@
     "tools/flight/esp32c6/README.md": "40e06b97-ede4-81bd-9e41-ef60ae0113f4",
     "tools/flight/legacy/README.md": "3ea06b97-ede4-8187-8e01-f0ed732742d7",
     "workloads/README.md": "3ea06b97-ede4-81b7-ae95-d419e41468f7",
-    "workloads/actuator_bringup/README.rst": "40d06b97-ede4-81e8-a4c4-e0f19176940f",
-    "workloads/ads7128_test/README.rst": "3ea06b97-ede4-8121-8fd5-ce424a1059e7",
-    "workloads/bmi088_test/README.rst": "3ea06b97-ede4-8156-aed4-cbf749676822",
+    "workloads/bringup/actuator_bringup/README.rst": "40d06b97-ede4-81e8-a4c4-e0f19176940f",
+    "workloads/bringup/ads7128_test/README.rst": "3ea06b97-ede4-8121-8fd5-ce424a1059e7",
+    "workloads/bringup/bmi088_test/README.rst": "3ea06b97-ede4-8156-aed4-cbf749676822",
     "workloads/flight_controller/README.rst": "40e06b97-ede4-8140-9558-d9510a05fd36",
     "workloads/flight_controller/docs/DRONET_NAV.md": "40f06b97-ede4-8124-bdc2-f799d9385352",
     "workloads/flight_controller/docs/FC_RAM_ANALYSIS.md": "40d06b97-ede4-81ad-9f61-f43b0235ca9c",
@@ -102,12 +100,12 @@
     "workloads/flight_controller/docs/MOTOR_MUSIC.md": "40d06b97-ede4-8162-a8a2-d93667db13da",
     "workloads/flight_controller/docs/TELEMETRY_BRINGUP.md": "40d06b97-ede4-8117-9c2b-fed5e7b1827b",
     "workloads/flight_controller/docs/TELEMETRY_PLAN.md": "40d06b97-ede4-81ba-9cf0-ee128206b104",
-    "workloads/i2c_scanner/README.rst": "3ea06b97-ede4-81a6-b9ac-cc78f93a61ff",
+    "workloads/bringup/i2c_scanner/README.rst": "3ea06b97-ede4-81a6-b9ac-cc78f93a61ff",
     "workloads/mpc/README.md": "3ea06b97-ede4-817d-9f93-f8e56822470e",
-    "workloads/pmw3901_test/README.rst": "3ea06b97-ede4-81d5-bda5-ff08a757cefd",
-    "workloads/sensor_bringup/README.rst": "40d06b97-ede4-81fd-9bbc-ce0e765de9db",
+    "workloads/bringup/pmw3901_test/README.rst": "3ea06b97-ede4-81d5-bda5-ff08a757cefd",
+    "workloads/bringup/sensor_bringup/README.rst": "40d06b97-ede4-81fd-9bbc-ce0e765de9db",
     "workloads/state/README.md": "3ea06b97-ede4-8175-8dd7-f816a03d6c95",
-    "workloads/vl35l5cx_test/README.rst": "3ea06b97-ede4-810c-9a3e-dbe67ba35f1f"
+    "workloads/bringup/vl35l5cx_test/README.rst": "3ea06b97-ede4-810c-9a3e-dbe67ba35f1f"
   },
   "assets": {
     "docs/figures/accel_camera_per_shell.png": {
@@ -280,14 +278,7 @@
     }
   },
   "headings": {
-    "README.md": {
-      "riskybird": "0c5a5e7fe31947e585fcf9de3ab217ab",
-      "start-here": "1b3cb55484724adc9964db659bc2af3a",
-      "what-is-here": "67de485ee92f4897be721c6d0bb3ecd0",
-      "documentation": "36809f8d6e86420fbcab4df5bbd981c8",
-      "scope": "24ef7f3c8a92413782ffc669d9f53243"
-    },
-    "artifacts/modelblaster/README.md": {
+    "workloads/fc_dronet/generated/README.md": {
       "verified-modelblaster-codegen-published-for-machines-that-cannot-verify": "aa40a6ee4e47483cae9253f01ee71621",
       "four-directories-two-shells": "d9c2cebde63f4be29e89ae3b4ef3c0d1",
       "two-more-directories-dimas-recipe-on-the-gemminisaturn-shells": "c41f302f92824b8b95b198cad8859cbf",
@@ -1003,19 +994,19 @@
       "the-tof-array": "91137fdeb5fa474fb32ce098b3ecc503",
       "motor-safety": "bf7f243b38ce4e3ab7d1834ee3c51245"
     },
-    "workloads/ads7128_test/README.rst": {
+    "workloads/bringup/ads7128_test/README.rst": {
       "ads7128-diagnostic": "bd4939403d2043c3b9827305dbc97f89"
     },
-    "workloads/bmi088_test/README.rst": {
+    "workloads/bringup/bmi088_test/README.rst": {
       "bmi088-diagnostic": "95bb11ebec5e4913b143837af8633b6d"
     },
-    "workloads/i2c_scanner/README.rst": {
+    "workloads/bringup/i2c_scanner/README.rst": {
       "i2c-scanner": "e9c22274c10645908724b7a6fdb13d7e"
     },
     "workloads/mpc/README.md": {
       "riskybird-mpc": "964ed30973c4425b85997fdc9f5e3174"
     },
-    "workloads/pmw3901_test/README.rst": {
+    "workloads/bringup/pmw3901_test/README.rst": {
       "pmw3901-optical-flow-diagnostic-and-flow-calibration-capture": "b8c717f59ec54a328d2578ed61382916",
       "console-keys": "dbcee8d114e64ab98a488d4126085deb",
       "build-and-run": "0dc640b958804d4e9aab128032da9562",
@@ -1025,7 +1016,7 @@
     "workloads/state/README.md": {
       "riskybird-state-estimation": "2d037ed5cb244159b370716d1f0ac7eb"
     },
-    "workloads/vl35l5cx_test/README.rst": {
+    "workloads/bringup/vl35l5cx_test/README.rst": {
       "four-vl53l5cx-diagnostic": "36c382a3c31042b19cf419d7d95a1510"
     }
   },

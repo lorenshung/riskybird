@@ -3694,8 +3694,8 @@ def cmd_modelblaster(args: argparse.Namespace) -> int:
         workload = get_workload("dronet")
         # resolve(): CMake is given this verbatim and resolves a relative path
         # against the harness source directory, not the caller's cwd, so
-        # `--gen-dir artifacts/...` became
-        # backends/modelblaster/harness/artifacts/... and failed as "not a
+        # `--gen-dir workloads/...` became
+        # backends/modelblaster/harness/workloads/... and failed as "not a
         # directory". Every documented invocation of this flag was relative.
         gen_dir = Path(args.gen_dir).resolve() if args.gen_dir else (
             modelblaster.generated_dir(args.model, args.quant, args.target)

@@ -6,8 +6,8 @@ grayscale input, conv0 and maxpool fused into one Gemmini call, NHWC islands,
 and the gemmini_q31_rvv kernel family compiled for a shell that has an
 integer-only vector unit. Its output is committed, verified, under
 
-    artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_softfp-gray-nhwc   (Fp16At35)
-    artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_zve64x-gray-nhwc   (IntAt35)
+    workloads/fc_dronet/generated/gemmini_q31_rvv_softfp-gray-nhwc   (Fp16At35)
+    workloads/fc_dronet/generated/gemmini_q31_rvv_zve64x-gray-nhwc   (IntAt35)
 
 and a board image is built from those with `rb modelblaster build --gen-dir`.
 This script is how those directories were made, and how to check that they
@@ -15,7 +15,7 @@ still come out the same:
 
     python3 tools/modelblaster/dronet_gray_nhwc.py --target gemmini_q31_rvv_softfp
     diff -r .rb/modelblaster/dronet-gray-nhwc/ir_gray_nhwc/gemmini_q31_rvv_softfp \\
-            artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_softfp-gray-nhwc
+            workloads/fc_dronet/generated/gemmini_q31_rvv_softfp-gray-nhwc
 
 SILICON TIER ONLY. Kernel selection is verify-gated: every curated kernel runs
 on spike against the scalar reference and is rejected past MB_DRIFT_ATOL. That

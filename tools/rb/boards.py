@@ -582,6 +582,15 @@ class Workload:
         )
 
 
+def _workload_dir(name: str) -> Path:
+    """workloads/<name>, or workloads/bringup|probes/<name> for the grouped ones."""
+    for group in ("", "bringup", "probes"):
+        path = ROOT / "workloads" / group / name
+        if path.is_dir():
+            return path
+    return ROOT / "workloads" / name
+
+
 def _workload(
     name: str,
     *,
@@ -607,7 +616,7 @@ def _workload(
 ) -> Workload:
     return Workload(
         name=name,
-        source_dir=source_dir if source_dir is not None else ROOT / "workloads" / name,
+        source_dir=source_dir if source_dir is not None else _workload_dir(name),
         modes=modes,
         default_mode=default_mode,
         targets=targets,
@@ -1350,7 +1359,7 @@ def flight_presets() -> dict[str, tuple[tuple[tuple[str, str], ...], tuple[tuple
 # change to t21-hover-1.0m.env reaches the photo build instead of silently forking from it.
 # The firmware side is workloads/lib/camera (ROSE_CAMERA; the sample's CMakeLists points
 # ROSE_CAMERA_DIR there by default). `rb fly photo` reads the frame back over JTAG after landing
-# (hardware/flight/photo.gdb).
+# (tools/flight/gdb/photo.gdb).
 PHOTO_CPPFLAGS = (
     ("RB_CAMERA_STATUS_LED", "0"),     # the LED pin belongs to the flight image
     ("RB_CAMERA_FRAME_LEN", "1000"),

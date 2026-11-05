@@ -60,7 +60,7 @@ Then re-run this script with MB_SRC=<that checkout> to copy it to ${DST}
 (or pass MODEL_DIR to scripts/build_fc_dronet.sh).
 
 The same recipe's committed, verify-gated output for this shell is
-${RB_ROOT}/artifacts/modelblaster/dronet/int8/gemmini_q31_rvv_softfp-gray-nhwc
+${RB_ROOT}/workloads/fc_dronet/generated/gemmini_q31_rvv_softfp-gray-nhwc
 (tools/modelblaster/dronet_gray_nhwc.py); MODEL_DIR may name it directly.
 EOF
 exit 1

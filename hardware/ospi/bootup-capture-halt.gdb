@@ -11,7 +11,7 @@
 #   - the outputs are capture-ramconsole.bin and capture-frame.raw, not
 #     bootup-frame.*, so a run with this script never overwrites the other's;
 #   - no `detach`: the core stays halted at camera_frame_ready, which lets
-#     hardware/bench/accel-regs.gdb read the capture core afterwards.
+#     tools/bench/gdb/accel-regs.gdb read the capture core afterwards.
 #
 # Output files land in the directory GDB runs in, which for `rb debug` is the
 # repository root. Move or rename them between runs.

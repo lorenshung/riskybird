@@ -180,7 +180,7 @@ def resolve_kernel_path(path: str) -> Path | None:
     """Find a picked kernel's source on THIS machine.
 
     kernel_picks.json records whatever path the codegen host used. A published
-    directory (artifacts/modelblaster/...) therefore names a file on someone
+    directory (workloads/fc_dronet/generated/...) therefore names a file on someone
     else's disk, and on a clean install every lookup missed and the engine
     split fell back to the name table -- the fallback that painted scalar and
     RVV ops as Gemmini. A relative path is taken inside the ModelBlaster
@@ -1183,7 +1183,7 @@ def harness_defines(
                 "environment and re-run `rb modelblaster generate`.\n"
                 "Or build from published, already-verified sources:\n"
                 "    rb modelblaster build --gen-dir "
-                "artifacts/modelblaster/dronet/int8/gemmini_q31 ...\n"
+                "workloads/fc_dronet/generated/gemmini_q31 ...\n"
                 "\n"
                 "To proceed anyway, knowing the numbers may be wrong:\n"
                 "    RB_ALLOW_UNVERIFIED_KERNELS=1 rb ..."

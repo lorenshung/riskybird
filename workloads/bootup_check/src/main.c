@@ -223,7 +223,7 @@ static struct rb_tof_array tof;
 
 /*
  * Channels 1, 2, 3 and 6, measured rather than assumed -- see
- * workloads/vl35l5cx_test: rb_tof_scan_xshut found those four and only those,
+ * workloads/bringup/vl35l5cx_test: rb_tof_scan_xshut found those four and only those,
  * and rb_tof_hold_all confirmed no VL53 part is wired straight to the bus.
  * Channel 6 is the down-facing VL53L1X; 1..3 are the side headers J9, J2, J11.
  * Slots that hold nothing report absent rather than failing, which is the whole

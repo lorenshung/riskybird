@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Solve FLOW_RAD_PER_COUNT from PMW3901 slide captures, or validate one.
 
-Reads the `FLOWCAL RUN ...` lines that workloads/pmw3901_test prints, applies
+Reads the `FLOWCAL RUN ...` lines that workloads/bringup/pmw3901_test prints, applies
 the run-rejection rules from docs/flight-calibration-procedures.md, and solves
 
     K = D / (h * |sum(counts)|)

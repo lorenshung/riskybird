@@ -52,8 +52,7 @@ results/
 /.rb/
 /.shynote-local/
 /docs/
-/README.md
-/artifacts/modelblaster/README.md
+/workloads/fc_dronet/generated/README.md
 /hardware/ospi/docs/CHIPYARD_INTEGRATION.md
 /hardware/ospi/docs/OSPI_I2C_INTEGRATION.md
 /hardware/ospi/docs/README.md
@@ -63,8 +62,8 @@ results/
 /tools/flight/legacy/README.md
 /workloads/README.md
 /hardware/zephyr/targets/esp32c6/PROGRAMMING.md
-/workloads/actuator_bringup/README.rst
-/workloads/sensor_bringup/README.rst
+/workloads/bringup/actuator_bringup/README.rst
+/workloads/bringup/sensor_bringup/README.rst
 /workloads/flight_controller/README.rst
 /tools/bench/groundstation/README.md
 /tools/bench/groundstation/mobile/DESIGN.md
@@ -83,10 +82,10 @@ results/
 /workloads/flight_controller/docs/TELEMETRY_BRINGUP.md
 /workloads/flight_controller/docs/TELEMETRY_PLAN.md
 /workloads/flight_controller/docs/DRONET_NAV.md
-/workloads/ads7128_test/README.rst
-/workloads/bmi088_test/README.rst
-/workloads/i2c_scanner/README.rst
+/workloads/bringup/ads7128_test/README.rst
+/workloads/bringup/bmi088_test/README.rst
+/workloads/bringup/i2c_scanner/README.rst
 /workloads/mpc/README.md
-/workloads/pmw3901_test/README.rst
+/workloads/bringup/pmw3901_test/README.rst
 /workloads/state/README.md
-/workloads/vl35l5cx_test/README.rst
+/workloads/bringup/vl35l5cx_test/README.rst
