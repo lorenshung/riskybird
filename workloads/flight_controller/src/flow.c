@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * PMW3901 optical-flow front-end (see flow.h). Reuses the standalone pmw3901.c driver
- * (workloads/pmw3901_test) with the optimized busy_wait_us read path (~285 us/read).
+ * (workloads/bringup/pmw3901_test) with the optimized busy_wait_us read path (~285 us/read).
  */
 #include "flow.h"
 #include "fc_shared_math.h"

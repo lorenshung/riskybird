@@ -6,7 +6,7 @@ zephyr-chipyard-sw; zephyr-chipyard-sw nests another ModelBlaster. Initialised
 as declared, this checkout would hold three Chipyards and four Zephyrs. The
 backends' own branches are shared upstream infrastructure, so rather than edit
 their .gitmodules, this rewrites only the local checkout, from the table in
-.submodule-redirects:
+backends/redirects:
 
   1. PATH stays uninitialised (a clean checkout there is deinitialised; its git
      directory is kept, so nothing is lost).
@@ -51,7 +51,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TABLE = ROOT / ".submodule-redirects"
+TABLE = ROOT / "backends" / "redirects"
 
 
 def git(repo: Path, *args: str, check: bool = True) -> str:

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "hardware/chipyard/project/RiskyBird.scala"
 RB_DIGITAL_TOP = ROOT / "hardware/chipyard/generators/chipyard/src/main/scala/RbDigitalTop.scala"
 DIGITAL_TOP = ROOT / "backends/chipyard/generators/chipyard/src/main/scala/DigitalTop.scala"
-OVERLAYS = ROOT / ".backend-overlays"
+OVERLAYS = ROOT / "backends" / "overlays"
 QUEUE = ROOT / "hardware/chipyard/patches"
 RISKYBIRD_TRAITS = ["ospi.CanHavePeripheryOspi", "uartdma.CanHavePeripheryUartTxDma"]
 

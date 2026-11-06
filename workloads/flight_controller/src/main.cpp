@@ -148,7 +148,7 @@ static void esp_uart_drain(void)
  * (latch the kill, clear the arm latch). HOVER_Z is clamped to
  * SAFE_MAX_HEIGHT_M by its hook. PROFILE only retimes a future flight. RESET is
  * the one that grants -- it sets g_arm_enabled -- and it grants exactly what a
- * tethered debugger already grants through hardware/flight/arm-enable.gdb. It
+ * tethered debugger already grants through tools/flight/gdb/arm-enable.gdb. It
  * does NOT arm: the lift-and-place gesture, the gyro cal, the battery check and
  * the motor-commit gate all still stand between RESET and a spinning motor.
  *
@@ -644,7 +644,7 @@ static const struct device *baro_dev = DEVICE_DT_GET(DT_ALIAS(baro));
  * the down ToF and still carry their protective film, so if left enabled they contend on 0x29 and
  * dominate it with a 0mm / ~87 Mcps crosstalk return (the down sensor's real reads only occasionally
  * win the bus). The flight controller uses ONLY the down ToF, so hold the sides in reset. See
- * workloads/sensor_bringup for the full multi-sensor readdressing scheme (down -> 0x30). */
+ * workloads/bringup/sensor_bringup for the full multi-sensor readdressing scheme (down -> 0x30). */
 static const uint8_t VL53L1X_SIDE_CH[4] = { 1, 2, 3, 4 };
 
 static int ads7128_rd(const struct device *bus, uint8_t reg, uint8_t *v)
@@ -771,7 +771,7 @@ SYS_INIT(board_sensor_init, POST_KERNEL, 80);   /* before CONFIG_SENSOR_INIT_PRI
  * sides as they power up + pass through it during readdress, and gets intermittently clobbered (stuck
  * 0mm / crosstalk return). The VL53L1X address is volatile -- a power cycle (XSHUT low->high) resets it
  * to 0x29 -- so board_sensor_init()/side_tof_init() always leave it freshly at 0x29, and we move it
- * here ONCE, right before vl53l1x_reinit(). Mechanism (ST UM2356 / workloads/sensor_bringup):
+ * here ONCE, right before vl53l1x_reinit(). Mechanism (ST UM2356 / workloads/bringup/sensor_bringup):
  * write the new 7-bit address to 16-bit register 0x0001 (VL53L1_I2C_SLAVE__DEVICE_ADDRESS) at the
  * sensor's current address. VL53L1X_DOWN_ADDR MUST equal the vl53l1x@30 DT node reg so the driver then
  * talks to it there. */
@@ -981,7 +981,7 @@ static inline float tilt_rad_from_gibbs(const float *state)
  * test sits out. At rest it stays 0; if it climbs with props spinning, the accelerometer test is
  * effectively off and the estimator test is carrying the attitude envelope alone -- which is a
  * thing to know and act on, not a thing to hide behind a wider band. The telemetry line and
- * hardware/flight/guard-check.gdb both report it. */
+ * tools/flight/gdb/guard-check.gdb both report it. */
 #ifndef SAFE_ACC_TRUST_LO_MPS2
 #define SAFE_ACC_TRUST_LO_MPS2 5.89f   /* 0.6 g */
 #endif
@@ -1365,7 +1365,7 @@ static void safety_banner(void)
  *      the GDB script fails with "No symbol". That absence is the proof the image cannot fly.
  *
  *   2. RUN TIME    the operator writes ROSE_COMMIT_KEY into g_flight_commit_key from a tethered
- *      debugger (hardware/flight/commit.gdb), on the bench, with the drone in front of them. It is
+ *      debugger (tools/flight/gdb/commit.gdb), on the bench, with the drone in front of them. It is
  *      a specific 32-bit constant, so neither uninitialised RAM, nor a stray `set var x = 1`, nor a
  *      wild store can produce it; and it is polled, not latched at boot, so it cannot survive into
  *      a later session.
@@ -1439,18 +1439,18 @@ static void motor_gate_banner(void)
 	       "NOT COMMITTED: motors latch OFF %d ms after they first spin.\n",
 	       (int)(ROSE_MOTOR_WINDOW_MS));
 	printk("flight_controller: COMMIT GATE -- to commit, write 0x%08x to g_flight_commit_key "
-	       "(hardware/flight/commit.gdb). Committed cap is %d ms.\n",
+	       "(tools/flight/gdb/commit.gdb). Committed cap is %d ms.\n",
 	       (unsigned)ROSE_COMMIT_KEY, (int)(ROSE_COMMIT_MAX_MS));
 #else
 	printk("flight_controller: COMMIT GATE -- UNCOMMITTED BUILD: motors latch OFF %d ms after "
 	       "they first spin, and CANNOT be committed at run time.\n",
 	       (int)(ROSE_MOTOR_WINDOW_MS));
 	printk("flight_controller: COMMIT GATE -- a flight test needs BOTH a rebuild with "
-	       "RB_CMAKE_ARGS=\"-DROSE_FLIGHT_COMMIT=1\" AND hardware/flight/commit.gdb.\n");
+	       "RB_CMAKE_ARGS=\"-DROSE_FLIGHT_COMMIT=1\" AND tools/flight/gdb/commit.gdb.\n");
 #endif
 }
 
-/* A soft reset (rose_cmd_reset / hardware/flight/reset.gdb) clears estop and disarms, and the
+/* A soft reset (rose_cmd_reset / tools/flight/gdb/reset.gdb) clears estop and disarms, and the
  * operator reasonably expects it to clear everything. It does NOT clear this latch -- "stays there
  * until reset" means a real reset -- so say so, once, rather than leaving them to wonder why the
  * motors never came back. */
@@ -3713,7 +3713,7 @@ static void uart_cmd_poll(void)
  *   disarmed  photo_finish()   sensor standby over I2C, then ~79k register reads to drain the frame
  *                              into rose_photo_pixels[]. Only once the motors are off (landed, flight
  *                              cap, ESTOP) -- never in flight.
- * The frame then sits in DDR until `rb fly photo` (hardware/flight/photo.gdb) halts the core and
+ * The frame then sits in DDR until `rb fly photo` (tools/flight/gdb/photo.gdb) halts the core and
  * dumps it over JTAG. Everything a dump needs is in the rose_photo_* globals, C linkage, so the gdb
  * script reads them by name. State values are part of that contract:
  *   0 off, 1 preparing, 2 ready (streaming), 3 armed, 4 captured (in the core), 5 drained OK;

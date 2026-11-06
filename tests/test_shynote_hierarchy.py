@@ -47,7 +47,8 @@ class HierarchyTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
-        (root / ".shynote-index.json").write_text(json.dumps({
+        (root / "tools").mkdir()
+        (root / "tools" / "shynote-index.json").write_text(json.dumps({
             "parent_page_id": ROOT, "folders": {"docs": FOLDER}, "asset_pages": [ASSETS]}))
         self.transport = Transport()
         config = SimpleNamespace(root=root, storage=NotionConfig(ROOT, "NOTION_TOKEN"))

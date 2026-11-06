@@ -9,4 +9,4 @@ target_sources(app PRIVATE src/main.c)
 
 # The HM01B0 register map is camera_bringup's, not a second copy of it. Two
 # copies of a sensor's register addresses drift, and the drift is silent.
-target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../camera_bringup/src)
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../bringup/camera_bringup/src)

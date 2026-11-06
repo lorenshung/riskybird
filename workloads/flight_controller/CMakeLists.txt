@@ -78,7 +78,7 @@ set(ROSE_ACTUATE_TIMEOUT_MS 0 CACHE STRING "stop motor actuation N ms after boot
 # ROSE_FLIGHT_COMMIT is the BUILD-TIME half of a two-part interlock and is deliberately NOT set by
 # any --mode in tools/rb/boards.py: no mode name may quietly imply permission to fly. It has to be
 # typed, as RB_CMAKE_ARGS="-DROSE_FLIGHT_COMMIT=1". With it at 0 the run-time commit variable is not
-# compiled into the image at all, so hardware/flight/commit.gdb fails with "No symbol" -- the
+# compiled into the image at all, so tools/flight/gdb/commit.gdb fails with "No symbol" -- the
 # absence of that symbol is the proof that the image cannot be made to fly.
 #
 # The RUN-TIME half is the operator writing the key from a debugger, on the bench. Neither act alone
@@ -327,7 +327,7 @@ if(ROSE_CAMERA)
   target_sources(app PRIVATE ${ROSE_CAMERA_DIR}/src/camera.c)
   target_include_directories(app PRIVATE
     ${ROSE_CAMERA_DIR}/include
-    ${ROSE_CAMERA_DIR}/../../camera_bringup/src)   # hm01b0.h
+    ${ROSE_CAMERA_DIR}/../../bringup/camera_bringup/src)   # hm01b0.h
   # Fail a dead sensor ~150 ms after MODE_SELECT instead of after the 6 s AE settle, so
   # photo_prepare() can reset and retry at boot (see ROSE_PHOTO_TRIES in main.cpp). The
   # 100 ms is camera_photo's proven MODE_SELECT -> PCLK check timing.

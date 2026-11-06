@@ -24,7 +24,7 @@ Install the pinned ShyNote CLI with Python 3.11+ and `uv`:
 Supply `NOTION_TOKEN` in the environment, or save its raw value in the ignored
 `.rb/notion-token` file with permissions `0600`. The Notion connection must have
 access to the notebook's parent page. `.shynote` selects this branch's notebook;
-`.shynote-index.json` records its document, folder, and asset mappings.
+`tools/shynote-index.json` records its document, folder, and asset mappings.
 ShyNote saves each note's repository path in a `shynote-metadata` code block at
 the top of the Notion page; leave that block first and intact.
 

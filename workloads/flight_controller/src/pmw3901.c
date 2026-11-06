@@ -248,7 +248,7 @@ int pmw3901_init(const struct device *dev)
      * would reverse both, and 0xB6 reversed would be 0x6D, so it is the first
      * transaction that is misaligned rather than the bus.
      *
-     * Ported from workloads/pmw3901_test/src/pmw3901.c, which is the copy of
+     * Ported from workloads/bringup/pmw3901_test/src/pmw3901.c, which is the copy of
      * this driver the FPGA bring-up used and where the effect was measured.
      */
     (void)pmw3901_register_read(dev, 0x00);

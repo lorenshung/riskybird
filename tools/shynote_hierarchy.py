@@ -39,7 +39,7 @@ class HierarchicalNotionStore(NotionStore):
         super().__init__(config, transport=transport or PacedTransport(config.storage.token_env))
         self.root = config.root
         self.index = {}
-        path = config.root / ".shynote-index.json"
+        path = config.root / "tools" / "shynote-index.json"
         if path.exists():
             index = json.loads(path.read_text())
             if index["parent_page_id"] != self.settings.parent_page_id:
