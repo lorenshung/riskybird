@@ -1,0 +1,41 @@
+{
+  "name": "v3_power_hold_800",
+  "comment": "v3 stand, PSU only no USB-C. Power stress: hold at COLL 800, one 3 deg step; watch vbat vs the 3.0 V FC cutoff and ESP bootn.",
+  "collective_permille": 800,
+  "roll_sp_mdeg": 0,
+  "mass_kg": 0.05,
+  "base_gains": {
+    "ATT_P": 5.0,
+    "RATE_P": 40.0,
+    "RATE_D": 1.0,
+    "ATT_I": 1.0,
+    "RATE_I": 0.0,
+    "ATT_GAIN": 0.85,
+    "MOTOR_TRIM_LEFT": 1.0,
+    "D_LPF_HZ": 30.0
+  },
+  "grid": [
+    {
+      "gains": {}
+    }
+  ],
+  "excitations": [
+    {
+      "type": "step",
+      "target": "att",
+      "amp": 52,
+      "dur_ms": 1500
+    }
+  ],
+  "repeats": 1,
+  "arrangement": {
+    "per_spin": 1
+  },
+  "limits": {
+    "max_trials": 1,
+    "max_coll_permille": 850,
+    "max_run_ms": 20000,
+    "motor_budget_s": 25,
+    "settle_ms": 1500
+  }
+}

@@ -1455,13 +1455,17 @@ _RIG_CPPFLAGS = (
     ("ATT_GAIN", "0.85f"),
     ("MOTOR_TRIM_LEFT", "1.0f"),
     ("IMU_OFFSET_Y", "0.016f"),
-    # v2 stand: rigid blockers at ~15 deg; raise for a 30 deg stop. fc_rig.cpp's own
-    # defaults (0.44f / tilt - 0.09f) are sized for the 30 deg stop.
-    ("RIG_MAX_TILT_RAD", "0.227f"),   # 13 deg tilt guard, inside the ~15 deg blockers
-    ("RIG_TGT_MAX_RAD", "0.14f"),     # 8 deg roll-target clamp
+    # v3 stand (2026-11-05): no blockers, the pivot turns a full 360 deg, so the tilt guard is
+    # only for an extreme excursion. fc_rig.cpp's own defaults (0.44f / tilt - 0.09f) were sized
+    # for a 30 deg stop, and the v2 stand's 0.227f / 0.14f for ~15 deg blockers.
+    ("RIG_MAX_TILT_RAD", "1.05f"),    # 60 deg tilt guard: extreme only
+    ("RIG_TGT_MAX_RAD", "0.35f"),     # 20 deg roll-target clamp
     # LiPo on the rig: t21's cutoff. The 3.2 V default estops on normal sag at hover
     # collective (sim twin, R0 ~0.18 ohm); the bench PSU browns the ESP out above ~0.45 duty.
     ("BATT_CUTOFF_V", "3.0f"),
+    # Keep the cutoff and arm gate, drop the sag boost: on the bench PSU the ADC sees the
+    # in-phase PWM troughs and the boost raised duty as the rail sagged (0.50 -> 0.58).
+    ("ROSE_BATT_SAG_COMP", "0"),
     # Time allowed from the end of RAMP_UP to come off the stop before ramping down. 8 s
     # while a tethered USB cable loads one side; the 2 s default is for an untethered drone.
     ("RIG_LIFTOFF_TIMEOUT_MS", "8000"),

@@ -166,15 +166,20 @@ class RigSim(unittest.TestCase):
     def test_liftoff_assist(self):
         """3.5 mN m toward the +30 deg stop (right wing down), the 2026-11-04 hardware gains: without
         the lift-off assist it never leaves the stop (as on hardware); with the defaults it lifts off
-        at COLL 600 and 800, never trips the guard and barely swings past level."""
+        at COLL 600 and 800, never trips the guard and barely swings past level. Built with the
+        v2 stand's limits (13 deg guard, 8 deg target clamp), the stand this happened on: the
+        blocker-free stand's 60 deg guard counts a 30 deg rest as already lifted off."""
         base = (rig_sim.HERE / "scenarios/liftoff_assist.txt").read_text()
+        twin = rig_sim.build({"RIG_MAX_TILT_RAD": "0.227f", "RIG_TGT_MAX_RAD": "0.14f"},
+                             out_dir=self.d / "build-v2", axes=(0,))["twin"]
         for coll in (600, 800):
             scen = self.d / f"assist{coll}.txt"
             scen.write_text(base.replace("COLL 600", f"COLL {coll}"))
-            off = self.run_twin(scen, **rig_sim.ASSIST_PLANT, gains=dict(rig_sim.HW_1104, LIFT_I=0))
+            run = lambda **kw: rig_sim.run_twin(twin, scen, kw)   # noqa: E731
+            off = run(**rig_sim.ASSIST_PLANT, gains=dict(rig_sim.HW_1104, LIFT_I=0))
             self.assertEqual(off["status"], "rampdown:RIG liftoff timeout", off)
             self.assertIsNone(off["liftoff_ms"])
-            on = self.run_twin(scen, **rig_sim.ASSIST_PLANT, gains=rig_sim.HW_1104)
+            on = run(**rig_sim.ASSIST_PLANT, gains=rig_sim.HW_1104)
             self.assertEqual(on["status"], "ok", on)
             self.assertLess(on["liftoff_ms"], 1500 + 8000)      # inside rig-roll's 8 s timeout
             self.assertLess(on["liftoff_att_int"], 0.0)         # pushes off the + stop

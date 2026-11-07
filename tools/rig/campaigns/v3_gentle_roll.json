@@ -1,0 +1,22 @@
+{
+  "name": "v3_gentle_roll",
+  "comment": "v3 stand (360 deg, no blockers), PSU only. COLL 500 hold was 'flat': a 3 deg target step got no roll response (moment <= 0.3 mNm, ~1% duty split), so check whether the rig turns at all. Gentle commanded roll: 10 deg step held 3 s, then a 10 deg 0.25 Hz sine. ATT_GAIN 0.85 (as flown) vs 2.0 (2.35x moment).",
+  "collective_permille": 600,
+  "roll_sp_mdeg": 0,
+  "mass_kg": 0.050,
+  "base_gains": {"ATT_P": 5.0, "RATE_P": 40.0, "RATE_D": 1.0, "ATT_I": 1.0, "RATE_I": 0.0, "ATT_GAIN": 0.85, "MOTOR_TRIM_LEFT": 1.0, "D_LPF_HZ": 30.0},
+  "grid_product": {"ATT_GAIN": [0.85, 2.0]},
+  "excitations": [
+    {"type": "step", "target": "att", "amp": 175, "dur_ms": 3000},
+    {"type": "sine", "target": "att", "amp": 175, "dur_ms": 8000, "f0_mHz": 250}
+  ],
+  "repeats": 1,
+  "arrangement": {"per_spin": 2},
+  "limits": {
+    "max_trials": 4,
+    "max_coll_permille": 850,
+    "max_run_ms": 60000,
+    "motor_budget_s": 70,
+    "settle_ms": 1500
+  }
+}
