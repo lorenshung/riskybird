@@ -311,6 +311,12 @@ static void esp_uart_drain(void)
 #ifndef ROSE_BATT_REPORT_ONLY
 #define ROSE_BATT_REPORT_ONLY 0
 #endif
+/* 0 = keep the battery arm gate and the BATT_CUTOFF_V estop but drop the sag compensation, so a
+ * sagging supply never pushes duty UP. Through bench leads the ADC reads the PWM troughs, and the
+ * boost became positive feedback (a 0.50 hold crept to 0.58 on the rig). Default 1 = unchanged. */
+#ifndef ROSE_BATT_SAG_COMP
+#define ROSE_BATT_SAG_COMP 1
+#endif
 #ifndef BATT_NOMINAL_V
 #define BATT_NOMINAL_V 3.8f      /* thrust-scaling reference; sag comp targets this pack voltage */
 #endif
@@ -371,7 +377,7 @@ static volatile uint32_t g_batt_miss_run;
  * Never REDUCES thrust (a fresh pack above nominal clamps to 1.0). */
 static inline float batt_thrust_scale(void)
 {
-#if ROSE_BATT_SENSE && !ROSE_BATT_REPORT_ONLY
+#if ROSE_BATT_SENSE && !ROSE_BATT_REPORT_ONLY && ROSE_BATT_SAG_COMP
 	float v = g_vbat;
 	if (v < 1.0f || v > 5.0f) { return 1.0f; }   /* invalid / not-yet-read -> no scaling */
 	float s = BATT_NOMINAL_V / v;
