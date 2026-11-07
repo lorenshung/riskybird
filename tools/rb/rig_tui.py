@@ -217,6 +217,10 @@ RBLINK_RE = re.compile(
     r"kill=(\d+)\s+txt=(\d+)\s+cl=(-?\d+)"
 )
 
+# The reset/safety tail esp_bridge appends after cl= (older images do not send it): the ESP's
+# re-arm hold (0 | boot | cut | kill), the raw ROM reset reason and the boot counter.
+RBLINK_TAIL_RE = re.compile(r"\brearm=(\w+)\b.*?\brst=0x([0-9a-fA-F]+).*?\bbootn=(\d+)")
+
 
 def parse_rblink(line):
     """The ESP's health line, same regex as tools/bench/riskybird-dash.py."""
@@ -224,7 +228,7 @@ def parse_rblink(line):
     if not m:
         return None
     g = m.groups()
-    return {
+    out = {
         "ml": g[0], "uptime_ms": int(g[1]), "seq": int(g[2]),
         "flags": int(g[3], 16), "flags_text": g[4].strip(),
         "duty": [int(g[5]), int(g[6]), int(g[7]), int(g[8])],
@@ -233,6 +237,10 @@ def parse_rblink(line):
         "cuts": int(g[15]), "pwmerr": int(g[16]),
         "kill": bool(int(g[17])), "txt": int(g[18]), "clients": int(g[19]),
     }
+    t = RBLINK_TAIL_RE.search(line, m.end())
+    if t:
+        out.update(rearm=t.group(1), rst=int(t.group(2), 16), bootn=int(t.group(3)))
+    return out
 
 
 def st_flag_names(st):

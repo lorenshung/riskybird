@@ -177,3 +177,14 @@
 &usb_serial {
 	status = "okay";
 };
+
+/*
+ * TG0 main watchdog, fed only by the motor-link thread (workloads/esp_bridge/
+ * src/esp_safety.c). Stage 0 at ESP_LINK_WDT_MS (250 ms) interrupts and the
+ * callback forces the four gates low and resets the chip; stage 1 at twice
+ * that is a hardware system reset if interrupts never ran. Motors build only:
+ * the default bridge has no gate to protect and no thread to feed it.
+ */
+&wdt0 {
+	status = "okay";
+};

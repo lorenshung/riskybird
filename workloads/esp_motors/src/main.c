@@ -362,7 +362,9 @@ static void uart_isr(const struct device *dev, void *user_data)
 
 /* ---- the motor thread ---------------------------------------------------- */
 
-static void handle_frame(const struct motor_link_cmd *cmd, int64_t now)
+/* Returns whether the frame feeds the failsafe deadline: false only for a
+ * stale/replayed sequence number. */
+static bool handle_frame(const struct motor_link_cmd *cmd, int64_t now)
 {
 	static uint8_t last_seq;
 	static int64_t last_ms;
@@ -372,7 +374,7 @@ static void handle_frame(const struct motor_link_cmd *cmd, int64_t now)
 
 		if (delta <= 0) {
 			g_stale++;
-			return;   /* deliberately does NOT feed the failsafe */
+			return false;   /* deliberately does NOT feed the failsafe */
 		}
 		if (delta > 1) {
 			g_gaps += (uint32_t)(delta - 1);
@@ -404,9 +406,10 @@ static void handle_frame(const struct motor_link_cmd *cmd, int64_t now)
 	if ((cmd->flags & MOTOR_LINK_FLAG_ARMED) == 0u ||
 	    (cmd->flags & MOTOR_LINK_FLAGS_BLOCK) != 0u) {
 		motors_off();
-		return;
+		return true;
 	}
 	motors_apply(cmd->duty);
+	return true;
 }
 
 static void motor_thread(void *a, void *b, void *c)
@@ -427,8 +430,7 @@ static void motor_thread(void *a, void *b, void *c)
 
 				if (motor_link_rx_feed(&g_rx, buf[i], &cmd)) {
 					now = k_uptime_get();
-					handle_frame(&cmd, now);
-					if (g_link_up) {
+					if (handle_frame(&cmd, now) && g_link_up) {
 						deadline = now + ESP_MOTORS_TIMEOUT_MS;
 					}
 				}

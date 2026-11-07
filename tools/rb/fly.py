@@ -68,6 +68,15 @@ _RB_RE = {
     "cl": re.compile(r"\bcl=(\d+)"),
     "flags": re.compile(r"\bfl=0x[0-9a-fA-F]+\[([^\]]*)\]"),
     "duty": re.compile(r"\bduty=\[([^\]]*)\]"),
+    # The reset/safety tail esp_bridge appends after cl= (absent from older images):
+    # rearm = the ESP's re-arm hold (0 | boot | cut | kill), rst = raw ROM reset reason,
+    # bootn = boots since RTC memory was lost, rtc = kept | cold, prev_up = the previous
+    # run's last uptime. `_` blocks \b, so prev_up / prev_kill / prev_duty never match above.
+    "rearm": re.compile(r"\brearm=(\w+)"),
+    "rst": re.compile(r"\brst=0x([0-9a-fA-F]+)"),
+    "bootn": re.compile(r"\bbootn=(\d+)"),
+    "rtc": re.compile(r"\brtc=(\w+)"),
+    "prev_up": re.compile(r"\bprev_up=(\d+)"),
 }
 
 
@@ -91,8 +100,10 @@ def parse_rblink(line: str) -> dict | None:
         value = m.group(1)
         if key == "duty":
             out[key] = [int(v) for v in value.split()]
-        elif key in ("ml", "flags"):
+        elif key in ("ml", "flags", "rearm", "rtc"):
             out[key] = value.strip()
+        elif key == "rst":
+            out[key] = int(value, 16)
         else:
             out[key] = int(value)
     return out

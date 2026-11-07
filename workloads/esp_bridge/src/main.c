@@ -142,6 +142,7 @@
 #include <stdio.h>
 
 #include "load_link.h"
+#include "esp_safety.h"
 
 #define FPGA_UART_NODE DT_ALIAS(fpga_uart)
 #if !DT_NODE_EXISTS(FPGA_UART_NODE)
@@ -156,6 +157,22 @@
 #if HAVE_MOTORS
 #include <zephyr/drivers/pwm.h>
 #include <riskybird/motor_link.h>
+#include <riskybird/motor_softstart.h>
+
+/* Phase interleave of the four LEDC channels (motor_phase_apply()). 1 = on,
+ * 0 = Zephyr's in-phase hpoint 0, for bench A/B. A CMake cache variable in
+ * CMakeLists.txt, like ESP_LINK_MAX_DUTY_PCT. */
+#ifndef ESP_LINK_PWM_INTERLEAVE
+#define ESP_LINK_PWM_INTERLEAVE 1
+#endif
+/* The spin-up gate in motors_service(). 1 = on, 0 = commands applied as
+ * received (the pre-gate behaviour), for bench A/B. Same mechanism. */
+#ifndef ESP_LINK_SOFTSTART
+#define ESP_LINK_SOFTSTART 1
+#endif
+#if ESP_LINK_PWM_INTERLEAVE
+#include <hal/ledc_ll.h>
+#endif
 #endif
 
 #define TELEM_PORT 14550
@@ -348,8 +365,39 @@ static volatile int32_t  g_last_gap_ms;
  * FPGA reading anything or even still running. That is the strongest single
  * argument for merging the two images, and it is latched -- cleared only by an
  * explicit RESET or a power cycle, never by the next frame saying ARMED.
+ *
+ * The latch also survives an ESP reset: it is mirrored into RTC memory
+ * (esp_safety_kill_store) and restored in main() before the link thread runs.
+ * Only the explicit RESET, or a power-on that loses LP SRAM, clears it.
  */
 static volatile bool g_kill;
+
+/* Bumped by the uplink thread on every ESTOP, so the link thread sees a latch
+ * even if a RESET cleared g_kill again within the same 5 ms tick. */
+static atomic_t g_kill_epoch = ATOMIC_INIT(0);
+
+/* The re-arm gate (esp_safety_core.h): after a boot or a kill, ARMED frames are
+ * refused until the sender has been seen NOT armed and then armed again. Link
+ * thread only; the status thread reads it for RBLINK. */
+static struct esp_rearm g_rearm = { .hold = ESP_REARM_BOOT };
+
+/*
+ * Whether the 120 ms silence failsafe ALSO sets the re-arm hold. 0 (default):
+ * no -- the cut zeroes the gates and the next valid ARMED frame resumes
+ * (unlimited if the cut was shorter than SS_CUT_COLD_MS, through a cold
+ * spin-up if longer: motors_cut()). In flight the FC keeps sending ARMED across a
+ * link gap and never disarms, so a hold here would turn a 120 ms UART hiccup
+ * into "motors off until someone re-arms", i.e. a crash. 1: the cut needs a
+ * disarm -> arm edge like a boot does (bench policy). A CMake cache variable
+ * in CMakeLists.txt, read back from the boot banner.
+ */
+#ifndef ESP_LINK_REARM_AFTER_CUT
+#define ESP_LINK_REARM_AFTER_CUT 0
+#endif
+
+/* esp_safety_wdt_start()'s result, for the RBLINK wdt= field: -EAGAIN until
+ * the first accepted ARMED frame starts the watchdog. */
+static volatile int g_wdt_rc = -EAGAIN;
 
 /* ---- actuation ----------------------------------------------------------- */
 
@@ -380,9 +428,101 @@ bool esp_bridge_motors_recently_on(void)
 	return (uint32_t)(k_uptime_get_32() - (uint32_t)atomic_get(&g_last_spin_ms)) < 1000u;
 }
 
+#if ESP_LINK_PWM_INTERLEAVE
+/*
+ * PWM PHASE INTERLEAVE. All four channels share LEDC timer 0 and Zephyr's
+ * driver writes hpoint = 0 on every pwm_set (pwm_led_esp32.c:103), so all four
+ * low-side FETs turn on at the same counter value every 50 us and +BATT sees
+ * 4x the per-motor current in one pulse. Here, after the driver has set the
+ * channels up, the hpoints are moved so the four pulses are PACKED into the
+ * period, two from the left and two from the right (ss_phase_hpoints() in
+ * motor_softstart.h): at most two FETs on at once up to ~50 % duty, where the
+ * old per-channel spread had three on from ~40 % (2026-11-05 power analysis:
+ * COLL 600 = 0.43 duty sat at the logic-dropout edge on the bench leads).
+ * Average current is unchanged; the peak, and the on-phase notch on +BATT, drop.
+ *
+ * NO WRAPAROUND. ESP32-C6 TRM v1.2 sec. 35.3.3: the output goes high at
+ * counter == Hpoint and low at counter == Lpoint = DUTY[24:4] + HPOINT, both
+ * latched at overflow, and the counter only runs 0 .. 2^res - 1. An Lpoint
+ * >= 2^res never matches and would leave the gate HIGH, so hpoint + duty is
+ * kept <= 2^res - 1 for every duty. Consequence: above 50 % duty every pulse
+ * covers mid-period and all four still overlap there (for 2d - P + 1 counts).
+ *
+ * Sequence, after any channel was rewritten: read every channel's running
+ * state and the DUTY[24:4] in its register (the driver's double rounding can
+ * differ from ours by a count), compute all four hpoints, and for each running
+ * channel whose hpoint register differs write hpoint, then duty_start +
+ * para_up as IDF's ledc_update_duty() does. Channels the driver stopped (0 %
+ * and 100 % -- sig_out_en 0, idle level) are never touched, so duty 0 stays
+ * genuinely off, and count as idle for placement. Every (hpoint, duty) pair
+ * the hardware can latch is valid: the driver writes hpoint 0 BEFORE a new
+ * duty, and each hpoint is bounded by P-1 minus the duty already in ITS OWN
+ * register -- a neighbour's duty only moves it within that bound -- so a
+ * channel whose duty did not change can be re-placed with no new duty at all.
+ * If an overflow falls between the driver's para_up and ours, one 50 us period
+ * runs with a pulse at hpoint 0 -- harmless.
+ *
+ * Link thread only, after pwm_set_dt() returned: the driver's semaphore is
+ * free and nothing else touches these channels.
+ */
+#define MOTOR_LEDC_HW ((ledc_dev_t *)DT_REG_ADDR(DT_PWMS_CTLR(DT_ALIAS(pwm_motor0))))
+
+static void motor_phase_apply_all(void)
+{
+	ledc_dev_t *const hw = MOTOR_LEDC_HW;
+	uint32_t d[MOTOR_LINK_NMOTORS], h[MOTOR_LINK_NMOTORS], period = 0;
+	bool run[MOTOR_LINK_NMOTORS];
+
+	for (unsigned i = 0; i < MOTOR_LINK_NMOTORS; i++) {
+		const ledc_channel_t ch = (ledc_channel_t)motors[i].channel;
+		const uint32_t tsel =
+			hw->channel_group[LEDC_LOW_SPEED_MODE].channel[ch].conf0.timer_sel;
+		const uint32_t p =
+			1u << hw->timer_group[LEDC_LOW_SPEED_MODE].timer[tsel].conf.duty_res;
+
+		if (i == 0u) {
+			period = p;
+		} else if (p != period) {
+			return;   /* not one shared timer: leave every hpoint as it is */
+		}
+		/* sig_out_en is the driver's own running/stopped state
+		 * (pwm_led_esp32_start/stop). A pulse under one 80 MHz cycle
+		 * (duty 1-2/10000) truncates to 0 cycles inside pwm_set_dt and
+		 * takes the stop path without writing DUTY, so the register can
+		 * still hold the previous nonzero duty: never trust it alone. */
+		run[i] = hw->channel_group[LEDC_LOW_SPEED_MODE].channel[ch].conf0.sig_out_en;
+		d[i] = run[i] ? hw->channel_group[LEDC_LOW_SPEED_MODE].channel[ch].duty.duty >> 4
+			      : 0u;
+	}
+	ss_phase_hpoints(d, period, h);
+	for (unsigned i = 0; i < MOTOR_LINK_NMOTORS; i++) {
+		const ledc_channel_t ch = (ledc_channel_t)motors[i].channel;
+		uint32_t cur;
+
+		if (!run[i] || d[i] == 0u || d[i] >= period - 1u) {
+			continue;   /* leave the driver's hpoint 0 */
+		}
+		ledc_ll_get_hpoint(hw, LEDC_LOW_SPEED_MODE, ch, &cur);
+		if (cur == h[i]) {
+			continue;
+		}
+		ledc_ll_set_hpoint(hw, LEDC_LOW_SPEED_MODE, ch, h[i]);
+		ledc_ll_set_duty_start(hw, LEDC_LOW_SPEED_MODE, ch, true);
+		ledc_ll_ls_channel_update(hw, LEDC_LOW_SPEED_MODE, ch);
+	}
+}
+#endif
+
+/* Last duty successfully written per gate; 0xFFFF forces the first write.
+ * The link thread wakes on every UART ISR, so rewriting unchanged duties
+ * would reprogram the LEDC (and reopen the in-phase window above) many times
+ * per frame. */
+static uint16_t g_written[MOTOR_LINK_NMOTORS] = { 0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu };
+
 static void motors_apply(const uint16_t duty[MOTOR_LINK_NMOTORS])
 {
 	const uint32_t ceiling = (MOTOR_LINK_DUTY_FULL * ESP_LINK_MAX_DUTY_PCT) / 100U;
+	bool rewrote = false;
 
 	for (unsigned i = 0; i < MOTOR_LINK_NMOTORS; i++) {
 		/* A program load resets the SoC and starts new code on it: no
@@ -394,11 +534,18 @@ static void motors_apply(const uint16_t duty[MOTOR_LINK_NMOTORS])
 		if (d > ceiling) {
 			d = ceiling;
 		}
-		/* Active-high into the SI2302: pulse 0 is genuinely off. */
-		pulse = (uint32_t)((uint64_t)MOTOR_PERIOD_NSEC * d / MOTOR_LINK_DUTY_FULL);
-		rc = pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, pulse);
-		if (rc != 0) {
-			g_pwm_errs++;
+		if (d != g_written[i]) {
+			/* Active-high into the SI2302: pulse 0 is genuinely off. */
+			pulse = (uint32_t)((uint64_t)MOTOR_PERIOD_NSEC * d /
+					   MOTOR_LINK_DUTY_FULL);
+			rc = pwm_set_dt(&motors[i], MOTOR_PERIOD_NSEC, pulse);
+			if (rc != 0) {
+				g_pwm_errs++;
+				g_written[i] = 0xFFFFu;   /* retry next call */
+			} else {
+				g_written[i] = (uint16_t)d;
+				rewrote = true;
+			}
 		}
 		g_duty[i] = (uint16_t)d;
 		if (d != 0u) {
@@ -406,13 +553,87 @@ static void motors_apply(const uint16_t duty[MOTOR_LINK_NMOTORS])
 			atomic_set(&g_ever_spun, 1);
 		}
 	}
+#if ESP_LINK_PWM_INTERLEAVE
+	/* A changed duty moves its neighbours too (packing): re-place all four. */
+	if (rewrote) {
+		motor_phase_apply_all();
+	}
+#else
+	(void)rewrote;
+#endif
 }
 
+/* ---- spin-up gate ---------------------------------------------------------
+ * The ESP's last-stage soft start (rules in riskybird/motor_softstart.h):
+ * handle_frame() stores the commanded duties; motors_service() runs on every
+ * link-thread wake (<= ESP_LINK_TICK_MS) and writes the gated duties. Link
+ * thread only; the status thread reads g_ss for the RBLINK line, torn reads
+ * being cosmetic as for g_duty. */
+static uint16_t g_tgt[MOTOR_LINK_NMOTORS];   /* post-ceiling commands */
+static struct ss g_ss;
+
+static uint32_t motors_now_us(void)
+{
+	return (uint32_t)k_ticks_to_us_floor64((uint64_t)k_uptime_ticks());
+}
+
+static void motors_set_target(const uint16_t duty[MOTOR_LINK_NMOTORS])
+{
+	const uint32_t ceiling = (MOTOR_LINK_DUTY_FULL * ESP_LINK_MAX_DUTY_PCT) / 100U;
+
+	/* Ceiling first, so the gate's "never above the command" is about what
+	 * can actually reach a gate. */
+	for (unsigned i = 0; i < MOTOR_LINK_NMOTORS; i++) {
+		g_tgt[i] = (uint16_t)(duty[i] > ceiling ? ceiling : duty[i]);
+	}
+}
+
+static void motors_service(uint32_t now_us)
+{
+	uint16_t tgt[MOTOR_LINK_NMOTORS];
+	/* esp_safety_wdt_held(): persist.c is erasing ESP flash with the
+	 * watchdog paused (granted only after 1 s with no duty), so nothing may
+	 * drive until it is released. */
+	const bool blocked = g_kill || load_link_active() || esp_safety_wdt_held();
+
+	for (unsigned i = 0; i < MOTOR_LINK_NMOTORS; i++) {
+		tgt[i] = blocked ? 0u : g_tgt[i];
+	}
+#if ESP_LINK_SOFTSTART
+	uint16_t out[MOTOR_LINK_NMOTORS];
+
+	ss_step(&g_ss, tgt, out, now_us);
+	motors_apply(out);
+#else
+	ARG_UNUSED(now_us);
+	motors_apply(tgt);
+#endif
+}
+
+/* Disarm (not-ARMED frame), kill, load session, flash hold, re-arm refusal:
+ * gates to 0 and every motor COLD, so the next arm always spins up. */
 static void motors_off(void)
 {
 	static const uint16_t zero[MOTOR_LINK_NMOTORS] = { 0, 0, 0, 0 };
 
+	ss_reset(&g_ss);
+	memset(g_tgt, 0, sizeof(g_tgt));
 	motors_apply(zero);
+}
+
+/*
+ * The 120 ms silence failsafe: gates to 0 at once, but the spin-up gate is NOT
+ * reset (ss_cut, rule 2 in motor_softstart.h). In flight the FC keeps sending
+ * ARMED across a link gap, and a rotor 120 ms after the cut is still spinning:
+ * resuming it through hold + stagger would cost authority and kick attitude.
+ * The motors go COLD only if the cut lasts SS_CUT_COLD_MS (rotors spun down,
+ * inrush matters again); handle_frame() ends the cut with ss_resume().
+ */
+static void motors_cut(uint32_t now_us)
+{
+	memset(g_tgt, 0, sizeof(g_tgt));
+	ss_cut(&g_ss, now_us);
+	motors_service(now_us);
 }
 
 /* ---- frame handling ------------------------------------------------------
@@ -429,12 +650,17 @@ static void motors_off(void)
  *                 command is the newest one.
  *   stale seq     Dropped, and does NOT advance the deadline. A UART cannot
  *                 reorder, so this is a replay or the tail of a resync.
+ *                 handle_frame() returns false for it and link_thread() only
+ *                 moves the deadline on true, so a sender stuck re-emitting
+ *                 one frame (same seq) ends in the timeout like silence.
  *   not ARMED     Every motor to 0, whatever the duty fields say.
  *   kill latched  Every motor to 0, whatever the frame says, until RESET.
  */
 static struct motor_link_rx g_rx;   /* link thread only */
 
-static void handle_frame(const struct motor_link_cmd *cmd, int64_t now)
+/* Returns whether the frame counts as link activity (feeds the failsafe
+ * deadline): false only for a stale/replayed sequence number. */
+static bool handle_frame(const struct motor_link_cmd *cmd, int64_t now)
 {
 	static uint8_t last_seq;
 	static int64_t last_ms;
@@ -444,7 +670,7 @@ static void handle_frame(const struct motor_link_cmd *cmd, int64_t now)
 
 		if (delta <= 0) {
 			g_stale++;
-			return;   /* deliberately does NOT feed the failsafe */
+			return false;   /* deliberately does NOT feed the failsafe */
 		}
 		if (delta > 1) {
 			g_gaps += (uint32_t)(delta - 1);
@@ -466,13 +692,50 @@ static void handle_frame(const struct motor_link_cmd *cmd, int64_t now)
 	 * cannot spin a motor. The blocking set is MOTOR_LINK_FLAGS_BLOCK, which
 	 * lives in the shared header so a sender that gains a new reason to stop
 	 * cannot diverge from a receiver that has never heard of it.
+	 *
+	 * The re-arm gate goes first: it has to SEE the not-armed frames (that
+	 * is its evidence of a disarm), and it refuses the first ARMED frames
+	 * after a boot or a kill (and a failsafe cut, if
+	 * ESP_LINK_REARM_AFTER_CUT) until that disarm -> arm edge.
 	 */
+	if (!esp_rearm_frame(&g_rearm, cmd->flags, MOTOR_LINK_FLAG_ARMED,
+			     MOTOR_LINK_FLAGS_BLOCK, g_kill)) {
+		motors_off();
+		return true;
+	}
 	if ((cmd->flags & MOTOR_LINK_FLAG_ARMED) == 0u ||
 	    (cmd->flags & MOTOR_LINK_FLAGS_BLOCK) != 0u) {
 		motors_off();
-		return;
+		return true;
 	}
-	motors_apply(cmd->duty);
+	/* The hardware watchdog starts at the first ARMED frame that may drive,
+	 * not at link-thread start: the boot runs WiFi bring-up and PHY
+	 * calibration asynchronously, and the dog only has to guard the time
+	 * the gates can be driven. Once started it runs until the next reset. */
+	if (g_wdt_rc == -EAGAIN) {
+		/* -EAGAIN again while persist.c holds the dog for a flash erase:
+		 * retried on the next frame. */
+		g_wdt_rc = esp_safety_wdt_start();
+	}
+	/* Fail closed: a watchdog that could not start (no &wdt0, a build
+	 * without CONFIG_WATCHDOG, an install/setup error) means no backstop for
+	 * a hung link thread, so nothing drives. -EAGAIN is the flash-erase hold
+	 * (the link thread cannot run during the IRQ-off erase anyway) and is
+	 * retried. RBLINK shows wdt=err. */
+	if (g_wdt_rc != 0 && g_wdt_rc != -EAGAIN) {
+		motors_off();
+		return true;
+	}
+	/* A failsafe cut, if one is latched, ends here: short -> the motors
+	 * resume unlimited, >= SS_CUT_COLD_MS -> cold spin-up. Then store, and
+	 * apply through the spin-up gate at once (the link thread also services
+	 * it on every wake). */
+	const uint32_t now_us = motors_now_us();
+
+	ss_resume(&g_ss, now_us);
+	motors_set_target(cmd->duty);
+	motors_service(now_us);
+	return true;
 }
 
 /* ---- the demux ------------------------------------------------------------
@@ -543,14 +806,30 @@ static void link_thread(void *a, void *b, void *c)
 	int64_t deadline = 0;
 	bool kill_applied = false;
 	bool load_applied = false;
+	bool hold_applied = false;
+	atomic_val_t kill_epoch = atomic_get(&g_kill_epoch);
 
 	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
+
+	/* The hardware watchdog (esp_safety.c) is fed only from this loop, so a
+	 * link thread that stops cycling resets the chip with the gates forced
+	 * low. It is started by handle_frame() at the first ARMED frame that may
+	 * drive (see there), and esp_safety_wdt_service() is a no-op until then. */
 
 	for (;;) {
 		uint8_t buf[64];
 		uint32_t n;
 		int64_t now;
 		bool woke_downlink = false;
+
+		/* Every ESTOP since the last pass, even one a RESET already cleared
+		 * again, sets the re-arm hold -- BEFORE this pass's frames, so none
+		 * of them can drive past it. */
+		if (atomic_get(&g_kill_epoch) != kill_epoch) {
+			kill_epoch = atomic_get(&g_kill_epoch);
+			esp_rearm_hold(&g_rearm, ESP_REARM_KILL);
+			motors_off();
+		}
 
 		while ((n = ring_buf_get(&uart_rb, buf, sizeof(buf))) > 0u) {
 			for (uint32_t i = 0; i < n; i++) {
@@ -567,8 +846,7 @@ static void link_thread(void *a, void *b, void *c)
 				}
 				if (got_frame) {
 					now = k_uptime_get();
-					handle_frame(&cmd, now);
-					if (g_link_up) {
+					if (handle_frame(&cmd, now) && g_link_up) {
 						deadline = now + ESP_LINK_TIMEOUT_MS;
 					}
 				}
@@ -580,9 +858,10 @@ static void link_thread(void *a, void *b, void *c)
 
 		now = k_uptime_get();
 		if (g_link_up && now >= deadline) {
-			motors_off();
+			motors_cut(motors_now_us());   /* zero, NOT cold: see there */
 			g_link_up = false;
 			g_failsafe_cuts++;
+			esp_rearm_on_cut(&g_rearm, ESP_LINK_REARM_AFTER_CUT);
 		}
 		/* A kill that arrives between frames must not wait for the next
 		 * one. motors_apply() already forces zero while latched; this
@@ -600,6 +879,26 @@ static void link_thread(void *a, void *b, void *c)
 				motors_off();
 			}
 		}
+		/* And for a flash-erase hold granted at the end of the last pass
+		 * (esp_safety_wdt_service below; motors_service blocks meanwhile). */
+		if (esp_safety_wdt_held() != hold_applied) {
+			hold_applied = esp_safety_wdt_held();
+			if (hold_applied) {
+				motors_off();
+			}
+		}
+
+		/* Advance the spin-up gate. After the failsafe, kill and load
+		 * checks, so a stale command is never written past the deadline
+		 * (motors_off() or motors_cut() above has already zeroed the targets). */
+		motors_service(motors_now_us());
+
+		/* Watchdog feed (and a persist.c flash-erase hold request: granted
+		 * here only after 1 s with no duty, which also blocks the gates
+		 * until released), and the previous-run snapshot for the next
+		 * boot's RBLINK prev_* fields (rate-limited inside). */
+		esp_safety_wdt_service(esp_bridge_motors_recently_on());
+		esp_safety_snap_store(g_duty, g_flags, g_kill, g_link_up, g_rearm.hold);
 
 		/* Yield. A cooperative thread that never blocks starves the
 		 * system; blocking with a timeout is what makes the failsafe
@@ -645,6 +944,10 @@ static const char *flags_str(uint8_t f, char *buf, size_t len)
  *   crc    frames rejected by CRC; noise  bytes that never belonged to a frame
  *   kill   1 = this ESP has latched a remote kill; frames are being ignored
  *   txt    ASCII bytes forwarded to the radio, i.e. proof the demux is working
+ *   ph     1 = PWM phase interleave built in, 0 = in-phase (hpoint 0)
+ *   ss     spin-up gate phase per motor, motor 1 first: 0 COLD 1 WAIT 2 HOLD
+ *          3 SLEW 4 RUN; ffff = gate compiled out (ESP_LINK_SOFTSTART=0)
+ *   sslim  service ticks in which the gate held some output below its command
  */
 static int status_line(char *buf, size_t len, int clients)
 {
@@ -653,7 +956,8 @@ static int status_line(char *buf, size_t len, int clients)
 	return snprintk(buf, len,
 			"RBLINK v1 ml=%s up=%lld seq=%u fl=0x%02x[%s] "
 			"duty=[%u %u %u %u] fr=%u gap=%d lost=%u stale=%u "
-			"crc=%u noise=%u cuts=%u pwmerr=%u kill=%u txt=%u cl=%d\n",
+			"crc=%u noise=%u cuts=%u pwmerr=%u kill=%u txt=%u cl=%d "
+			"ph=%u ss=%04x sslim=%u\n",
 			g_link_up ? "up" : "down", k_uptime_get(),
 			(unsigned)g_seq, (unsigned)g_flags,
 			flags_str(g_flags, fbuf, sizeof(fbuf)),
@@ -663,12 +967,64 @@ static int status_line(char *buf, size_t len, int clients)
 			(unsigned)g_gaps, (unsigned)g_stale,
 			(unsigned)g_rx.bad_crc, (unsigned)g_rx.noise,
 			(unsigned)g_failsafe_cuts, (unsigned)g_pwm_errs,
-			g_kill ? 1u : 0u, (unsigned)g_text_bytes, clients);
+			g_kill ? 1u : 0u, (unsigned)g_text_bytes, clients,
+			(unsigned)ESP_LINK_PWM_INTERLEAVE,
+			ESP_LINK_SOFTSTART ? (unsigned)ss_phase_word(&g_ss) : 0xffffu,
+			(unsigned)g_ss.lim_ticks);
+}
+
+/*
+ * Reset and safety fields, appended AFTER cl= so every existing RBLINK parser
+ * (rig_tui / riskybird-dash regexes anchor on "... txt=N cl=N") still matches:
+ *
+ *   rearm   the re-arm hold: 0 | boot | kill, and cut only in a build with
+ *           ESP_LINK_REARM_AFTER_CUT=1 (by default a failsafe cut resumes on
+ *           the next ARMED frame). Anything but 0 with fl=ARMED means the ESP
+ *           is refusing ARMED frames until the sender disarms and arms again
+ *           (esp_safety_core.h)
+ *   rablk   ARMED frames refused by that hold since boot
+ *   wdt     hardware watchdog: off (not started: it starts at the first ARMED
+ *           frame allowed to drive) | <ms>ms (running) | held (paused for a
+ *           flash erase; the gates are held at 0 meanwhile) | err (start
+ *           failed). After an rb debug session this is not proof
+ *           the dog is live: an OpenOCD halt likely disables the MWDTs
+ *           (unverified) and the firmware cannot see that.
+ *   rst     raw ROM reset reason of THIS boot, with a name; 0x01 = power-on
+ *           OR chip brownout (the C6 cannot tell them apart)
+ *   hw      Zephyr hwinfo RESET_* mask (what persist.c acts on)
+ *   bootn   boots since RTC memory was last lost; rtc kept|cold says whether
+ *           it survived this reset (cold = true power loss, or garbage)
+ *   prev_fault  none | wdt/<thread>/up<ms> | fatal<reason>/pc<hex>/<thread>/up<ms>
+ *   prev_*  the previous run's last snapshot (<= 10 ms old when it died):
+ *           uptime, applied duties, flag byte, kill, link, re-arm hold
+ */
+static int status_tail(char *buf, size_t len, int n)
+{
+	if (n <= 0 || (size_t)n >= len) {
+		return n;
+	}
+	if (buf[n - 1] == '\n') {
+		n--;
+	}
+	n += snprintk(buf + n, len - n, " rearm=%s rablk=%u wdt=%s",
+		      esp_rearm_hold_name(g_rearm.hold), (unsigned)g_rearm.blocked,
+		      g_wdt_rc == 0 ? esp_safety_wdt_state() :
+		      g_wdt_rc == -EAGAIN ? "off" : "err");
+	if ((size_t)n < len) {
+		n += esp_safety_boot_fields(buf + n, len - n);
+	}
+	if ((size_t)n < len) {
+		n += esp_safety_prev_fields(buf + n, len - n);
+	}
+	if ((size_t)n < len) {
+		n += snprintk(buf + n, len - n, "\n");
+	}
+	return n;
 }
 
 int esp_bridge_status(char *buf, size_t len)
 {
-	return status_line(buf, len, -1);
+	return status_tail(buf, len, status_line(buf, len, -1));
 }
 
 #else
@@ -679,7 +1035,15 @@ bool esp_bridge_motors_recently_on(void)
 
 int esp_bridge_status(char *buf, size_t len)
 {
-	return snprintk(buf, len, "RBLINK none (no motor path in this image)\n");
+	int n = snprintk(buf, len, "RBLINK none (no motor path in this image)");
+
+	if (n > 0 && (size_t)n < len) {
+		n += esp_safety_boot_fields(buf + n, len - n);
+	}
+	if (n > 0 && (size_t)n < len) {
+		n += snprintk(buf + n, len - n, "\n");
+	}
+	return n;
 }
 #endif /* HAVE_MOTORS */
 
@@ -808,7 +1172,9 @@ static void downlink_thread(void *a, void *b, void *c)
  * in front of the telemetry stream. */
 static void status_thread(void *a, void *b, void *c)
 {
-	char buf[256];
+	/* 640: the v1 line is ~230 B; the reset/safety tail (status_tail) adds
+	 * up to ~260 more. A truncated line loses its newline and the tail. */
+	char buf[640];
 	int sock = -1;
 	bool sock_err_said = false;
 
@@ -832,12 +1198,14 @@ static void status_thread(void *a, void *b, void *c)
 			}
 		}
 		clients_now(&cl);
-		n = status_line(buf, sizeof(buf), cl.count);
+		n = status_tail(buf, sizeof(buf), status_line(buf, sizeof(buf), cl.count));
 		if (n <= 0) {
 			continue;
 		}
-		if (n > (int)sizeof(buf)) {
-			n = (int)sizeof(buf);   /* snprintk truncated */
+		if (n > (int)sizeof(buf) - 1) {
+			/* snprintk truncated: it wrote sizeof(buf) - 1 chars and the
+			 * NUL, which must not go out in the datagram. */
+			n = (int)sizeof(buf) - 1;
 		}
 		if (sock >= 0) {
 			send_to_clients(sock, &cl, buf, (size_t)n);
@@ -903,9 +1271,17 @@ static void uplink_thread(void *a, void *b, void *c)
 		 * component in the chain that can actually stop a motor. */
 		if (n == 5 && memcmp(cmd, "ESTOP", 5) == 0) {
 			g_kill = true;
+			atomic_inc(&g_kill_epoch);
+			esp_safety_kill_store(true);   /* survives an ESP reset */
 			local = " -- ESP GATES CUT AND LATCHED";
 		} else if (n == 5 && memcmp(cmd, "RESET", 5) == 0) {
+			/* No extra step is implied: the FC's own ESTOP-flagged (not
+			 * armed) frames during the latch already satisfy the re-arm
+			 * gate, so the FC's next ARMED frame applies. Only an FC that
+			 * stayed ARMED through the whole latch has to disarm first,
+			 * and RBLINK says so (rearm=kill, rablk counting). */
 			g_kill = false;
+			esp_safety_kill_store(false);
 			local = " -- ESP kill latch CLEARED, frames apply again";
 		}
 #endif
@@ -1123,6 +1499,9 @@ int main(void)
 {
 	printk("\n=== RiskyBird ESP link: FPGA uart <-> WiFi UDP%s ===\n",
 	       HAVE_MOTORS ? " + 4x motor gates" : "");
+	/* Reset cause, boot counter and the previous run's RTC records, before
+	 * anything else can overwrite them. */
+	esp_safety_boot();
 
 #if HAVE_MOTORS
 	printk("esp_bridge: MOTORS BUILD -- this image DRIVES the gates. "
@@ -1131,6 +1510,20 @@ int main(void)
 	       MOTOR_PERIOD_NSEC, 1000000U / MOTOR_PERIOD_NSEC);
 	printk("esp_bridge: failsafe %d ms, tick %d ms, duty ceiling %u%%\n",
 	       ESP_LINK_TIMEOUT_MS, ESP_LINK_TICK_MS, ESP_LINK_MAX_DUTY_PCT);
+	printk("esp_bridge: PWM interleave %s\n", ESP_LINK_PWM_INTERLEAVE ?
+	       "ON (hpoint_i = i*(P-1-duty)/3, no Lpoint wrap)" :
+	       "OFF (all four in phase, hpoint 0)");
+	if (ESP_LINK_SOFTSTART) {
+		printk("esp_bridge: spin-up gate ON -- idle %u/10000 hold %u ms, "
+		       "slew %u/10000 per s, stagger %u ms, max %u ms; cold at "
+		       "boot, disarm, kill and load, and after a failsafe cut "
+		       ">= %u ms (a shorter cut resumes unlimited)\n",
+		       (unsigned)SS_IDLE, (unsigned)SS_HOLD_MS,
+		       (unsigned)SS_RATE_PER_S, (unsigned)SS_STAGGER_MS,
+		       (unsigned)SS_MAX_MS, (unsigned)SS_CUT_COLD_MS);
+	} else {
+		printk("esp_bridge: spin-up gate OFF -- commands applied as received\n");
+	}
 	printk("esp_bridge: workloads/esp_motors and workloads/motor_safe claim "
 	       "these same pins -- only one image can be flashed\n");
 
@@ -1151,6 +1544,22 @@ int main(void)
 	 * carrier's 10k gate pulldown.
 	 */
 	motors_off();
+
+	/* Re-arm hold from boot, and an ESTOP latched before this reset stays
+	 * latched. Both before the link thread exists. */
+	esp_rearm_init(&g_rearm);
+	if (esp_safety_kill_restored()) {
+		g_kill = true;
+		printk("esp_bridge: ESP KILL LATCH RESTORED from RTC memory (an ESTOP "
+		       "before this reset was never cleared) -- send RESET to clear\n");
+	}
+	printk("esp_bridge: re-arm gate ON -- after boot or ESTOP%s, ARMED applies "
+	       "only after a disarm -> arm edge%s; watchdog %d ms (hardware backstop "
+	       "%d ms), started at the first ARMED frame allowed to drive\n",
+	       ESP_LINK_REARM_AFTER_CUT ? " or a failsafe cut" : "",
+	       ESP_LINK_REARM_AFTER_CUT ? "" : " (a failsafe cut resumes on the next "
+	       "ARMED frame: ESP_LINK_REARM_AFTER_CUT=0)",
+	       ESP_LINK_WDT_MS, 2 * ESP_LINK_WDT_MS);
 #endif
 
 	if (!device_is_ready(fpga_uart)) {
@@ -1183,7 +1592,19 @@ int main(void)
 #if HAVE_MOTORS
 	/* Highest priority in the application, and created BEFORE the radio
 	 * threads so it is already running by the time anything can queue
-	 * network work. */
+	 * network work.
+	 *
+	 * The UART IRQ has been filling uart_rb since before softap_start(),
+	 * which can take seconds; on a full ring the NEWEST bytes are dropped.
+	 * Frames in that backlog would be stamped with the drain time and treated
+	 * as fresh, so start the link thread on an empty ring: the next frame
+	 * the FC sends is the first one acted on. */
+	{
+		const unsigned int key = irq_lock();
+
+		ring_buf_reset(&uart_rb);
+		irq_unlock(key);
+	}
 	k_thread_create(&link_thread_data, link_stack,
 			K_THREAD_STACK_SIZEOF(link_stack),
 			link_thread, NULL, NULL, NULL,

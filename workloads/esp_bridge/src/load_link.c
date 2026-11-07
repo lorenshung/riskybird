@@ -712,21 +712,29 @@ static void session(struct transport *t, const struct request *rq)
 	uint32_t id = 0;
 	bool id_valid = false;
 
-	if (rq->kind == K_STASH || rq->kind == K_POLICY || rq->kind == K_AUTO) {
-		persist_session(t->is_usb ? NULL : &t->sock, t->is_usb, rq);
-		return;
-	}
 	if (rq->kind == K_STAT) {
-		char line[256];
+		/* Not say_kind(): its 200-byte buffer already cut the ~230-byte
+		 * v1 line, and the reset/safety tail roughly doubles it. Static
+		 * rather than on the 4 KiB stack: only this thread runs sessions. */
+		static char line[704];
+		int n = snprintk(line, sizeof(line), "%s OK ", KINDS[rq->kind].name);
 
-		(void)esp_bridge_status(line, sizeof(line));
-		say_kind(t, rq, "OK %s", line);
+		(void)esp_bridge_status(&line[n], sizeof(line) - (size_t)n);
+		t_say(t, line);
 		return;
 	}
 	if (esp_bridge_motors_recently_on()) {
 		say_kind(t, rq, "ERR motors-running: a gate carried a nonzero duty in the last "
 			 "second; a session would cut the motor link. Land and disarm first.\n");
 		printk("load_link: %s %s refused: motors running\n", t->name, k->name);
+		return;
+	}
+	/* Below the refusal on purpose: a stash or policy write erases ESP flash
+	 * with interrupts and the cache off (up to a 64 KiB block per call), which
+	 * stalls the motor failsafe, and RBAUTO1 reboots the FPGA. None of that
+	 * may happen while a gate is driven. */
+	if (rq->kind == K_STASH || rq->kind == K_POLICY || rq->kind == K_AUTO) {
+		persist_session(t->is_usb ? NULL : &t->sock, t->is_usb, rq);
 		return;
 	}
 	if (rq->kind == K_POKE && !tsi_synced) {

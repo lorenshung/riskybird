@@ -18,8 +18,9 @@
  * image does not otherwise use: it boots with ESP_SIMPLE_BOOT, not MCUboot.
  * (If MCUboot OTA is ever enabled, move this.)
  *
- * THE POWER-ON SEQUENCE (only when the ESP's reset cause is power-on: an ESP
- * crash, watchdog or reflash must never reset a SoC that may be flying):
+ * THE POWER-ON SEQUENCE (only when the ESP's reset cause is power-on or
+ * brownout: an ESP crash, watchdog or reflash must never reset a SoC that may
+ * be flying):
  *
  *   1. If uart1 has already delivered traffic, a program is running: stop.
  *   2. PING until a loader answers (<= 15 s): that id is the golden image's.
@@ -41,6 +42,7 @@
 
 #include "load_link.h"
 #include "load_link_internal.h"
+#include "esp_safety.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/storage/flash_map.h>
@@ -129,6 +131,36 @@ static bool part_open(void)
 	return fa != NULL || flash_area_open(PART_ID, &fa) == 0;
 }
 
+/* Every erase goes through here. esp_flash erases a whole sector or 64 KiB
+ * block per op with interrupts and the cache off, which can outlast the motors
+ * build's 250 ms watchdog and stalls the motor failsafe. So an erase runs ONLY
+ * under a granted hold (esp_safety.c): no duty on any gate for 1 s, the dog
+ * paused (or kept from starting), and the gates held at 0 until the release.
+ * Otherwise it is refused with -EBUSY -- a session can last seconds after
+ * load_link's motors-running check, and the FC may have spun up since. The
+ * default build has no dog or gates and always erases. */
+static int erase_guarded(off_t off, size_t len)
+{
+	int rc = -EBUSY;
+
+	if (!esp_bridge_motors_recently_on() && esp_safety_wdt_hold(true)) {
+		rc = flash_area_erase(fa, off, len);
+	}
+	/* Always: a refused request must not stay pending and be granted later. */
+	(void)esp_safety_wdt_hold(false);
+	return rc;
+}
+
+/* Page programs hold IRQs off for ~1 ms at a time, no hold needed, but none
+ * while a gate is driven either (same 1 s rule). */
+static int write_guarded(off_t off, const void *data, size_t len)
+{
+	if (esp_bridge_motors_recently_on()) {
+		return -EBUSY;
+	}
+	return flash_area_write(fa, off, data, len);
+}
+
 static uint32_t pol_crc(const struct policy *p)
 {
 	return crc32_ieee((const uint8_t *)p, offsetof(struct policy, crc));
@@ -151,9 +183,9 @@ static int policy_save(void)
 	if (!part_open()) {
 		return -ENODEV;
 	}
-	int rc = flash_area_erase(fa, POLICY_OFF, ERASE_UNIT);
+	int rc = erase_guarded(POLICY_OFF, ERASE_UNIT);
 
-	return rc ? rc : flash_area_write(fa, POLICY_OFF, &pol, sizeof(pol));
+	return rc ? rc : write_guarded(POLICY_OFF, &pol, sizeof(pol));
 }
 
 static bool stash_header(struct stash_hdr *h)
@@ -388,7 +420,7 @@ static void stash_receive(struct out *o, const char *args)
 		return;
 	}
 	if (strcmp(args, " CLEAR") == 0) {
-		(void)flash_area_erase(fa, STASH_OFF, ERASE_UNIT);
+		(void)erase_guarded(STASH_OFF, ERASE_UNIT);
 		say(o, "RBSTASH OK cleared\n");
 		return;
 	}
@@ -403,8 +435,11 @@ static void stash_receive(struct out *o, const char *args)
 	}
 	uint32_t span = ROUND_UP(len, ERASE_UNIT);
 
-	if (flash_area_erase(fa, STASH_OFF, span) != 0) {
-		say(o, "RBSTASH ERR erase failed\n");
+	int erc = erase_guarded(STASH_OFF, span);
+
+	if (erc != 0) {
+		say(o, erc == -EBUSY ? "RBSTASH ERR motors-running: erase refused\n" :
+		    "RBSTASH ERR erase failed\n");
 		return;
 	}
 	say(o, "RBSTASH READY\n");
@@ -419,7 +454,7 @@ static void stash_receive(struct out *o, const char *args)
 			int n = ll_recv(o->sock, o->is_usb, &buf[have], want - have);
 
 			if (n < 0 || k_uptime_get() - last > 5000) {
-				(void)flash_area_erase(fa, STASH_OFF, ERASE_UNIT);
+				(void)erase_guarded(STASH_OFF, ERASE_UNIT);
 				say(o, "RBSTASH ERR host stopped at %u/%lu B\n", got + have, len);
 				return;
 			}
@@ -433,15 +468,21 @@ static void stash_receive(struct out *o, const char *args)
 		uint32_t wlen = ROUND_UP(have, 4);
 
 		memset(&buf[have], 0xff, wlen - have);
-		if (flash_area_write(fa, STASH_OFF + got, buf, wlen) != 0) {
-			(void)flash_area_erase(fa, STASH_OFF, ERASE_UNIT);
-			say(o, "RBSTASH ERR flash write failed\n");
+		int wrc = write_guarded(STASH_OFF + got, buf, wlen);
+
+		if (wrc != 0) {
+			/* Refused (motors started mid-upload), the clearing erase
+			 * is refused too; the partial blob then fails stash_crc_ok()
+			 * and is never loaded. */
+			(void)erase_guarded(STASH_OFF, ERASE_UNIT);
+			say(o, wrc == -EBUSY ? "RBSTASH ERR motors-running: write refused\n" :
+			    "RBSTASH ERR flash write failed\n");
 			return;
 		}
 		got += have;
 	}
 	if (!stash_header(&h) || HDR_LEN + h.data_len != len || !stash_crc_ok(&h)) {
-		(void)flash_area_erase(fa, STASH_OFF, ERASE_UNIT);
+		(void)erase_guarded(STASH_OFF, ERASE_UNIT);
 		say(o, "RBSTASH ERR the blob failed its header/CRC check; stash cleared\n");
 		return;
 	}
@@ -478,9 +519,14 @@ void persist_session(int *sock, bool is_usb, const struct request *rq)
 				return;
 			}
 		}
-		if (changed && policy_save() != 0) {
-			say(&o, "RBPOLICY ERR flash write failed\n");
-			return;
+		if (changed) {
+			int prc = policy_save();
+
+			if (prc != 0) {
+				say(&o, prc == -EBUSY ? "RBPOLICY ERR motors-running: flash "
+				    "write refused\n" : "RBPOLICY ERR flash write failed\n");
+				return;
+			}
 		}
 		report(&o);
 		break;
@@ -499,14 +545,30 @@ void persist_session(int *sock, bool is_usb, const struct request *rq)
 void persist_start(void)
 {
 	uint32_t cause = 0;
+	uint32_t raw = esp_safety_reset_raw();
 
 	(void)hwinfo_get_reset_cause(&cause);
 	(void)hwinfo_clear_reset_cause();
 	policy_load();
-	printk("persist: reset cause 0x%x%s; policy boot=%s autoload=%u update_bad=%u\n",
-	       cause, (cause & RESET_POR) ? " (power-on)" : "",
+	/*
+	 * A brownout is a power event too: the FPGA on the same rail may have
+	 * reconfigured to golden with an empty SoC, exactly as at power-on. On the
+	 * C6 the chip-level brownout already reads as RESET_POR (ROM 0x01 is both);
+	 * RESET_BROWNOUT is the digital-core brownout (ROM 0x0F). The 2 s uart1
+	 * guard below still leaves a running FPGA alone.
+	 *
+	 * The raw ROM reason is logged as well because hwinfo maps the USB-serial
+	 * (0x15) and JTAG (0x16/0x18) resets to 0, and RBLINK carries it as rst=.
+	 */
+	bool power_event = (cause & (RESET_POR | RESET_BROWNOUT)) != 0u;
+
+	printk("persist: reset cause 0x%x%s, rom rst=0x%02x (%s); policy boot=%s "
+	       "autoload=%u update_bad=%u\n",
+	       cause, (cause & RESET_BROWNOUT) ? " (brownout)" :
+		      (cause & RESET_POR) ? " (power-on or chip brownout)" : "",
+	       (unsigned)raw, esp_safety_reset_name(raw),
 	       pol.boot_update ? "update" : "golden", pol.autoload, pol.update_bad);
-	if (!(cause & RESET_POR)) {
+	if (!power_event) {
 		printk("persist: not a power-on reset: the FPGA may be mid-flight; "
 		       "leaving it alone\n");
 		return;
