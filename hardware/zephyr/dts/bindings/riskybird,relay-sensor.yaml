@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  A sensor whose samples arrive from the ESP32-C6 over uart1 instead of the FPGA's own bus
+  (workloads/lib/motor_link/include/riskybird/sensor_link.h). The flight controller's relay
+  builds point the bmi088-accel, bmi088-gyro and tof aliases at these nodes
+  (hardware/zephyr/fpga-sensor-relay.overlay), so the flight code reads them through the
+  ordinary sensor API: sample_fetch() latches the newest relayed sample, or fails when it is
+  stale, and channel_get() returns it.
+
+compatible: "riskybird,relay-sensor"
+
+include: base.yaml
+
+properties:
+  kind:
+    type: string
+    required: true
+    enum:
+      - "accel"
+      - "gyro"
+      - "distance"
+    description: |
+      Which relayed quantity this node serves: accel (SENSOR_CHAN_ACCEL_XYZ, m/s^2) and gyro
+      (SENSOR_CHAN_GYRO_XYZ, rad/s) from the IMU frame, distance (SENSOR_CHAN_DISTANCE, m)
+      from the down-ToF frame.

@@ -1,0 +1,56 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Sensor relay builds of flight_controller (rb --mode *-relay): the ESP reads the sensors and
+ * sends them over uart1; the FPGA does not touch its own I2C at all.
+ *
+ * Applied last (workloads/flight_controller/CMakeLists.txt appends it to EXTRA_DTC_OVERLAY_FILE
+ * when RB_SENSOR_RELAY is set), so it overrides the drone and workload overlays.
+ *
+ * i2c0 is DISABLED, with every sensor on it. That is the guarantee: any code path left that
+ * would still drive the FPGA's I2C controller now fails to LINK (a disabled node has no device),
+ * rather than running and wedging the controller on a bus it cannot reach. The aliases the
+ * flight code reads are pointed at riskybird,relay-sensor nodes instead.
+ */
+
+&i2c0 {
+	status = "disabled";
+};
+
+&bmi088_accel {
+	status = "disabled";
+};
+
+&bmi088_gyro {
+	status = "disabled";
+};
+
+&vl53l1x {
+	status = "disabled";
+};
+
+/ {
+	relay_accel: relay-accel {
+		compatible = "riskybird,relay-sensor";
+		kind = "accel";
+		status = "okay";
+	};
+
+	relay_gyro: relay-gyro {
+		compatible = "riskybird,relay-sensor";
+		kind = "gyro";
+		status = "okay";
+	};
+
+	relay_tof: relay-tof {
+		compatible = "riskybird,relay-sensor";
+		kind = "distance";
+		status = "okay";
+	};
+
+	aliases {
+		bmi088-accel = &relay_accel;
+		bmi088-gyro = &relay_gyro;
+		tof = &relay_tof;
+	};
+};

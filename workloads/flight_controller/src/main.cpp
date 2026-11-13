@@ -60,6 +60,17 @@ extern "C" void pid_set_walls(int16_t front_mm, int16_t back_mm,
 #define HAVE_FLOW DT_NODE_EXISTS(DT_ALIAS(flow))
 #define HAVE_TOF  DT_NODE_EXISTS(DT_ALIAS(tof))
 #define HAVE_BARO DT_NODE_EXISTS(DT_ALIAS(baro))   /* BMP388 (bosch,bmp388) -> `baro` alias */
+
+/* Sensor relay builds (rb --mode *-relay): the ESP reads the IMU, the down ToF and the battery
+ * channel and sends them over uart1 (riskybird/sensor_link.h, sensor_relay_fc.c). The FPGA never
+ * touches its own I2C -- fpga-sensor-relay.overlay disables i2c0 -- and the aliases above point at
+ * relay devices, so the flight code reads them as before. Off (0) in every other build. */
+#ifndef ROSE_SENSOR_RELAY
+#define ROSE_SENSOR_RELAY 0
+#endif
+#if ROSE_SENSOR_RELAY
+#include "sensor_relay_fc.h"
+#endif
 #define HAVE_ESP_UART DT_NODE_EXISTS(DT_ALIAS(esp_uart))
 #if HAVE_ESP_UART
 /* The FPGA full-drone shell exposes the ESP link as `esp-uart`. Keep the
@@ -703,11 +714,18 @@ static void battery_sense_init(const struct device *bus)
  * a bus error or an implausible result (keeps the previous g_vbat). */
 static void battery_poll(void)
 {
+#if ROSE_SENSOR_RELAY
+	/* The ESP reads the same AIN5 code and relays it (sensor_relay_fc.c); the math below is
+	 * unchanged. A code older than 1 s counts as a miss, like a failed bus read. */
+	uint16_t raw;
+	if (!sensor_relay_batt(&raw)) { g_batt_miss_run++; return; }
+#else
 	const struct device *bus = g_batt_bus;
 	if (!bus) { return; }
 	uint8_t rx[2];
 	if (i2c_read(bus, rx, sizeof(rx), ADS7128_I2C_ADDR) != 0) { g_batt_miss_run++; return; }
 	uint16_t raw = (uint16_t)(((uint16_t)rx[0] << 4) | (rx[1] >> 4));   /* 12-bit, left-justified */
+#endif
 	float vbat = ((float)raw / 4096.0f) * BATT_VREF_V * BATT_DIVIDER;
 	if (vbat < 0.5f || vbat > 6.0f) { g_batt_miss_run++; return; }   /* reject garbage; say so */
 	g_batt_miss_run = 0;
@@ -1190,13 +1208,7 @@ static const char *safety_violation(const float *state, const float *gyro, const
     return why;
 }
 
-#if defined(ROSE_RIG) && ROSE_RIG
-/* ---- Roll harness ("rig"): the drone on a 1-DOF roll pivot, NEVER flown free ------------------
- * fc_rig.h/.cpp hold the logic; these are main.cpp's hooks. g_rig takes the uplink verbs
- * (uart_cmd_dispatch), one fc_rig_step() per tick (in place of the autoflight arm gate and
- * profile) and feeds fc_rig_roll_law() in controller_pid.cpp. */
-#include "fc_rig.h"
-struct fc_rig_state g_rig;
+#if (defined(ROSE_RIG) && ROSE_RIG) || ROSE_SENSOR_RELAY
 /* uart1 uplink delivery counters, published once per tick by uart_cmd_poll() (fc_uart_rx.h) and
  * read by name from the ELF over RBPOKE: bytes received; bytes the RX ring dropped because it was
  * full (the SiFive UART has no overrun flag, so FIFO losses are invisible); lines handed to
@@ -1206,6 +1218,20 @@ volatile uint32_t g_uart1_rx_bytes;
 volatile uint32_t g_uart1_rx_overruns;
 volatile uint32_t g_uart1_lines_ok;
 volatile uint32_t g_uart1_lines_bad;
+#endif
+#if ROSE_SENSOR_RELAY
+/* Sensor-relay demultiplexer state (riskybird/sensor_link.h); its counters are readable by name
+ * over RBPOKE/JTAG: g_relay_rx.frames_ok, .crc_errors, .seq_gaps, .lost_in_frame, .hunted. */
+struct sensor_link_rx g_relay_rx;
+#endif
+
+#if defined(ROSE_RIG) && ROSE_RIG
+/* ---- Roll harness ("rig"): the drone on a 1-DOF roll pivot, NEVER flown free ------------------
+ * fc_rig.h/.cpp hold the logic; these are main.cpp's hooks. g_rig takes the uplink verbs
+ * (uart_cmd_dispatch), one fc_rig_step() per tick (in place of the autoflight arm gate and
+ * profile) and feeds fc_rig_roll_law() in controller_pid.cpp. */
+#include "fc_rig.h"
+struct fc_rig_state g_rig;
 #if defined(SAFE_SOFT_LAND) && SAFE_SOFT_LAND
 #error "ROSE_RIG: soft-land has nowhere to descend to on the roll harness"
 #endif
@@ -3583,9 +3609,9 @@ static void uart_cmd_dispatch(char *line)
 	}
 }
 
-#if defined(ROSE_RIG) && ROSE_RIG
+#if (defined(ROSE_RIG) && ROSE_RIG) || ROSE_SENSOR_RELAY
 /*
- * Rig builds read uart1 from its RX interrupt, not by polling. Polled once per loop iteration,
+ * Rig and sensor-relay builds read uart1 from its RX interrupt, not by polling. Polled once per loop iteration,
  * the SiFive RX FIFO (8 bytes, ~0.7 ms of the link at 115200) overflowed silently between polls
  * that are 2.8 ms apart on average and up to 18 ms: of 7 back-to-back GAIN lines one was applied,
  * and a COLL 5 ms after RESET never arrived, so the rig never armed (2026-11-04). The ISR moves
@@ -3596,7 +3622,7 @@ static void uart_cmd_dispatch(char *line)
  * cannot coexist with ROSE_UART_CMD).
  */
 #ifndef CONFIG_UART_INTERRUPT_DRIVEN
-#error "ROSE_RIG reads uart1 from its RX interrupt: build with CONFIG_UART_INTERRUPT_DRIVEN=y (rb --mode rig-roll sets it)"
+#error "ROSE_RIG / ROSE_SENSOR_RELAY read uart1 from its RX interrupt: build with CONFIG_UART_INTERRUPT_DRIVEN=y (rb --mode rig-roll and the *-relay modes set it)"
 #endif
 #include "fc_uart_rx.h"
 
@@ -3643,11 +3669,34 @@ static void uart1_rx_irq_start(void)
 
 static void uart_cmd_poll(void)
 {
-	/* Bounded like the polled reader: 256 is ~22 ms of the link, more than any iteration. */
+	/* Bounded like the polled reader: 256 is ~22 ms of the link, more than any iteration. A relay
+	 * build also carries ~7.6 kB/s of sensor frames, so it drains a full ring per call. */
+#if ROSE_SENSOR_RELAY
+	int budget = (int)FC_RX_RING_SIZE;
+#else
 	int budget = 256;
+#endif
 	int entry;
 
 	while (budget-- > 0 && (entry = fc_rx_ring_get(&g_uart1_ring)) >= 0) {
+#if ROSE_SENSOR_RELAY
+		/* Frames out first; only text reaches the line assembler. A broken frame (or a ring
+		 * loss on a byte the demux consumed) drops any partial command line, exactly as a ring
+		 * loss would (fc_uart_rx.h). */
+		struct sensor_link_frame frame;
+		const enum sensor_link_rx_result r = sensor_link_rx_feed(&g_relay_rx, entry, &frame);
+
+		if (r == SL_RX_FRAME) {
+			sensor_relay_ingest(&frame);
+			continue;
+		}
+		if (r == SL_RX_EATEN) {
+			continue;
+		}
+		if (r == SL_RX_ABORT) {
+			entry = (int)(FC_RX_LOST | '\n');
+		}
+#endif
 		char *const line = fc_line_feed(&g_uart1_lines, entry);
 
 		if (line != NULL) {
@@ -3703,7 +3752,7 @@ static void uart_cmd_poll(void)
 		}
 	}
 }
-#endif /* ROSE_RIG */
+#endif /* ROSE_RIG || ROSE_SENSOR_RELAY */
 #endif /* ROSE_UART_CMD */
 
 /* =============================================================================================
@@ -4076,6 +4125,21 @@ int main(void)
 	uart1_rx_irq_start();
 #endif
 #endif
+#if ROSE_SENSOR_RELAY
+#if !ROSE_UART_CMD
+#error "ROSE_SENSOR_RELAY receives its frames through the uart1 command reader (ROSE_UART_CMD)"
+#endif
+#if !(defined(ROSE_RIG) && ROSE_RIG)
+	uart1_rx_irq_start();
+#endif
+	sensor_link_rx_init(&g_relay_rx);
+	/* Through the non-blocking queue, like every other text line: a polled write here landed
+	 * inside a half-drained RIG line on the bench and the ESP never recognised it. */
+	esp_uart_queue_line(RELAY_KEEPALIVE_LINE, sizeof(RELAY_KEEPALIVE_LINE) - 1);
+	printk("flight_controller: SENSOR RELAY build -- IMU, down-ToF and battery come from the ESP "
+	       "over uart1; the FPGA's i2c0 is disabled. IMU older than %d ms is a miss.\n",
+	       (int)ROSE_RELAY_IMU_STALE_MS);
+#endif
 	motors_startup_pulse();   /* optional boot "go" signal (ROSE_START_PULSE_MS); no-op if unset */
 #if defined(ROSE_AUTOFLIGHT) && ROSE_AUTOFLIGHT
 	/* Boot chirp (1-2-3-4 sweep) = "the board just reset". Fires EARLY, before the ~12 s sensor
@@ -4237,9 +4301,49 @@ int main(void)
 	uint32_t cyc_prev = k_cycle_get_32();
 	int imu_miss = 0;
 	for (int iter = 0; CTRL_RUN_FOREVER || iter < CTRL_ITERS; iter++) {
+#if ROSE_SENSOR_RELAY
+		/* The IMU arrives through uart1, so drain it BEFORE reading it: drained after (where
+		 * the other builds do it, and only on a good read) a stale IMU would block the very
+		 * frames that refresh it. Commands are dispatched here too, still ahead of the reset
+		 * check and est.update. Then ask the ESP to keep streaming, once a second. */
+		uart_cmd_poll();
+		{
+			static int64_t next_keepalive_ms;
+			const int64_t now_ms = k_uptime_get();
+
+			if (now_ms >= next_keepalive_ms) {
+				next_keepalive_ms = now_ms + 1000;
+				esp_uart_queue_line(RELAY_KEEPALIVE_LINE, sizeof(RELAY_KEEPALIVE_LINE) - 1);
+			}
+			/* And move queued text now: the usual drain is further down the loop, which a
+			 * missed IMU read skips -- so without this a relay that has not started yet
+			 * could never send the keepalive that starts it. Non-blocking (FIFO space only). */
+			esp_uart_drain();
+		}
+#endif
 		if (!read_sensor_frame(&f)) {
+#if ROSE_SENSOR_RELAY
+			/* One line a second, not one per miss: the polled console busy-waits ~5 ms per
+			 * line, and a relay that has not started yet misses every iteration. */
+			{
+				static int64_t next_say_ms;
+
+				if (k_uptime_get() >= next_say_ms) {
+					next_say_ms = k_uptime_get() + 1000;
+					printk("flight_controller: IMU fetch error (relay: imu=%u stale=%u "
+					       "crc=%u gaps=%u rxo=%u)\n", (unsigned)g_relay_imu_frames,
+					       (unsigned)g_relay_imu_stale, (unsigned)g_relay_rx.crc_errors,
+					       (unsigned)g_relay_rx.seq_gaps, (unsigned)g_uart1_rx_overruns);
+				}
+			}
+			/* Disarmed, a relay gap (no FC asking yet, a program-load session holding uart1
+			 * for seconds) must not latch the ESTOP: nothing is driving, and a latched ESTOP
+			 * would refuse the arm that follows. Armed, the IMU-lost cutoff stands as is. */
+			if (++imu_miss >= SAFE_MAX_IMU_MISS && !g_estop && g_armed) {
+#else
 			printk("flight_controller: IMU fetch error\n");
 			if (++imu_miss >= SAFE_MAX_IMU_MISS && !g_estop) {
+#endif
 				g_estop = true;
 				/* COMMAND ZERO FIRST, REPORT AFTERWARDS.
 				 *
@@ -4271,7 +4375,9 @@ int main(void)
 		 * late. ESTOP in particular should not wait: at the PID cascade's ~1.3 ms that
 		 * is invisible, but at the default controller's 25-35 ms it is a whole
 		 * actuation period. */
-		uart_cmd_poll();
+#if !ROSE_SENSOR_RELAY
+		uart_cmd_poll();   /* relay builds drain at the top of the loop */
+#endif
 #endif
 		/* Soft RESET (uplink cmd): return to the just-booted state WITHOUT a chip reset -- clear the
 		 * estop latch, disarm, and re-init the estimator + controller (which clears all integrators).

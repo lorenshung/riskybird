@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 cmake_minimum_required(VERSION 3.20.0)
 
+# Sensor relay builds (rb --mode *-relay): the ESP reads the sensors and sends them over uart1.
+# Applied before find_package(Zephyr), and last, so it overrides the drone and workload overlays:
+# it disables the FPGA's i2c0 and points the sensor aliases at the relay devices.
+if(RB_SENSOR_RELAY)
+  list(APPEND EXTRA_DTC_OVERLAY_FILE ${RB_ROOT}/hardware/zephyr/fpga-sensor-relay.overlay)
+endif()
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 # No GP relaxation. With CONFIG_RISCV_GP the linker rewrites small-global accesses to be
@@ -350,6 +357,9 @@ if(ROSE_ESP_MOTORS)
       "ROSE_ESP_MOTORS=1 needs -DROSE_MOTOR_LINK_DIR=<riskybird>/workloads/lib/motor_link")
   endif()
   target_include_directories(app PRIVATE ${ROSE_MOTOR_LINK_DIR}/include)
+  if(RB_SENSOR_RELAY)
+    target_sources(app PRIVATE src/sensor_relay_fc.c)
+  endif()
 endif()
 
 # DRAM flight recorder (riskybird workloads/lib/flightrec): every control

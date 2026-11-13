@@ -1518,8 +1518,46 @@ def _with_flight_presets(workload: Workload) -> Workload:
     )
 
 
+# ---- sensor relay (*-relay) ----------------------------------------------------------------
+#
+# The ESP reads the IMU, the down ToF and the ADS7128 battery channel and sends them over uart1
+# (workloads/lib/motor_link/include/riskybird/sensor_link.h); the FPGA never touches its own I2C.
+# For a drone whose FPGA cannot reach the sensor bus (2026-11-12: bus SDA reaches no FPGA pin).
+# Each mode is its base plus four switches, nothing else:
+#   RB_SENSOR_RELAY      CMakeLists.txt appends hardware/zephyr/fpga-sensor-relay.overlay last:
+#                        i2c0 and its sensors disabled, the aliases on riskybird,relay-sensor nodes.
+#   CONFIG_BMI08X/VL53L1X=n  their nodes are disabled; say so, rather than leave Kconfig to drop a
+#                        requested =y.
+#   CONFIG_UART_INTERRUPT_DRIVEN  frames arrive at ~7.6 kB/s; the polled 8-byte FIFO would drop them.
+#   ROSE_SENSOR_RELAY    main.cpp: demux in uart_cmd_poll, keepalive, battery from the relay.
+#   FC_RX_RING_SIZE 2048 ~270 ms of relay traffic, so a 30-60 ms polled-console stall cannot
+#                        overrun the ring.
+# Needs the esp_bridge motors image from the same commit (it answers the keepalive).
+_RELAY_CMAKE = (
+    ("RB_SENSOR_RELAY", "1"),
+    ("CONFIG_BMI08X", "n"),
+    ("CONFIG_VL53L1X", "n"),
+    ("CONFIG_UART_INTERRUPT_DRIVEN", "y"),
+)
+_RELAY_CPPFLAGS = (
+    ("ROSE_SENSOR_RELAY", "1"),
+    ("FC_RX_RING_SIZE", "2048u"),
+)
+_RELAY_NOTE = (
+    "%s, with the IMU, down ToF and battery relayed by the ESP over uart1 (FPGA I2C off); needs "
+    "the esp_bridge motors image from the same commit"
+)
+RELAY_MODES = (
+    ("esp-motors-relay", "esp-motors", _RELAY_CMAKE, _RELAY_CPPFLAGS, _RELAY_NOTE % "esp-motors"),
+    ("rig-roll-relay", "rig-roll", _RELAY_CMAKE, _RELAY_CPPFLAGS, _RELAY_NOTE % "rig-roll"),
+    ("rig-pitch-relay", "rig-pitch", _RELAY_CMAKE, _RELAY_CPPFLAGS, _RELAY_NOTE % "rig-pitch"),
+)
+
 WORKLOADS["flight_controller"] = _with_photo_modes(
-    _with_photo_modes(_with_flight_presets(WORKLOADS["flight_controller"])), RIG_MODES
+    _with_photo_modes(
+        _with_photo_modes(_with_flight_presets(WORKLOADS["flight_controller"])), RIG_MODES
+    ),
+    RELAY_MODES,
 )
 
 
