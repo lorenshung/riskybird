@@ -154,6 +154,14 @@
  * the code without them would link and then drive nothing. */
 #define HAVE_MOTORS DT_NODE_EXISTS(DT_ALIAS(pwm_motor0))
 
+/* Sensor relay (sensor_relay.c): the motors overlay declares the relay's down-ToF node. It
+ * does nothing until a relay flight controller sends its keepalive. */
+#define HAVE_SENSOR_RELAY (HAVE_MOTORS && DT_NODE_HAS_STATUS(DT_NODELABEL(relay_vl53l1x), okay))
+#if HAVE_SENSOR_RELAY
+#include "sensor_relay.h"
+#include <riskybird/sensor_link.h>
+#endif
+
 #if HAVE_MOTORS
 #include <zephyr/drivers/pwm.h>
 #include <riskybird/motor_link.h>
@@ -273,6 +281,14 @@ static bool fpga_uart_write(const char *s, size_t len)
 	load_link_tx_unlock();
 	return true;
 }
+
+#if HAVE_SENSOR_RELAY
+/* For sensor_relay.c: the same writer, so a frame and a forwarded command line never interleave. */
+bool esp_bridge_fpga_write(const char *s, size_t len)
+{
+	return fpga_uart_write(s, len);
+}
+#endif
 
 /* ==========================================================================
  * MOTOR HALF -- compiled only when the devicetree declares the gates
@@ -1136,6 +1152,16 @@ static void downlink_thread(void *a, void *b, void *c)
 			overlong = false;
 			continue;
 		}
+#if HAVE_SENSOR_RELAY
+		/* A relay flight controller asking for sensor frames: consumed here, not sent to the
+		 * radio (the FC writes it once a second; the ground station has no use for it). */
+		if (len == sizeof(RELAY_KEEPALIVE_VERB) - 1 &&
+		    memcmp(line, RELAY_KEEPALIVE_VERB, len) == 0) {
+			sensor_relay_keepalive();
+			len = 0;
+			continue;
+		}
+#endif
 		line[len++] = '\n';
 
 		struct client_list cl;
@@ -1213,6 +1239,21 @@ static void status_thread(void *a, void *b, void *c)
 		if (!load_link_active()) {   /* the USB tunnel shares the console */
 			printk("%s", buf);
 		}
+#if HAVE_SENSOR_RELAY
+		/* Its own line, after RBLINK, so the RBLINK parsers see an unchanged line; every
+		 * tenth tick (~2 s), so it does not crowd the console or the radio. */
+		static unsigned relay_tick;
+
+		n = (++relay_tick % 10u == 0u) ? sensor_relay_status(buf, sizeof(buf)) : 0;
+		if (n > 0 && n < (int)sizeof(buf)) {
+			if (sock >= 0) {
+				send_to_clients(sock, &cl, buf, (size_t)n);
+			}
+			if (!load_link_active()) {
+				printk("%s", buf);
+			}
+		}
+#endif
 	}
 }
 #endif /* HAVE_MOTORS */
@@ -1630,6 +1671,11 @@ int main(void)
 			status_thread, NULL, NULL, NULL,
 			K_PRIO_PREEMPT(7), 0, K_NO_WAIT);
 	k_thread_name_set(&status_thread_data, "status");
+#endif
+
+#if HAVE_SENSOR_RELAY
+	/* Preemptible, below the motor link; idle (and off the bus) until a keepalive arrives. */
+	sensor_relay_start();
 #endif
 
 	/* After every thread exists, so the list is the steady-state one. */

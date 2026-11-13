@@ -7,6 +7,11 @@ project(esp_bridge)
 
 target_sources(app PRIVATE src/main.c src/load_link.c src/persist.c src/esp_safety.c)
 
+# The sensor relay (motors build): compiled only when the motors overlay declares its nodes.
+if(CONFIG_SENSOR)
+  target_sources(app PRIVATE src/sensor_relay.c)
+endif()
+
 # The motor duty-frame wire format is a contract shared with the FPGA flight
 # controller and with workloads/esp_motors, so it lives in integration/ and every
 # end compiles the same header rather than each keeping a copy that can drift.

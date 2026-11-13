@@ -188,3 +188,36 @@
 &wdt0 {
 	status = "okay";
 };
+
+/*
+ * Sensor relay (workloads/esp_bridge/src/sensor_relay.c). The ESP reads the drone's sensors and
+ * sends them to a relay flight controller over uart1 -- only after that FC asks with its
+ * keepalive; until then nothing here touches the bus.
+ *
+ * zephyr,deferred-init on every sensor: no driver talks to the bus before main(), so a stuck
+ * bus can never hold the motor link, the radio or the loader at boot. sensor_relay.c calls
+ * device_init() from a preemptible thread once the FC has asked.
+ *
+ * The BMI088 rates are the FPGA flight controller's own (targets/fpga/workloads/
+ * flight_controller.overlay: 800 Hz accel, 1000 Hz gyro / 116 Hz bandwidth), so the relayed
+ * samples are what the FC's local reads were. The down VL53L1X stays at its power-on 0x29:
+ * the relay holds the side VL53L5CX LPn lines low, so nothing else answers there.
+ */
+&bmi088_accel {
+	accel-hz = "800";
+	zephyr,deferred-init;
+};
+
+&bmi088_gyro {
+	gyro-hz = "1000_116";
+	zephyr,deferred-init;
+};
+
+&i2c0 {
+	relay_vl53l1x: vl53l1x@29 {
+		compatible = "st,vl53l1x";
+		reg = <0x29>;
+		zephyr,deferred-init;
+		status = "okay";
+	};
+};
