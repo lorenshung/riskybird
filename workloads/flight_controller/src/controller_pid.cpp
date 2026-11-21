@@ -45,10 +45,44 @@
 
 /* --- gains (verbatim from the original firmware) --- */
 static const float gravity            = 9.81f;
+#if ROSE_MANUAL_PILOT
+/* Manual-pilot THROTTLE mode: the vertical axis is a DIRECT collective (thrust only when the up-stick
+ * is positive) with NO gravity feed-forward, so neutral stick = 0 thrust. g_manual_throttle is set by
+ * main.cpp's pilot_nav_tick: -1 = use the altitude PID; [0..1] = direct throttle. */
+extern float g_manual_throttle;
+/* ANGLE (self-level) pilot mode: stick -> bank (true rad) straight into the attitude loop, velocity
+ * loop bypassed. Set by main.cpp pilot_nav_tick; see ROSE_PILOT_ANGLE there. */
+#ifndef ROSE_PILOT_ANGLE
+#define ROSE_PILOT_ANGLE 0
+#endif
+#if ROSE_MANUAL_PILOT && ROSE_PILOT_ANGLE
+extern float g_pilot_roll_sp, g_pilot_pitch_sp;
+#endif
+/* ALTITUDE pilot mode (main.cpp pilot_alt_tick): the altitude PID's collective gets a hard CEILING and
+ * an upward SLEW limit, so a bad height estimate can never slam the motors to 100% (2026-11-17: it did,
+ * and flipped the drone on takeoff), and takeoff spools up to hover instead of stepping there. */
+#ifndef ROSE_PILOT_ALT
+#define ROSE_PILOT_ALT 0
+#endif
+#ifndef ALT_ACC_MAX_G
+#define ALT_ACC_MAX_G 1.35f   /* collective ceiling, g (hover ~1.06 g = direct throttle 0.528) */
+#endif
+#ifndef ALT_SPOOL_GPS
+#define ALT_SPOOL_GPS 4.0f    /* max collective rise, g per second (0 -> 1.1 g in ~0.27 s): still a ramp,
+                               * but short, so takeoff doesn't linger just below hover with feet down */
+#endif
+#endif
 
 /* altitude loop */
-static const float natFreq_height     = 2.0f;
-static const float dampingRatio_height = 0.7f;
+/* altitude loop: build-tunable for altitude tuning (-DALT_NATFREQ / -DALT_DAMPING); defaults = flown */
+#ifndef ALT_NATFREQ
+#define ALT_NATFREQ 2.0f    /* rad/s: stiffness of the height hold */
+#endif
+#ifndef ALT_DAMPING
+#define ALT_DAMPING 0.7f    /* damping ratio (vz feedback) */
+#endif
+static const float natFreq_height     = ALT_NATFREQ;
+static const float dampingRatio_height = ALT_DAMPING;
 /* Altitude INTEGRAL term (makes the height loop a PID). The gravity feed-forward goes through an
  * uncalibrated force->duty curve, so a pure P/D loop droops (FF too low) or overshoots (FF too high),
  * and battery sag drifts the hover point during a flight -- no single PID_MASS_KG fits. The integrator
@@ -216,6 +250,78 @@ static float forceToVoltage(float forceNewtons)
  * as it was in flight. Under PID_TILT_TIGHT it is read as radians (2.6 deg). */
 #ifndef ROLL_TRIM_RAD
 #define ROLL_TRIM_RAD 0.0f
+#endif
+/* Attitude INTEGRAL (roll/pitch). The attitude loop is P-only, so a steady moment disturbance (CG
+ * offset, a weak motor, prop mismatch) leaves a steady angle error the pilot has to hold off with
+ * stick: flight 2026-11-21 12:47 needed +6.3 deg roll / +2.4 deg pitch of stick while the drone
+ * hovered at ~0 / +1 deg. The integral adds KI_ATT * int(angle error) (true rad) to the attitude
+ * TARGET, so it trims that moment out over ~1/KI_ATT s. Guarded like alt_int: held at 0 on the ground
+ * (est height < ALT_INT_GROUND_M) or with low collective, integrates only within ATT_INT_BAND of the
+ * target (no windup through stick slams / upsets), clamped to +-ATT_INT_MAX. KI_ATT 0 = off (default,
+ * flown builds byte-identical in behaviour). */
+#ifndef KI_ATT
+#define KI_ATT 0.0f            /* 1/s */
+#endif
+#ifndef ATT_INT_MAX
+#define ATT_INT_MAX 0.20f      /* rad (~11.5 deg) of target bias */
+#endif
+#ifndef ATT_INT_BAND
+#define ATT_INT_BAND 0.25f     /* rad: integrate only while |angle error| is below this */
+#endif
+#ifndef ATT_INT_STICK
+#define ATT_INT_STICK 1e9f     /* rad: integrate only while the commanded bank (stick / vel loop) is within
+                                * this of level, so a pilot correction is never absorbed into the trim and
+                                * then released as a fling when the stick is centred (flight 11-21 13:15) */
+#endif
+/* VELOCITY HOLD in the manual ANGLE mode (ROSE_PILOT_VEL_HOLD=1): with the roll/pitch stick centred
+ * (|bank setpoint| < PILOT_HOLD_STICK) and the drone above PILOT_HOLD_MIN_H, the flow-fed velocity loop
+ * flies to ZERO velocity instead of holding level; any stick deflection hands bank straight back to the
+ * pilot. The velocity integral is FROZEN (not reset) while the pilot steers, so the learned tilt trim
+ * survives manoeuvres, and the tilt slew state tracks the stick so the hand-back is bumpless. */
+/* Altitude-loop damping source. The complementary estimator's vz is accelerometer-integrated with a
+ * 15 Hz ToF correction; in flight (vibration/prop wash) it tracked the true climb rate poorly -- flight
+ * 2026-11-21 13:47: corr 0.32 with d(ToF)/dt, ~1/3 of its amplitude -- so the D term barely damped and
+ * height swung 0.1-1.1 m about a 0.63 m setpoint. ALT_VZ_FROM_Z=1 damps on a low-passed derivative of
+ * the height estimate (which tracks the ToF closely) instead. ALT_VZ_TAU = that low-pass (s). */
+#ifndef ALT_VZ_FROM_Z
+#define ALT_VZ_FROM_Z 0
+#endif
+#ifndef ALT_VZ_TAU
+#define ALT_VZ_TAU 0.08f
+#endif
+/* Per-motor DUTY trim (feed-forward), multiplied onto each motor's duty after the mixer. Set from the
+ * measured steady-hover duty shares so the vehicle spins up BALANCED: flights 2026-11-21 13:39-13:54
+ * hovered at FR/BR/BL/FL = 1.06/0.88/1.09/0.97 of the mean (stick centred), consistently; with no
+ * feed-forward the spin-up on the ground tipped the drone to -11 deg roll before liftoff and launched it
+ * ~0.4 m sideways before the loops caught it. Index order = duty[] = FR, BR, BL, FL. Default 1 = off. */
+#ifndef MOTOR_DUTY_TRIM_0
+#define MOTOR_DUTY_TRIM_0 1.0f
+#endif
+#ifndef MOTOR_DUTY_TRIM_1
+#define MOTOR_DUTY_TRIM_1 1.0f
+#endif
+#ifndef MOTOR_DUTY_TRIM_2
+#define MOTOR_DUTY_TRIM_2 1.0f
+#endif
+#ifndef MOTOR_DUTY_TRIM_3
+#define MOTOR_DUTY_TRIM_3 1.0f
+#endif
+/* ATT_INT_KEEP=1: on the ground HOLD the learned attitude integral instead of zeroing it, so each takeoff
+ * after the first starts with the trim already learned (soft RESET / init() still clears it). */
+#ifndef ATT_INT_KEEP
+#define ATT_INT_KEEP 0
+#endif
+#ifndef ROSE_PILOT_VEL_HOLD
+#define ROSE_PILOT_VEL_HOLD 0
+#endif
+#ifndef PILOT_HOLD_STICK
+#define PILOT_HOLD_STICK 0.035f   /* rad of commanded bank below which the stick counts as centred */
+#endif
+#ifndef PILOT_HOLD_MIN_H
+#define PILOT_HOLD_MIN_H 0.15f    /* m: below this the flow velocity is too coarse -> stay in angle mode */
+#endif
+#ifndef ATT_INT_MIN_G
+#define ATT_INT_MIN_G 0.5f     /* integrate only with collective above this many g (airborne-ish) */
 #endif
 #ifndef PITCH_TRIM_RAD
 #define PITCH_TRIM_RAD 0.0f
@@ -402,14 +508,49 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 		if (alt_int >  ALT_INT_MAX) { alt_int =  ALT_INT_MAX; }
 		else if (alt_int < -ALT_INT_MAX) { alt_int = -ALT_INT_MAX; }
 	}
-	const float desAcc3 = -2.0f * dampingRatio_height * natFreq_height * estVel_3
+	float vz_alt = estVel_3;
+	if (ALT_VZ_FROM_Z) {
+		if (!have_zprev || dt <= 0.0f) { z_prev = estHeight; vz_d = 0.0f; have_zprev = true; }
+		else {
+			const float raw = (estHeight - z_prev) / dt;
+			z_prev = estHeight;
+			const float k = dt / ((float)(ALT_VZ_TAU) + dt);
+			vz_d += k * (raw - vz_d);
+		}
+		vz_alt = vz_d;
+	}
+	const float desAcc3 = -2.0f * dampingRatio_height * natFreq_height * vz_alt
 			      - natFreq_height * natFreq_height * (estHeight - desHeight)
 			      + alt_int;
-	const float desNormalizedAcceleration =
+	float desNormalizedAcceleration =
 #if PID_THRUST_COMP_FLOWN && !PID_GIBBS_LEGACY
 		(gravity + desAcc3) / (cosf(tanf(0.5f * estRoll)) * cosf(tanf(0.5f * estPitch)));
 #else
 		(gravity + desAcc3) / (cosf(estRoll) * cosf(estPitch));
+#endif
+#if ROSE_MANUAL_PILOT
+	/* Throttle mode: replace the altitude PID + gravity feed-forward with a DIRECT collective, so
+	 * thrust is commanded only when the up-stick is positive (neutral -> 0 thrust, no auto-hover). */
+	if (g_manual_throttle >= 0.0f) {
+		desNormalizedAcceleration = g_manual_throttle * (2.0f * gravity);   /* ~0.5 throttle = hover */
+		alt_int = 0.0f;
+	}
+#if ROSE_PILOT_ALT
+	{
+		static float s_coll;   /* last collective (normalized accel), tracked in every mode -> bumpless */
+		if (g_manual_throttle >= 0.0f) {
+			s_coll = desNormalizedAcceleration;          /* direct / off: just track it */
+		} else {
+			float c = desNormalizedAcceleration;
+			const float cmax = (float)(ALT_ACC_MAX_G) * gravity;
+			const float up   = s_coll + (float)(ALT_SPOOL_GPS) * gravity * dt;
+			if (c > cmax) { c = cmax; }
+			if (c > up)   { c = up; }
+			if (c < 0.0f) { c = 0.0f; }
+			desNormalizedAcceleration = s_coll = c;
+		}
+	}
+#endif
 #endif
 
 	/* (2) horizontal velocity loop -> desired accelerations -> desired tilt (ROSE_VEL_LOOP=0 holds
@@ -417,6 +558,10 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 #if ROSE_VEL_LOOP
 	/* PI velocity loop: P for transients, I to cancel the constant drift P leaves as steady-state
 	 * error (auto-trims the mount/CG tilt). (1/VEL_TC)*err == the old -(1/VEL_TC)*(est-des). */
+#if ROSE_MANUAL_PILOT && ROSE_PILOT_ANGLE && ROSE_PILOT_VEL_HOLD
+	const float vel_int_1_was = vel_int_1, vel_int_2_was = vel_int_2;
+	desVel_1 = 0.0f; desVel_2 = 0.0f;   /* hold = zero velocity (setpoint[6/7] carry the stick here) */
+#endif
 	const float verr1 = desVel_1 - estVel_1;
 	const float verr2 = desVel_2 - estVel_2;
 	if (estHeight < ALT_INT_GROUND_M) {
@@ -447,14 +592,65 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 		desRoll_prev = desRoll; desPitch_prev = desPitch;
 	}
 #else
-	const float desRoll  = 0.0f;
-	const float desPitch = 0.0f;
+	float desRoll  = 0.0f;
+	float desPitch = 0.0f;
 	(void)estVel_1; (void)estVel_2; (void)desVel_1; (void)desVel_2;
+#endif
+#if ROSE_MANUAL_PILOT && ROSE_PILOT_ANGLE
+	/* Unconditional in a manual-pilot ANGLE build: pilot_nav_tick runs every tick and zeroes the bank
+	 * setpoints whenever the pilot is not in control. (It used to test g_manual_throttle >= 0, but the
+	 * ALTITUDE pilot mode drives the altitude PID with g_manual_throttle = -1, which would silently
+	 * have handed roll/pitch back to the velocity loop.) */
+	{
+		/* ANGLE mode: the pilot's stick IS the bank target. Overrides the velocity loop's output
+		 * (computed above but discarded), and keeps that loop's integrator + slew state pinned so a
+		 * build that re-enters velocity mode starts bumpless instead of from wound-up state. */
+#if ROSE_PILOT_VEL_HOLD && ROSE_VEL_LOOP
+		const bool hold = fabsf(g_pilot_roll_sp) < (float)(PILOT_HOLD_STICK) &&
+				  fabsf(g_pilot_pitch_sp) < (float)(PILOT_HOLD_STICK) &&
+				  estHeight > (float)(PILOT_HOLD_MIN_H);
+		if (!hold) {
+			desRoll  = g_pilot_roll_sp;
+			desPitch = g_pilot_pitch_sp;
+			vel_int_1 = vel_int_1_was; vel_int_2 = vel_int_2_was;   /* freeze while the pilot steers */
+			if (estHeight < ALT_INT_GROUND_M) { vel_int_1 = 0.0f; vel_int_2 = 0.0f; }
+			desRoll_prev = desRoll; desPitch_prev = desPitch;      /* bumpless hand-back to the hold */
+		}
+		/* else: keep the velocity loop's (capped, slew-limited) desRoll/desPitch -> brake to zero */
+#else
+		desRoll  = g_pilot_roll_sp;
+		desPitch = g_pilot_pitch_sp;
+#if ROSE_VEL_LOOP
+		vel_int_1 = 0.0f; vel_int_2 = 0.0f;
+		desRoll_prev = desRoll; desPitch_prev = desPitch;
+#endif
+#endif
+	}
 #endif
 
 	/* (3) attitude loop -> desired body rates (+ static trim to cancel unobservable hover drift) */
-	const float roll_tgt  = desRoll  + PID_ANGLE(ROLL_TRIM_RAD);
-	const float pitch_tgt = desPitch + PID_ANGLE(PITCH_TRIM_RAD);
+	float roll_tgt  = desRoll  + PID_ANGLE(ROLL_TRIM_RAD);
+	float pitch_tgt = desPitch + PID_ANGLE(PITCH_TRIM_RAD);
+	if (KI_ATT > 0.0f) {
+		if (estHeight < ALT_INT_GROUND_M || desNormalizedAcceleration < (float)(ATT_INT_MIN_G) * gravity) {
+			if (!ATT_INT_KEEP) { att_int_r = 0.0f; att_int_p = 0.0f; }   /* grounded / spooling: no windup
+			                                                * (KEEP: hold the learned value for the next takeoff) */
+		} else {
+			const float er = roll_tgt - estRoll, ep = pitch_tgt - estPitch;
+#if ROSE_MANUAL_PILOT && ROSE_PILOT_ANGLE
+			/* the PILOT's stick, not desRoll: under the velocity hold desRoll is the loop's own bank */
+			const bool still = fabsf(g_pilot_roll_sp) < (float)(ATT_INT_STICK) && fabsf(g_pilot_pitch_sp) < (float)(ATT_INT_STICK);
+#else
+			const bool still = fabsf(desRoll) < (float)(ATT_INT_STICK) && fabsf(desPitch) < (float)(ATT_INT_STICK);
+#endif
+			if (still && fabsf(er) < (float)(ATT_INT_BAND)) { att_int_r += (float)(KI_ATT) * er * dt; }
+			if (still && fabsf(ep) < (float)(ATT_INT_BAND)) { att_int_p += (float)(KI_ATT) * ep * dt; }
+			if (att_int_r >  ATT_INT_MAX) { att_int_r =  ATT_INT_MAX; } else if (att_int_r < -ATT_INT_MAX) { att_int_r = -ATT_INT_MAX; }
+			if (att_int_p >  ATT_INT_MAX) { att_int_p =  ATT_INT_MAX; } else if (att_int_p < -ATT_INT_MAX) { att_int_p = -ATT_INT_MAX; }
+		}
+		roll_tgt  += att_int_r;
+		pitch_tgt += att_int_p;
+	}
 	const float rollRate_tgt  = (-1.0f / (PID_FLOWN_SCALE * tau_roll))  * (estRoll  - roll_tgt);
 	const float pitchRate_tgt = (-1.0f / (PID_FLOWN_SCALE * tau_pitch)) * (estPitch - pitch_tgt);
 	const float yawRate_tgt   = (-1.0f / (PID_FLOWN_SCALE * tau_yaw))   * (estYaw   - yaw_tgt);
@@ -501,6 +697,13 @@ void HierarchicalPidController::compute(const float state[CTRL_NSTATES],
 	duty[1] = forceToVoltage(0.9f * ctrl[2]);
 	duty[2] = forceToVoltage(0.9f * ctrl[3] * (float)(MOTOR_TRIM_LEFT));
 	duty[3] = forceToVoltage(0.9f * ctrl[0] * (float)(MOTOR_TRIM_LEFT));
+	{
+		const float tr[4] = { MOTOR_DUTY_TRIM_0, MOTOR_DUTY_TRIM_1, MOTOR_DUTY_TRIM_2, MOTOR_DUTY_TRIM_3 };
+		for (int i = 0; i < 4; i++) {
+			duty[i] *= tr[i];
+			if (duty[i] > 1.0f) { duty[i] = 1.0f; }
+		}
+	}
 
 	/* Emit in the shared normalized-thrust convention (send_control adds 0.583 back to recover
 	 * duty, then clamps + applies the bench MOTOR_MAX_DUTY cap / timeout). */

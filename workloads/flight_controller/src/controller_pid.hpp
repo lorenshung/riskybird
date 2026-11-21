@@ -23,6 +23,8 @@ struct HierarchicalPidController : IController {
 		alt_int = 0.0f;
 		vel_int_1 = vel_int_2 = 0.0f;
 		desRoll_prev = desPitch_prev = 0.0f;
+		att_int_r = att_int_p = 0.0f;
+		vz_d = 0.0f; z_prev = 0.0f; have_zprev = false;
 	}
 	void compute(const float state[CTRL_NSTATES], const float setpoint[CTRL_NSTATES],
 		     float u_out[CTRL_NACTIONS], float dt) override;
@@ -33,6 +35,8 @@ private:
 	float alt_int = 0.0f;                             /* altitude integral (KI_HEIGHT) -> hover FF */
 	float vel_int_1 = 0.0f, vel_int_2 = 0.0f;         /* velocity integral (KI_VEL) -> drift trim */
 	float desRoll_prev = 0.0f, desPitch_prev = 0.0f;  /* tilt slew-limiter state */
+	float att_int_r = 0.0f, att_int_p = 0.0f;         /* attitude integral (KI_ATT) -> moment trim */
+	float vz_d = 0.0f, z_prev = 0.0f; bool have_zprev = false;  /* ALT_VZ_FROM_Z: filtered dz/dt */
 };
 
 #endif /* ROSE_CONTROLLER_PID_HPP */

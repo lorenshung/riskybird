@@ -57,4 +57,10 @@ int pmw3901_read_motion_count(const struct device *dev, int16_t *deltaX, int16_t
 uint8_t pmw3901_register_read(const struct device *dev, uint8_t reg);
 int pmw3901_register_write(const struct device *dev, uint8_t reg, uint8_t value);
 
+#define PMW3901_FRAME_SIDE   35
+#define PMW3901_FRAME_PIXELS (PMW3901_FRAME_SIDE * PMW3901_FRAME_SIDE)
+void pmw3901_set_init_variant(int v);   /* 0 Crazyflie, 1 PixArt v3.20 (PX4), 2/3 PAW3902 low/super-low light */
+int  pmw3901_get_init_variant(void);
+int pmw3901_frame_capture(const struct device *dev, uint8_t out[PMW3901_FRAME_PIXELS], bool slow);
+
 #endif // PMW3901_H

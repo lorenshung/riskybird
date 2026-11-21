@@ -16,6 +16,7 @@
 #include <zephyr/sys/printk.h>
 #include <errno.h>
 #include <math.h>
+#include <string.h>
 
 /*
  * Which SPI controller the PMW3901 hangs off.
@@ -98,6 +99,15 @@ int64_t flow_sample_ms(void)
 	return INT64_MIN / 2;
 }
 
+void flow_counts(struct flow_counts_snap *out)
+{
+	*out = (struct flow_counts_snap){0};
+}
+
+int flow_frame_request(bool slow) { ARG_UNUSED(slow); return -ENODEV; }
+int flow_frame_get(uint8_t out[FLOW_FRAME_PIXELS], uint32_t *seq) { ARG_UNUSED(out); ARG_UNUSED(seq); return 1; }
+int flow_reinit_request(int variant) { ARG_UNUSED(variant); return -ENODEV; }
+
 void flow_rose_request(void) { }
 void flow_rose_collect(void) { }
 
@@ -179,10 +189,27 @@ static bool    g_squal_ok;
 static uint32_t g_seq;
 static int64_t g_last_ms = -100000;
 
+/* Raw-count accumulators for the ground station's FLOW CAL mode (flow_counts()). Running totals of
+ * the sensor's own deltaX/deltaY since boot, so the host gets K = D / (h * |sum|) by differencing two
+ * telemetry lines -- a dropped datagram loses nothing. Every read is counted (bad SQUAL included,
+ * tallied in g_c.nbad so the host can reject that run, as tools/flow-cal.py does). */
+static struct flow_counts_snap g_c;
+
 /* One motion burst -> the cached angular flow. Shared by the SPI thread and the RoSE transport, so
  * both run the same conversion, filter and gate. dt = time since the previous burst read. */
 static void flow_ingest(const motionBurst_t *m, float dt)
 {
+	k_mutex_lock(&flow_mtx, K_FOREVER);
+	g_c.cx += m->deltaX; g_c.cy += m->deltaY; g_c.n++;
+	if (m->squal < FLOW_MIN_SQUAL) { g_c.nbad++; }
+	const int adx = m->deltaX < 0 ? -m->deltaX : m->deltaX;
+	const int ady = m->deltaY < 0 ? -m->deltaY : m->deltaY;
+	if (adx > g_c.pkx) { g_c.pkx = adx; }
+	if (ady > g_c.pky) { g_c.pky = ady; }
+	g_c.squal = m->squal; g_c.shutter = m->shutter;
+	g_c.rawsum = m->rawDataSum; g_c.rawmax = m->maxRawData; g_c.rawmin = m->minRawData;
+	k_mutex_unlock(&flow_mtx);
+
 	if (dt > 1e-4f && dt < 0.5f) {
 		static struct fc_flow_filter filtered;
 		fc_flow_counts(&filtered, m->deltaX, m->deltaY, dt, FLOW_RAD_PER_COUNT,
@@ -267,11 +294,82 @@ int flow_init(void)
 K_THREAD_STACK_DEFINE(flow_stack, 2048);
 static struct k_thread flow_thread;
 
+/* Raw frame grab, run by the flow thread (it owns the SPI bus). */
+static atomic_t g_frame_req;
+static uint8_t  g_frame[FLOW_FRAME_PIXELS];
+static uint8_t  g_frame_tmp[FLOW_FRAME_PIXELS];
+static uint32_t g_frame_seq;
+static int      g_frame_rc;
+
+int flow_frame_request(bool slow)
+{
+	atomic_set(&g_frame_req, slow ? 2 : 1);
+	return 0;
+}
+
+/* Bench A/B of the register init: re-run pmw3901_init with the chosen variant on the flow thread. */
+static atomic_t g_reinit_req;   /* 0 none, else variant+1 */
+int flow_reinit_request(int variant)
+{
+	if (variant < 0 || variant > 3) { return -EINVAL; }
+	atomic_set(&g_reinit_req, variant + 1);
+	return 0;
+}
+
+int flow_frame_get(uint8_t out[FLOW_FRAME_PIXELS], uint32_t *seq)
+{
+	k_mutex_lock(&flow_mtx, K_FOREVER);
+	int rc = 1;
+	if (g_frame_seq != *seq) {
+		memcpy(out, g_frame, FLOW_FRAME_PIXELS);
+		*seq = g_frame_seq;
+		rc = g_frame_rc;
+	}
+	k_mutex_unlock(&flow_mtx);
+	return rc;
+}
+
+static void flow_do_frame(bool slow)
+{
+	const int64_t t0 = k_uptime_get();
+	int rc = pmw3901_frame_capture(PMW3901_DEV, g_frame_tmp, slow);
+	const int64_t t1 = k_uptime_get();
+	/* frame mode stops motion tracking: soft-POR + full register init back to normal operation */
+	int irc = -1;
+	for (int i = 0; i < 5 && irc != 0; i++) {
+		irc = pmw3901_init(PMW3901_DEV);
+	}
+	printk("flow: frame capture (%s) rc=%d in %d ms, re-init rc=%d\n", slow ? "slow" : "fast", rc, (int)(t1 - t0), irc);
+	k_mutex_lock(&flow_mtx, K_FOREVER);
+	memcpy(g_frame, g_frame_tmp, FLOW_FRAME_PIXELS);
+	g_frame_rc = rc;
+	g_frame_seq++;
+	k_mutex_unlock(&flow_mtx);
+}
+
 static void flow_thread_fn(void *a, void *b, void *c)
 {
 	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
 	uint32_t t_prev = k_cycle_get_32();
 	for (;;) {
+		const atomic_val_t rreq = atomic_set(&g_reinit_req, 0);
+		if (rreq) {
+			pmw3901_set_init_variant((int)rreq - 1);
+			int irc = -1;
+			for (int i = 0; i < 5 && irc != 0; i++) { irc = pmw3901_init(PMW3901_DEV); }
+			printk("flow: re-init variant %d rc=%d\n", (int)rreq - 1, irc);
+			(void)pmw3901_read_motion_burst(PMW3901_DEV, &(motionBurst_t){0});
+			t_prev = k_cycle_get_32();
+			continue;
+		}
+		const atomic_val_t freq = atomic_set(&g_frame_req, 0);
+		if (freq) {
+			flow_do_frame(freq == 2);
+			(void)pmw3901_read_motion_burst(PMW3901_DEV, &(motionBurst_t){0});  /* drop the
+				* deltas accumulated across the capture/re-init so they don't hit the totals */
+			t_prev = k_cycle_get_32();
+			continue;
+		}
 		motionBurst_t m;
 		int rc = pmw3901_read_motion_burst(PMW3901_DEV, &m);
 		uint32_t t_now = k_cycle_get_32();
@@ -280,6 +378,10 @@ static void flow_thread_fn(void *a, void *b, void *c)
 
 		if (rc == 0) {
 			flow_ingest(&m, dt);
+		} else {
+			k_mutex_lock(&flow_mtx, K_FOREVER);
+			g_c.nerr++;
+			k_mutex_unlock(&flow_mtx);
 		}
 		k_msleep(FLOW_PERIOD_MS);
 	}
@@ -344,6 +446,14 @@ int64_t flow_sample_ms(void)
 	const int64_t t = g_last_ms;
 	k_mutex_unlock(&flow_mtx);
 	return t;
+}
+
+void flow_counts(struct flow_counts_snap *out)
+{
+	k_mutex_lock(&flow_mtx, K_FOREVER);
+	*out = g_c;
+	g_c.pkx = 0; g_c.pky = 0;   /* peaks are per call (one reader: the telemetry thread) */
+	k_mutex_unlock(&flow_mtx);
 }
 
 #endif /* HAVE_FLOW_HW */

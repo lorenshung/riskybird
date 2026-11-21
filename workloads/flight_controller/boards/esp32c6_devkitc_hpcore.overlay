@@ -1,0 +1,138 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * REAL-hardware overlay for the shared flight controller on the ESP32C6 "riskybird" PCB
+ * (standalone ESP build -- FC + radio on the same chip, no FPGA).
+ *
+ * Full drone, through the SAME application aliases the FPGA/RoSE targets use:
+ *   - BMI088 IMU + VL53L1X down-ToF + BMP388 baro on i2c0  (bmi088-accel/-gyro, tof, baro)
+ *   - PMW3901 optical flow on spi2 (SPIM2, software CS via gpio0)  (flow-spi; standalone pmw3901.c)
+ *   - 4 ESC motors on LEDC PWM ch0-3 -> gpio21/20/23/22  (motors -> riskybird,pwm-motors)
+ * Motor + flow pin maps reuse esp_motors.overlay / pmw3901_test.overlay (proven on this PCB).
+ * On spike_riscv64 these same aliases bind to the RoSE virtual drivers instead.
+ */
+
+#include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/pinctrl/esp32c6-pinctrl.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+&pinctrl {
+	i2c0_default: i2c0_default {
+		group1 {
+			pinmux = <I2C0_SDA_GPIO15>, <I2C0_SCL_GPIO14>;
+			bias-pull-up;
+			drive-open-drain;
+			output-high;
+		};
+	};
+
+	/* 4 ESC PWM on LEDC ch0-3 -> gpio21/20/23/22 (from esp_motors.overlay) */
+	ledc0_default: ledc0_default {
+		group1 {
+			pinmux = <LEDC_CH0_GPIO21>, <LEDC_CH1_GPIO20>,
+				 <LEDC_CH2_GPIO23>, <LEDC_CH3_GPIO22>;
+			output-enable;
+		};
+	};
+
+	/* PMW3901 optical flow on SPIM2 (from pmw3901_test.overlay) */
+	spim2_pmw3901: spim2_pmw3901 {
+		group1 {
+			pinmux = <SPIM2_MISO_GPIO18>, <SPIM2_SCLK_GPIO6>, <SPIM2_CSEL_GPIO10>;
+		};
+		group2 {
+			pinmux = <SPIM2_MOSI_GPIO7>;
+			output-low;
+		};
+	};
+};
+
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
+	clock-frequency = <I2C_BITRATE_FAST>;
+
+	/* BMI088 6-axis IMU (accel @0x18, gyro @0x68) */
+	bmi088_accel: bmi08x@18 {
+		compatible = "bosch,bmi08x-accel";
+		reg = <0x18>;
+		accel-hz = "800";
+		accel-fs = <6>;
+		status = "okay";
+	};
+	bmi088_gyro: bmi08x@68 {
+		compatible = "bosch,bmi08x-gyro";
+		reg = <0x68>;
+		gyro-hz = "1000_116";
+		gyro-fs = <1000>;
+		status = "okay";
+	};
+
+	/* VL53L1X down-ToF. Powers up at 0x29 (XSHUT via ADS7128 GPIO6, raised by board_sensor_init()),
+	 * then main.cpp's vl53l1x_readdress_down() moves it to 0x30 before vl53l1x_reinit(). The driver
+	 * must therefore be bound at 0x30 (matches the canonical FPGA/chipyard overlays); a node left at
+	 * 0x29 makes reinit NAK (sensor already moved) and the ToF never ranges -> tofv=0. */
+	vl53l1x: vl53l1x@30 {
+		compatible = "st,vl53l1x";
+		reg = <0x30>;
+		status = "okay";
+	};
+
+	/* BMP388 barometer @0x76 (SDO=GND) -- same part/addr as the FPGA board. */
+	bmp388: bmp388@76 {
+		compatible = "bosch,bmp388";
+		reg = <0x76>;
+		status = "okay";
+	};
+};
+
+/* 4 ESC motor channels on LEDC (20 kHz). Node + channels mirror esp_motors.overlay. */
+&ledc0 {
+	pinctrl-0 = <&ledc0_default>;
+	pinctrl-names = "default";
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel0@0 { reg = <0x0>; timer = <0>; };
+	channel1@1 { reg = <0x1>; timer = <0>; };
+	channel2@2 { reg = <0x2>; timer = <0>; };
+	channel3@3 { reg = <0x3>; timer = <0>; };
+};
+
+/* PMW3901 optical-flow SPI bus (flow.c uses DT_ALIAS(flow_spi) + gpio0 software CS). */
+&spi2 {
+	status = "okay";
+	pinctrl-0 = <&spim2_pmw3901>;
+	pinctrl-names = "default";
+};
+
+/ {
+	/* Collective PWM motor block the app binds via DT_ALIAS(motors). */
+	pwm_motors: pwm_motors {
+		compatible = "riskybird,pwm-motors";
+		pwms = <&ledc0 0 50000 PWM_POLARITY_NORMAL>,
+		       <&ledc0 1 50000 PWM_POLARITY_NORMAL>,
+		       <&ledc0 2 50000 PWM_POLARITY_NORMAL>,
+		       <&ledc0 3 50000 PWM_POLARITY_NORMAL>;
+	};
+
+	/* PMW3901 wiring (CS/reset/led gpios), read by the standalone pmw3901.c driver. */
+	riskybird_pmw3901: pmw3901-wiring {
+		compatible = "riskybird,pmw3901";
+		spi-bus = <&spi2>;
+		cs-gpios = <&gpio0 19 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		led-gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+	};
+
+	aliases {
+		bmi088-accel = &bmi088_accel;
+		bmi088-gyro  = &bmi088_gyro;
+		tof = &vl53l1x;
+		baro = &bmp388;
+		motors = &pwm_motors;
+		flow-spi = &spi2;
+	};
+};

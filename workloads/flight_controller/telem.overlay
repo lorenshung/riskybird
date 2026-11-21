@@ -1,0 +1,8 @@
+/*
+ * Telemetry build overlay (opt-in via EXTRA_DTC_OVERLAY_FILE=telem.overlay).
+ * Enable the ESP32-C6 on-chip 2.4 GHz WiFi radio for the SoftAP + UDP telemetry downlink.
+ * The antenna is the Lemon RX I-PEX MHF3 on the ESP32-C6-MINI-1U. See docs/TELEMETRY_PLAN.md.
+ */
+&wifi {
+	status = "okay";
+};
