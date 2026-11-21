@@ -362,6 +362,11 @@ static volatile uint32_t g_stale;
 static volatile uint32_t g_failsafe_cuts;
 static volatile uint32_t g_pwm_errs;
 static volatile uint32_t g_text_bytes;     /* ASCII bytes handed to the radio half */
+static volatile uint32_t g_dl_lines;       /* DIAG: lines downlink_thread passed to send_to_clients */
+static volatile int g_dl_sock = -2;        /* DIAG: downlink socket fd (-2=open never attempted) */
+static volatile int g_dl_cl;               /* DIAG: cl.count at downlink_thread's last line */
+static volatile int g_dl_err;              /* DIAG: errno of the last failed downlink sendto */
+static volatile int g_tx_sock = -1;        /* shared TX socket, created+healed by status_thread */
 static volatile uint8_t  g_flags;
 static volatile uint8_t  g_seq;
 static volatile bool     g_link_up;
@@ -652,6 +657,56 @@ static void motors_cut(uint32_t now_us)
 	motors_service(now_us);
 }
 
+/* ---- RESET chirp ----------------------------------------------------------
+ * On RESET, sweep motors 1-2-3-4 at ~break-away duty (crisp -- applied via motors_apply, bypassing
+ * the spin-up ramp) so the operator hears the board re-arm. Runs in the link thread, interleaved
+ * with the watchdog feed, and aborts on kill / load / flash-hold. The FC's own settle (gyro recal
+ * with motors held off) runs in parallel, so the net post-RESET sequence is: chirp -> settle -> fly.
+ * motors_apply() already zeroes on kill/load, so this can never drive past a safety stop. */
+#define CHIRP_DUTY   ((MOTOR_LINK_DUTY_FULL * 15U) / 100U)   /* at break-away: spins, never stalls */
+#define CHIRP_ON_MS  250
+#define CHIRP_GAP_MS 120
+static atomic_t g_chirp_req = ATOMIC_INIT(0);
+
+/* Returns true while a chirp is in progress (the caller then skips the normal motors_service). */
+static bool chirp_service(void)
+{
+	static int     phase = -1;    /* -1 idle; even = motor (phase/2) ON, odd = gap after it */
+	static int64_t phase_end;
+
+	if (atomic_cas(&g_chirp_req, 1, 0)) {
+		phase = 0;
+		phase_end = k_uptime_get() + CHIRP_ON_MS;
+	}
+	if (phase < 0) {
+		return false;
+	}
+	if (g_kill || load_link_active() || esp_safety_wdt_held()) {
+		phase = -1;
+		motors_off();
+		return false;
+	}
+
+	uint16_t d[MOTOR_LINK_NMOTORS] = { 0 };
+	unsigned m = (unsigned)phase >> 1;
+
+	if (((phase & 1) == 0) && m < MOTOR_LINK_NMOTORS) {
+		d[m] = (uint16_t)CHIRP_DUTY;
+	}
+	motors_apply(d);
+
+	if (k_uptime_get() >= phase_end) {
+		phase++;
+		if (phase >= 2 * (int)MOTOR_LINK_NMOTORS) {
+			phase = -1;
+			ss_reset(&g_ss);   /* normal spin-up starts cold after the chirp */
+			return false;
+		}
+		phase_end = k_uptime_get() + (((phase & 1) != 0) ? CHIRP_GAP_MS : CHIRP_ON_MS);
+	}
+	return true;
+}
+
 /* ---- frame handling ------------------------------------------------------
  *
  * The failsafe rules, identical to workloads/esp_motors because they are the
@@ -906,8 +961,11 @@ static void link_thread(void *a, void *b, void *c)
 
 		/* Advance the spin-up gate. After the failsafe, kill and load
 		 * checks, so a stale command is never written past the deadline
-		 * (motors_off() or motors_cut() above has already zeroed the targets). */
-		motors_service(motors_now_us());
+		 * (motors_off() or motors_cut() above has already zeroed the targets).
+		 * A RESET chirp, if active, owns the gates this tick instead. */
+		if (!chirp_service()) {
+			motors_service(motors_now_us());
+		}
 
 		/* Watchdog feed (and a persist.c flash-erase hold request: granted
 		 * here only after 1 s with no duty, which also blocks the gates
@@ -973,7 +1031,7 @@ static int status_line(char *buf, size_t len, int clients)
 			"RBLINK v1 ml=%s up=%lld seq=%u fl=0x%02x[%s] "
 			"duty=[%u %u %u %u] fr=%u gap=%d lost=%u stale=%u "
 			"crc=%u noise=%u cuts=%u pwmerr=%u kill=%u txt=%u cl=%d "
-			"ph=%u ss=%04x sslim=%u\n",
+			"ph=%u ss=%04x sslim=%u dls=%u dsk=%d dcl=%d derr=%d\n",
 			g_link_up ? "up" : "down", k_uptime_get(),
 			(unsigned)g_seq, (unsigned)g_flags,
 			flags_str(g_flags, fbuf, sizeof(fbuf)),
@@ -986,7 +1044,8 @@ static int status_line(char *buf, size_t len, int clients)
 			g_kill ? 1u : 0u, (unsigned)g_text_bytes, clients,
 			(unsigned)ESP_LINK_PWM_INTERLEAVE,
 			ESP_LINK_SOFTSTART ? (unsigned)ss_phase_word(&g_ss) : 0xffffu,
-			(unsigned)g_ss.lim_ticks);
+			(unsigned)g_ss.lim_ticks,
+			(unsigned)g_dl_lines, g_dl_sock, g_dl_cl, g_dl_err);
 }
 
 /*
@@ -1093,9 +1152,10 @@ static void clients_now(struct client_list *cl)
 	(void)net_dhcpv4_server_foreach_lease(net_if_get_wifi_sap(), lease_cb, cl);
 }
 
-static void send_to_clients(int sock, const struct client_list *cl,
+static int send_to_clients(int sock, const struct client_list *cl,
 			    const char *data, size_t len)
 {
+	int rc = 0;
 	for (int i = 0; i < cl->count; i++) {
 		struct sockaddr_in dst = {
 			.sin_family = AF_INET,
@@ -1103,9 +1163,12 @@ static void send_to_clients(int sock, const struct client_list *cl,
 		};
 
 		dst.sin_addr = cl->addr[i];
-		(void)zsock_sendto(sock, data, len, 0,
-				   (struct sockaddr *)&dst, sizeof(dst));
+		if (zsock_sendto(sock, data, len, 0,
+				   (struct sockaddr *)&dst, sizeof(dst)) < 0) {
+			rc = errno;
+		}
 	}
+	return rc;
 }
 
 /* ---- downlink -------------------------------------------------------------
@@ -1119,13 +1182,12 @@ static void downlink_thread(void *a, void *b, void *c)
 	static char line[TELEM_LINE_MAX];
 	size_t len = 0;
 	bool overlong = false;
-	int sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-	if (sock < 0) {
-		printk("esp_bridge: telemetry socket failed (%d)\n", errno);
-		return;
-	}
-
+	/* Opened LAZILY on first send (not here): downlink_thread is created before the SoftAP netif is
+	 * up, and a UDP socket opened then binds to no interface, so sendto to the 192.168.4.x clients is
+	 * silently dropped forever -- while RBLINK (status_thread, which already opens lazily) still
+	 * arrives. That is exactly the split observed on the bench: telemetry delivered, camera IMG
+	 * chunks never. So we do NOT open our own socket here -- we send over g_tx_sock, the one
+	 * status_thread creates and heals and which demonstrably reaches the clients. */
 	for (;;) {
 		uint8_t ch;
 
@@ -1168,25 +1230,29 @@ static void downlink_thread(void *a, void *b, void *c)
 
 		clients_now(&cl);
 
-		/* Diagnostic, rate-limited to the first few lines and then one a
-		 * second. Without it a silent downlink is ambiguous between three
-		 * very different faults: no bytes arriving on the UART at all, a
-		 * line assembled but no DHCP lease to unicast it to, or the send
-		 * itself failing. Each needs a different fix, and the console
-		 * cannot distinguish them after the fact. */
-		{
-			static uint32_t seen;
-			static int64_t next_report;
-
-			seen++;
-			if (seen <= 3 || k_uptime_get() >= next_report) {
-				next_report = k_uptime_get() + 1000;
-				printk("esp_bridge: line #%u (%u B), %d client(s): %.*s\n",
-				       seen, (unsigned)len, cl.count,
-				       (int)(len > 60 ? 60 : len - 1), line);
-			}
+		/* Open lazily + retry, exactly like status_thread (which reliably delivers RBLINK): a socket
+		 * opened once at thread start, before the SoftAP netif is up, can be dead for the session.
+		 * Defer the open until a DHCP lease exists: a lease proves the SoftAP netif is up and running,
+		 * so the socket binds to it and can route to the 192.168.4.x clients. Opening on the first
+		 * uart1 line (the free-running recorder's heartbeat, ~2 s after an ESP reset) raced the netif
+		 * and bound to no interface -> every camera IMG chunk silently dropped while RBLINK (status
+		 * thread, which opens later) still arrived. cl.count>0 removes that race deterministically. */
+		g_dl_cl = cl.count;
+		/* Reuse the shared TX socket that status_thread creates and heals: its RBLINK reliably
+		 * reaches the SoftAP clients, whereas a socket created here got -ENOENT (no route) on every
+		 * sendto for the whole session -- an own-socket vs netif-selection quirk we sidestep by
+		 * sending over the one socket already proven to deliver. */
+		g_dl_sock = g_tx_sock;
+		if (g_tx_sock >= 0 && cl.count > 0) {
+			g_dl_err = send_to_clients(g_tx_sock, &cl, line, len);
+			g_dl_lines++;
 		}
-		send_to_clients(sock, &cl, line, len);
+
+		/* NO printk on this path. The console is a USB-CDC endpoint that BLOCKS when no host drains
+		 * it; a diagnostic printk here (it used to sit BEFORE the send) stalled the whole downlink
+		 * whenever nobody had the ESP console open -- RBLINK still arrived (status_thread sends before
+		 * its printk) but camera IMG frames never did. The link thread avoids printk for the same
+		 * reason; the downlink must too. Liveness is still visible in RBLINK's txt=/noise= counters. */
 		len = 0;
 	}
 }
@@ -1223,6 +1289,7 @@ static void status_thread(void *a, void *b, void *c)
 				       "console-only, NOT reaching the ground station\n", errno);
 			}
 		}
+		g_tx_sock = sock;   /* publish the working socket for downlink_thread to reuse */
 		clients_now(&cl);
 		n = status_tail(buf, sizeof(buf), status_line(buf, sizeof(buf), cl.count));
 		if (n <= 0) {
@@ -1323,6 +1390,7 @@ static void uplink_thread(void *a, void *b, void *c)
 			 * and RBLINK says so (rearm=kill, rablk counting). */
 			g_kill = false;
 			esp_safety_kill_store(false);
+			atomic_set(&g_chirp_req, 1);   /* RESET -> 1-2-3-4 motor chirp (board re-armed) */
 			local = " -- ESP kill latch CLEARED, frames apply again";
 		}
 #endif

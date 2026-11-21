@@ -53,6 +53,9 @@
 #ifndef ESP_RELAY_BATT_PERIOD_MS
 #define ESP_RELAY_BATT_PERIOD_MS 200
 #endif
+#ifndef ESP_RELAY_BARO_PERIOD_MS
+#define ESP_RELAY_BARO_PERIOD_MS 40   /* ~25 Hz; altitude needs no more, and SL_BARO is tiny (~11 B) */
+#endif
 #define RELAY_TIMEOUT_MS 3000       /* keepalive is ~1 s; three missed and the stream stops */
 
 #define ADS7128_ADDR          0x17
@@ -71,6 +74,7 @@ static const struct device *const i2c = DEVICE_DT_GET(DT_NODELABEL(i2c0));
 static const struct device *const accel = DEVICE_DT_GET(DT_NODELABEL(bmi088_accel));
 static const struct device *const gyro = DEVICE_DT_GET(DT_NODELABEL(bmi088_gyro));
 static const struct device *const tof = DEVICE_DT_GET(DT_NODELABEL(relay_vl53l1x));
+static const struct device *const baro = DEVICE_DT_GET(DT_NODELABEL(relay_bmp388));
 
 static atomic_t keepalive_ms;       /* k_uptime_get_32() of the last RELAY ON; 0 = never */
 static K_SEM_DEFINE(first_keepalive, 0, 1);
@@ -79,11 +83,14 @@ static volatile bool board_ready;
 
 static struct {
 	uint32_t imu_sent, imu_fail, tof_sent, tof_fail, batt_sent, batt_fail, tx_refused;
+	uint32_t baro_sent, baro_fail;
 	uint32_t imu_gap_max_us;        /* worst interval between successful IMU reads */
-	int init_rc_accel, init_rc_gyro, init_rc_tof, init_rc_board;
-	int imu_last_rc, tof_last_rc;   /* the most recent failure's errno, 0 if none yet */
-	bool imu_up, tof_up;
-} st = { .init_rc_accel = 1, .init_rc_gyro = 1, .init_rc_tof = 1, .init_rc_board = 1 };
+	int init_rc_accel, init_rc_gyro, init_rc_tof, init_rc_board, init_rc_baro;
+	int imu_last_rc, tof_last_rc, baro_last_rc;   /* the most recent failure's errno, 0 if none yet */
+	bool imu_up, tof_up, baro_up;
+	uint8_t baro_id76, baro_id77;   /* CHIP_ID probed on each strap addr: 0x50 BMP388, 0x60 BMP390 */
+	uint32_t baro_last_pa;          /* last compensated pressure (Pa), for the status line */
+} st = { .init_rc_accel = 1, .init_rc_gyro = 1, .init_rc_tof = 1, .init_rc_board = 1, .init_rc_baro = 1 };
 
 static uint8_t seq[SL_TYPE_COUNT];
 
@@ -304,9 +311,175 @@ static void tof_thread(void *a, void *b, void *c)
 	}
 }
 
+/* Barometer (BMP388/BMP390) relay. Slow, non-blocking reads on a low-priority thread: fetch the
+ * compensated pressure (kPa, the Zephyr SENSOR_CHAN_PRESS convention) and temperature, pack them as
+ * SL_BARO (pressure 0.01 Pa, temperature 0.01 degC) and send. The FC's control loop turns kPa into
+ * altitude relative to its arm-time reference and fuses it with the ToF (ROSE_BARO). A one-shot
+ * CHIP_ID probe of both strap addresses runs first so the populated part + address are visible in
+ * the status line even if the driver's node address is wrong. */
+static void baro_thread(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
+
+	while (!board_ready) {   /* after the IMU thread has set up the bus/expander */
+		k_msleep(100);
+	}
+
+	/* CHIP_ID (reg 0x00): 0x50 = BMP388, 0x60 = BMP390. Probe both SDO straps; a 0 means no ACK. */
+	{
+		uint8_t reg = 0x00u, id = 0u;
+
+		if (i2c_write_read(i2c, 0x76u, &reg, 1, &id, 1) == 0) { st.baro_id76 = id; }
+		id = 0u;
+		if (i2c_write_read(i2c, 0x77u, &reg, 1, &id, 1) == 0) { st.baro_id77 = id; }
+	}
+
+	k_mutex_lock(&bus_setup, K_FOREVER);
+	st.init_rc_baro = dev_bringup(baro);
+	k_mutex_unlock(&bus_setup);
+	while (st.init_rc_baro != 0) {
+		k_msleep(1000);
+		k_mutex_lock(&bus_setup, K_FOREVER);
+		st.init_rc_baro = dev_bringup(baro);
+		k_mutex_unlock(&bus_setup);
+	}
+	st.baro_up = true;
+
+	for (;;) {
+		if (!streaming()) {
+			k_msleep(50);
+			continue;
+		}
+		struct sensor_value pv, tv;
+		const int frc = sensor_sample_fetch(baro);
+		const int prc = frc == 0 ? sensor_channel_get(baro, SENSOR_CHAN_PRESS, &pv) : frc;
+		const int trc = prc == 0 ? sensor_channel_get(baro, SENSOR_CHAN_AMBIENT_TEMP, &tv) : prc;
+
+		if (trc == 0) {
+			const float kpa = (float)sensor_value_to_double(&pv);
+			const float degc = (float)sensor_value_to_double(&tv);
+			uint8_t p[SL_BARO_LEN];
+
+			sl_baro_pack(p, kpa, degc);
+			send(SL_BARO, p, &st.baro_sent);
+			st.baro_last_pa = kpa <= 0.0f ? 0u : (uint32_t)(kpa * 1000.0f + 0.5f);
+			k_msleep(ESP_RELAY_BARO_PERIOD_MS);
+		} else {
+			st.baro_fail++;
+			st.baro_last_rc = trc;
+			k_msleep(50);
+		}
+	}
+}
+
+/* ---- HM01B0 camera config over the ESP's i2c0 ---------------------------------------------
+ * The camera's SCCB (addr 0x24) is on the shared i2c0 (via PCA9306); the FPGA drives MCLK and
+ * captures the DVP, but its own I2C is dead, so the ESP owns sensor config. The HM01B0 cannot
+ * ACK on SCCB until the FPGA's MCLK is running, so retry until it does, then stream once. */
+#define HM01B0_ADDR       0x24
+#define HM01B0_MODEL_ID   0x01B0u
+
+static volatile uint16_t cam_model;
+static volatile uint32_t cam_cfg_tries;
+static volatile bool cam_streaming;
+
+static int cam_rd(uint16_t reg, uint8_t *out)
+{
+	/* SCCB has no repeated START: the address write must STOP before the read begins. */
+	uint8_t a[2] = { (uint8_t)(reg >> 8), (uint8_t)reg };
+	int rc = i2c_write(i2c, a, sizeof(a), HM01B0_ADDR);
+
+	return rc ? rc : i2c_read(i2c, out, 1, HM01B0_ADDR);
+}
+
+static int cam_wr(uint16_t reg, uint8_t val)
+{
+	uint8_t b[3] = { (uint8_t)(reg >> 8), (uint8_t)reg, val };
+
+	return i2c_write(i2c, b, sizeof(b), HM01B0_ADDR);
+}
+
+/* Full streaming config: SW reset -> standby -> HM01B0 init (exposure/timing/AE) -> test-pattern
+ * off -> stream. The init sequence (from camera_dma_fpga, which reconstructs a real photo) is what
+ * makes the sensor output the live scene rather than its power-on test pattern. Needs MCLK up. */
+static void hm01b0_stream(void)
+{
+	static const struct { uint16_t r; uint8_t v; } HM_INIT[] = {
+		{0x1003,0x08},{0x1007,0x08},{0x1000,0x43},{0x1001,0x40},{0x1002,0x32},{0x0350,0x7F},
+		{0x1006,0x01},{0x1008,0x00},{0x1009,0xA0},{0x100A,0x60},{0x100B,0x90},{0x100C,0x40},
+		{0x3044,0x0A},{0x3045,0x00},{0x3047,0x0A},{0x3050,0xC0},{0x3051,0x42},{0x3052,0x50},
+		{0x3053,0x00},{0x3054,0x03},{0x3055,0xF7},{0x3056,0xF8},{0x3057,0x29},{0x3058,0x1F},
+		{0x3064,0x00},{0x3065,0x04},{0x3022,0x01},{0x1012,0x01},{0x2000,0x07},
+		{0x2100,0x01},{0x2101,0x40},{0x2102,0x0A},{0x2103,0x03},{0x2104,0x07},
+		{0x2105,0x02},{0x2106,0x20},{0x2108,0x03},{0x2109,0x03},{0x210B,0x80},
+#if defined(CAM_QQVGA) && CAM_QQVGA
+		/* 2x2 subsample + binning -> ~162x162. Halves each dimension => fewer lines read =>
+		 * higher fps, and binning AVERAGES 2x2 => lower noise. On this COLOUR (Bayer) part it
+		 * averages adjacent CFA sites => the output is effectively GRAYSCALE (no mosaic) — which
+		 * is exactly what DroNet wants. Also trim FRAME/LINE length so the frame readout actually
+		 * shortens (otherwise the sensor pads back to the full-res line count). */
+		{0x0383,0x03},{0x0387,0x03},{0x0390,0x03},
+		{0x0340,0x00},{0x0341,0xA6},                 /* FRAME_LEN ~166 lines (162 + vblank) */
+		{0x0342,0x01},{0x0343,0x78},                 /* LINE_LEN ~376 pclks */
+#endif
+#if defined(CAM_QVGA) && CAM_QVGA
+		/* QVGA window: 324x244 crop at (0,0) — a WINDOW, not averaged, so the Bayer mosaic
+		 * survives => COLOUR is preserved (unlike binning/subsample). Fewer active lines; trim
+		 * FRAME_LEN so the readout actually shortens (~1.3x fps). Line length unchanged. */
+		{0x3010,0x01},
+		{0x0340,0x01},{0x0341,0x00},                 /* FRAME_LEN = 256 lines (244 + vblank) */
+#endif
+		{0x0101,0x01},{0x0104,0x01},
+	};
+	(void)cam_wr(0x0103, 0x01); k_msleep(50);   /* SW reset */
+	(void)cam_wr(0x0100, 0x00);                 /* standby */
+	for (unsigned i = 0; i < sizeof(HM_INIT) / sizeof(HM_INIT[0]); i++) {
+		(void)cam_wr(HM_INIT[i].r, HM_INIT[i].v);
+	}
+	(void)cam_wr(0x0601, 0x00);                 /* test pattern off (live pixels) */
+	(void)cam_wr(0x0100, 0x01);                 /* stream */
+}
+
+/* Keep the HM01B0 configured whenever the FPGA drives MCLK: (re)configure on the down->up edge
+ * (first bring-up, or after an FPGA workload reload drops MCLK), then only verify MODEL_ID in
+ * steady state so streaming isn't disturbed. The sensor can't ACK on SCCB without MCLK, so a
+ * failing MODEL_ID read == MCLK is down. */
+static void cam_thread(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
+	bool was_up = false;
+
+	for (;;) {
+		uint8_t h, l;
+		bool acks = (cam_rd(0x0000, &h) == 0 && cam_rd(0x0001, &l) == 0);
+
+		if (acks) {
+			cam_model = (uint16_t)(((uint16_t)h << 8) | l);
+		}
+		bool is_hm = acks && cam_model == HM01B0_MODEL_ID;
+
+		if (is_hm && !was_up) {
+			hm01b0_stream();
+			was_up = true;
+			cam_streaming = true;
+			printk("CAM: HM01B0 0x%04x configured over ESP i2c0 -> streaming\n", cam_model);
+		} else if (!is_hm && was_up) {
+			was_up = false;
+			cam_streaming = false;
+			printk("CAM: lost camera (MCLK down?) -- will reconfigure when it returns\n");
+		}
+		cam_cfg_tries++;
+		k_msleep(was_up ? 2000 : 500);
+	}
+}
+
+K_THREAD_STACK_DEFINE(relay_cam_stack, 2048);
+static struct k_thread relay_cam_data;
+
 K_THREAD_STACK_DEFINE(relay_imu_stack, 2048);
 K_THREAD_STACK_DEFINE(relay_tof_stack, 2048);
-static struct k_thread relay_imu_data, relay_tof_data;
+K_THREAD_STACK_DEFINE(relay_baro_stack, 2048);
+static struct k_thread relay_imu_data, relay_tof_data, relay_baro_data;
 
 void sensor_relay_start(void)
 {
@@ -316,6 +489,15 @@ void sensor_relay_start(void)
 	k_thread_create(&relay_tof_data, relay_tof_stack, K_THREAD_STACK_SIZEOF(relay_tof_stack),
 			tof_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(8), 0, K_NO_WAIT);
 	k_thread_name_set(&relay_tof_data, "relay_tof");
+	/* Below the ToF (priority 9): the baro read is short but altitude tolerates jitter. */
+	k_thread_create(&relay_baro_data, relay_baro_stack, K_THREAD_STACK_SIZEOF(relay_baro_stack),
+			baro_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(9), 0, K_NO_WAIT);
+	k_thread_name_set(&relay_baro_data, "relay_baro");
+	/* Camera config is independent of the FC keepalive (the FPGA just needs MCLK up), so it runs
+	 * at the lowest preemptible priority and does not wait for RELAY ON. */
+	k_thread_create(&relay_cam_data, relay_cam_stack, K_THREAD_STACK_SIZEOF(relay_cam_stack),
+			cam_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, K_NO_WAIT);
+	k_thread_name_set(&relay_cam_data, "relay_cam");
 }
 
 int sensor_relay_status(char *buf, size_t len)
@@ -325,10 +507,15 @@ int sensor_relay_status(char *buf, size_t len)
 	}
 	return snprintf(buf, len,
 			"RELAY %s imu=%u/%u fail(rc %d) gap_max=%uus tof=%u/%u fail(rc %d) batt=%u/%u fail "
-			"txrefused=%u init=b%d a%d g%d t%d\n",
+			"baro=%u/%u(rc %d) id76=%02x id77=%02x pa=%u "
+			"txrefused=%u init=b%d a%d g%d t%d p%d cam=0x%04x/%s\n",
 			streaming() ? "on" : "stale", (unsigned)st.imu_sent, (unsigned)st.imu_fail,
 			st.imu_last_rc, (unsigned)st.imu_gap_max_us, (unsigned)st.tof_sent,
 			(unsigned)st.tof_fail, st.tof_last_rc,
-			(unsigned)st.batt_sent, (unsigned)st.batt_fail, (unsigned)st.tx_refused,
-			st.init_rc_board, st.init_rc_accel, st.init_rc_gyro, st.init_rc_tof);
+			(unsigned)st.batt_sent, (unsigned)st.batt_fail,
+			(unsigned)st.baro_sent, (unsigned)st.baro_fail, st.baro_last_rc,
+			st.baro_id76, st.baro_id77, (unsigned)st.baro_last_pa,
+			(unsigned)st.tx_refused,
+			st.init_rc_board, st.init_rc_accel, st.init_rc_gyro, st.init_rc_tof, st.init_rc_baro,
+			(unsigned)cam_model, cam_streaming ? "stream" : "wait");
 }

@@ -46,6 +46,8 @@ struct relay_data {
 	float v[3];
 };
 
+#define RELAY_BARO_STALE_MS 500
+
 static struct k_spinlock lock;
 static struct {
 	float accel[3], gyro[3];
@@ -55,11 +57,15 @@ static struct {
 	uint16_t batt_code;
 	int64_t batt_ms;
 	bool batt_valid;
+	float baro_kpa, baro_tc;     /* compensated pressure (kPa) + temperature (degC) from SL_BARO */
+	int64_t baro_ms;
+	bool baro_valid;
+	uint32_t baro_seq;           /* per-sample counter so the control loop processes each once */
 } latest;
 static K_SEM_DEFINE(tof_new, 0, 1);
 
 /* Counters, readable over JTAG (and printed on the console at boot by the caller). */
-volatile uint32_t g_relay_imu_frames, g_relay_tof_frames, g_relay_batt_frames;
+volatile uint32_t g_relay_imu_frames, g_relay_tof_frames, g_relay_batt_frames, g_relay_baro_frames;
 volatile uint32_t g_relay_imu_stale;
 
 void sensor_relay_ingest(const struct sensor_link_frame *f)
@@ -98,9 +104,40 @@ void sensor_relay_ingest(const struct sensor_link_frame *f)
 		k_spin_unlock(&lock, key);
 		g_relay_batt_frames++;
 		break;
-	default:
-		break;   /* SL_BARO: not consumed by this build (the FPGA devicetree has no baro) */
+	case SL_BARO: {
+		float kpa, tc;
+
+		sl_baro_unpack(f->payload, &kpa, &tc);
+		key = k_spin_lock(&lock);
+		latest.baro_kpa = kpa;
+		latest.baro_tc = tc;
+		latest.baro_ms = now;
+		latest.baro_valid = true;
+		latest.baro_seq++;
+		k_spin_unlock(&lock, key);
+		g_relay_baro_frames++;
+		break;
 	}
+	default:
+		break;
+	}
+}
+
+/* Newest relayed barometer sample (pressure kPa + temperature degC) if under RELAY_BARO_STALE_MS
+ * old. *seq is a per-sample counter the control loop gates on so each reading is processed once
+ * (matching the FC-direct baro_thread_fn seq path in main.cpp). */
+bool sensor_relay_baro(float *kpa, float *tc, uint32_t *seq)
+{
+	k_spinlock_key_t key = k_spin_lock(&lock);
+	const bool ok = latest.baro_valid && (k_uptime_get() - latest.baro_ms) < RELAY_BARO_STALE_MS;
+
+	if (ok) {
+		if (kpa) { *kpa = latest.baro_kpa; }
+		if (tc)  { *tc  = latest.baro_tc; }
+		if (seq) { *seq = latest.baro_seq; }
+	}
+	k_spin_unlock(&lock, key);
+	return ok;
 }
 
 bool sensor_relay_batt(uint16_t *code)

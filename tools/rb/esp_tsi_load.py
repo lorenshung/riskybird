@@ -92,7 +92,18 @@ class Tsi:
 
 def open_link(args: argparse.Namespace) -> serial.SerialBase:
     if not args.url:
-        return serial.Serial(args.usb, 115200, timeout=0.5)
+        # Deassert DTR/RTS BEFORE opening: on this ESP32-C6 the native USB JTAG/serial
+        # unit resets into the ROM download loader when either line is asserted at open,
+        # which takes esp_bridge (and its load_link console) off the wire. Setting the
+        # states on the unopened port makes pyserial apply them during open().
+        s = serial.Serial()
+        s.port = args.usb
+        s.baudrate = 115200
+        s.timeout = 0.5
+        s.dtr = False
+        s.rts = False
+        s.open()
+        return s
     # The ESP serves one connection at a time and refuses a new one for a
     # moment after the last closed (its TCP close/TIME_WAIT), so retry briefly.
     deadline = time.monotonic() + 5.0

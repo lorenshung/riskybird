@@ -220,4 +220,28 @@
 		zephyr,deferred-init;
 		status = "okay";
 	};
+
+	/*
+	 * Barometer (U5). The riskybirdv3 BOM swapped the schematic BMP390 -> BMP388 (C779278, the
+	 * JLC-assemblable part; same LGA-10 2x2 package/pinout, same BMP38x register family); the stock
+	 * Zephyr bosch,bmp388 driver also drives a genuine BMP390 if one was hand-populated, so the
+	 * chip-ID (0x50 BMP388 / 0x60 BMP390) is probed at bring-up and surfaced in the RELAY status
+	 * line. SDO strap sets the address bit: 0x76 (SDO=GND) vs 0x77 (SDO=VDDIO) -- default to 0x76;
+	 * sensor_relay.c probes both so a wrong guess is visible in one flash.
+	 *
+	 * Bosch "drone" preset: 8x pressure / 1x temperature oversampling, 50 Hz ODR, IIR coef 3 --
+	 * ~0.33 Pa resolution (~3 cm) with light smoothing for vibration. Polled (no int-gpios to the
+	 * ESP; INT_BARO is routed to the FPGA, not here). deferred-init like every sensor node: nothing
+	 * touches the bus until a relay FC asks.
+	 */
+	relay_bmp388: bmp388@76 {
+		compatible = "bosch,bmp388";
+		reg = <0x76>;
+		odr = "50";
+		osr-press = <8>;
+		osr-temp = <1>;
+		iir-filter = <3>;
+		zephyr,deferred-init;
+		status = "okay";
+	};
 };
