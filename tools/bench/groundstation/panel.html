@@ -32,7 +32,22 @@
   #state{grid-column:span 12;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:18px;
     font-weight:700;font-size:22px;letter-spacing:.5px;border:1px solid var(--line);background:var(--panel)}
   #state .badge{font-family:var(--mono);font-size:13px;font-weight:600;padding:4px 10px;border-radius:20px;
-    background:#0d1117;border:1px solid var(--line);color:var(--dim);letter-spacing:.5px}
+    background:#0d1117;border:1px solid var(--line);color:var(--dim);letter-spacing:.5px;
+    font-variant-numeric:tabular-nums}
+  /* One stable line: nothing wraps, numeric badges have fixed widths (the it counter / Hz / vib change
+   * every frame and used to push the row across the wrap point, flickering between 1 and 2 lines), and
+   * the free-text "why" badge is the only elastic item -- it truncates with an ellipsis (full text in
+   * its tooltip) instead of wrapping. */
+  #state > *{white-space:nowrap;flex:none}
+  #state #whybadge{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  #state #calbadge{min-width:7ch;text-align:center}
+  #state #itbadge{min-width:12ch;text-align:center}
+  #state #vibbadge{min-width:13ch;text-align:center}
+  #state #loopbadge{min-width:12ch;text-align:center}
+  @media (max-width:760px){   /* narrow: a deliberate 2-row layout, never a flicker */
+    #state{flex-wrap:wrap;row-gap:8px}
+    #state #whybadge{order:9;flex-basis:100%}
+  }
   #state.s-estop{background:rgba(248,81,73,.16);border-color:var(--bad);color:var(--bad);animation:pulse 1s infinite}
   #state.s-armed{background:rgba(255,123,0,.14);border-color:var(--arm);color:var(--arm)}
   #state.s-arming{background:rgba(210,153,34,.14);border-color:var(--warn);color:var(--warn)}
@@ -70,6 +85,55 @@
   #profile{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
   #profile label{display:flex;flex-direction:column;gap:4px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
   #profile input{width:96px;background:#0a0e14;border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:8px;font-family:var(--mono);font-size:13px}
+  /* ---- manual pilot (Steam Deck / gamepad) ---- */
+  #pilotcard{border-color:#2d3a52}
+  .pilot-grid{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center}
+  @media(max-width:900px){.pilot-grid{grid-template-columns:1fr}}
+  .stick{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .stick canvas{width:190px;height:190px;background:#0a0e14;border:1px solid var(--line);border-radius:12px;touch-action:none}
+  .stick .lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+  .stick .val{font-family:var(--mono);font-size:12px;color:var(--ink);text-align:center;line-height:1.5}
+  .pilot-center{display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center}
+  .pilot-btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+  /* big, touch-sized controls for arm's-length use on the Deck */
+  button.big{font-size:18px;padding:16px 26px;border-radius:12px;min-width:150px}
+  button.kill{background:var(--bad);border-color:#ff6b63;color:#fff;font-size:22px;padding:20px 40px;
+    box-shadow:0 0 0 2px rgba(248,81,73,.35);letter-spacing:.5px}
+  button.toggle{background:#12233a;border-color:var(--accent);color:var(--accent)}
+  button.toggle.on{background:var(--ok);border-color:var(--ok);color:#06220f}
+  button.armbtn{background:#12233a;border-color:var(--accent);color:var(--accent)}
+  button.disarmbtn{background:#3a2d12;border-color:var(--warn);color:var(--warn)}
+  .pilot-status{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:12px;
+    font-family:var(--mono);font-size:13px;color:var(--dim)}
+  .pilot-status b{color:var(--ink);font-weight:650}
+  .pill{padding:4px 12px;border-radius:20px;border:1px solid var(--line);background:#0d1117}
+  .pill.ok{color:var(--ok);border-color:var(--ok)} .pill.warn{color:var(--warn);border-color:var(--warn)}
+  .pill.bad{color:var(--bad);border-color:var(--bad)}
+  .pilot-opts{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:10px;font-size:12px;color:var(--dim)}
+  .pilot-opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .pilot-opts input[type=range]{width:120px}
+  /* ---- FLOW CAL ---- */
+  #fccard{border-color:#2d4a3a}
+  .fc-grid{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:18px}
+  @media(max-width:900px){.fc-grid{grid-template-columns:1fr}}
+  .fc-ctl{display:flex;flex-direction:column;gap:12px}
+  .fc-ctl .lab{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:4px}
+  .seg{display:flex;gap:8px} .seg button{flex:1;padding:10px 8px}
+  .seg button.on{background:var(--ok);border-color:var(--ok);color:#06220f}
+  .sl{display:flex;align-items:center;gap:10px} .sl input[type=range]{flex:1}
+  .sl input[type=number]{width:84px;background:#0a0e14;border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px;font-family:var(--mono);font-size:13px}
+  #fc_run{display:flex;flex-direction:column;gap:10px}
+  #fc_live{display:flex;flex-wrap:wrap;gap:14px;font-family:var(--mono);font-size:13px;color:var(--dim)}
+  #fc_live b{color:var(--ink)}
+  #fc_tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  #fc_tbl th{color:var(--dim);font-weight:500;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+  #fc_tbl td{text-align:right;padding:4px 6px;border-bottom:1px solid #1f2630}
+  #fc_tbl td.l,#fc_tbl th.l{text-align:left}
+  #fc_tbl tr.rej td{color:var(--dim)} #fc_tbl tr.rej td.why{color:var(--warn)}
+  #fc_tbl button{padding:2px 8px;font-size:11px}
+  #fc_sum{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .fcs{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px}
+  .fcs .kbig{font-size:20px;font-weight:700;color:var(--ink)}
 </style>
 </head>
 <body>
@@ -84,16 +148,135 @@
 </header>
 
 <div class="wrap">
-  <div id="state" class="s-nolink"><span id="statetxt">WAITING FOR TELEMETRY</span>
+  <div id="state" class="s-nolink" style="order:-3">
+    <span id="statetxt">WAITING FOR TELEMETRY</span>
+    <span class="badge" id="whybadge" style="background:#0d1117">—</span>
     <span class="badge" id="calbadge">cal --</span>
     <span class="badge" id="itbadge">it --</span>
-    <span class="badge" id="loopbadge">-- Hz loop</span>
+    <span class="badge" id="vibbadge" title="decaying peak |accel| over ~0.7 s — motor vibration level (1 g at rest)">vib --</span>
+    <span class="badge" id="loopbadge" style="margin-left:auto">-- Hz loop</span>
   </div>
 
-  <!-- 3D estimated state -->
-  <div class="card c12">
-    <h2>3D — estimated state <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· drag to orbit · scroll to zoom · R to reset view</span></h2>
-    <canvas id="scene" width="1000" height="430" style="width:100%;height:auto;cursor:grab"></canvas>
+  <!-- manual pilot (Steam Deck / gamepad) -->
+  <div class="card c12" id="pilotcard">
+    <h2>Manual pilot &nbsp;<span class="muted" style="text-transform:none;letter-spacing:0">gamepad · left stick = velocity (fwd/back, left/right) · right stick = throttle (up only) + yaw · <b>right stick DOWN &gt;50% = CUT MOTORS</b></span></h2>
+    <div class="pilot-grid">
+      <div class="stick">
+        <div class="lbl">Left — velocity</div>
+        <canvas id="pad_l" width="190" height="190"></canvas>
+        <div class="val" id="padl_val">vx -- · vy --</div>
+      </div>
+      <div class="pilot-center">
+        <div class="pilot-btns">
+          <button class="big armbtn" onclick="cmd('RESET')" title="RESET / ARM-ENABLE: clears ESTOP, re-runs gyro cal, enables arming">↺ ARM / ENABLE</button>
+          <button class="big disarmbtn" onclick="cmd('DISARM')">DISARM</button>
+          <button class="kill" onclick="cmd('ESTOP')">⭘ FAILSAFE · STOP</button>
+        </div>
+        <div class="pilot-btns">
+          <button class="big toggle" id="engageBtn" onclick="toggleEngage()">PILOT: OFF</button>
+          <button class="big toggle" id="traceBtn" onclick="toggleTrace()">⦿ TRACE: OFF</button>
+        </div>
+        <div class="pilot-status">
+          <span class="pill" id="gp_pill">no gamepad — press a button</span>
+          <span>throttle <b id="pz">--</b></span>
+          <span>yaw rate <b id="pyaw">--</b> °/s</span>
+          <span id="dead_pill" class="pill">deadman</span>
+          <span id="txpill" class="pill">tx 0</span>
+          <button onclick="cmd('PING')">PING</button>
+          <span id="ack" class="muted">ready</span>
+        </div>
+        <div class="pilot-opts">
+          <label><input type="checkbox" id="opt_deadman" checked> require deadman (hold RB)</label>
+          <label>vmax <input type="range" id="opt_vmax" min="0.1" max="1.0" step="0.05" value="0.5"><span id="vmax_v">0.50</span> m/s</label>
+          <label>expo <input type="range" id="opt_expo" min="0" max="0.7" step="0.05" value="0.35"><span id="expo_v">0.35</span></label>
+          <span class="muted" id="dryrun_note"></span>
+        </div>
+      </div>
+      <div class="stick">
+        <div class="lbl">Right — throttle / yaw</div>
+        <canvas id="pad_r" width="190" height="190"></canvas>
+        <div class="val" id="padr_val">throttle -- · yaw --</div>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:10px;font-size:11px;font-family:var(--mono)">
+      buttons: A=engage · B=FAILSAFE · X=disarm · Y=arm · RB=deadman · Start=trace &nbsp;|&nbsp;
+      throttle = right-stick up only (0 at neutral); pushing it DOWN past half-way cuts the motors (ESTOP, same as B — ARM/ENABLE to clear). Release / deadman / link-loss → collective winds down over ~1.5 s (controlled descent, not a hard cut). Sign conventions bench-verified.
+    </div>
+    <div class="muted" id="gp_dbg" style="margin-top:6px;font-size:11px;font-family:var(--mono);word-break:break-all;color:#8fb3ff">gamepad debug: press a button to begin</div>
+  </div>
+
+  <!-- optical-flow calibration on the flow rail -->
+  <div class="card c12" id="fccard">
+    <h2>Flow calibration &nbsp;<span class="muted" style="text-transform:none;letter-spacing:0">flow rail · motors off · K = D / (h · |Σ counts|) per slide</span></h2>
+    <div class="fc-grid">
+      <div class="fc-ctl">
+        <div>
+          <div class="lab">Axis across the travel</div>
+          <div class="seg">
+            <button id="fc_ax_x" class="on" onclick="fcAxis('x')" title="drone x along the track: IDX 0 or 180 on the stand">X · IDX 0/180</button>
+            <button id="fc_ax_y" onclick="fcAxis('y')" title="drone y along the track: IDX 270 on the stand">Y · IDX 270</button>
+          </div>
+        </div>
+        <div>
+          <div class="lab">Distance D = S − L (m)</div>
+          <div class="sl"><input type="range" id="fc_d" min="0.20" max="1.50" step="0.005" value="1.000" oninput="fcSync('d')">
+            <input type="number" id="fc_dn" min="0.05" max="5" step="0.001" value="1.000" oninput="fcSync('dn')"></div>
+        </div>
+        <div>
+          <div class="lab">Intended slide time (s) &nbsp;<span id="fc_speed" class="muted"></span></div>
+          <div class="sl"><input type="range" id="fc_t" min="1" max="10" step="0.5" value="4" oninput="fcSync('t')">
+            <input type="number" id="fc_tn" min="0.3" max="60" step="0.5" value="4" oninput="fcSync('tn')"></div>
+        </div>
+        <div>
+          <div class="lab">Lens height h (m) &nbsp;<span id="fc_tof" class="muted"></span></div>
+          <div class="sl">
+            <button onclick="fcH(0.100)" style="padding:6px 10px">H 100</button>
+            <button onclick="fcH(0.150)" style="padding:6px 10px">H 150</button>
+            <input type="number" id="fc_h" min="0.02" max="2" step="0.0005" value="0.1000" style="flex:1">
+          </div>
+        </div>
+        <label class="muted" style="font-size:12px;display:flex;gap:6px;align-items:center">
+          <input type="checkbox" id="fc_auto" checked> auto-stop 0.8 s after the stand stops</label>
+        <div class="seg">
+          <button class="toggle" id="fc_go" onclick="fcStart()" style="font-size:16px">▶ START SLIDE</button>
+          <button class="disarmbtn" onclick="fcPost({action:'stop'})">■ STOP</button>
+          <button onclick="fcPost({action:'cancel'})">✕</button>
+        </div>
+        <span id="fc_msg" class="muted" style="font-family:var(--mono);font-size:12px">—</span>
+      </div>
+      <div id="fc_run">
+        <canvas id="fc_pace" width="900" height="120" style="height:120px"></canvas>
+        <div id="fc_live"><span>no run</span></div>
+        <div id="fc_sum"></div>
+        <div id="fi_box" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin:8px 0">
+          <canvas id="fi_cv" width="35" height="35" style="width:245px;height:245px;image-rendering:pixelated;background:#000;border:1px solid var(--line)"></canvas>
+          <div style="flex:1;min-width:220px;font-family:var(--mono);font-size:12px;display:flex;flex-direction:column;gap:6px">
+            <div class="seg">
+              <button onclick="fiGrab()">◉ GRAB RAW FRAME</button>
+              <label class="muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fi_live" onchange="fiLiveTick()"> live (~1/s)</label>
+              <label class="muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fi_stretch" checked onchange="fiDraw()"> stretch contrast</label>
+            </div>
+            <div id="fi_stats" class="muted">no frame yet — 35×35 raw pixels from the PMW3901 (motors off; tracking pauses ~0.5 s per grab)</div>
+            <div class="muted" style="font-size:11px">exposure: shutter near 8191 = starved for light · texture: std / grad (higher = more trackable) · focus: lapvar (higher = sharper)</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table id="fc_tbl"><thead><tr>
+          <th>#</th><th class="l">ax</th><th>dir</th><th>D m</th><th>h m</th><th>counts</th><th>leak</th>
+          <th>ms</th><th>SQUAL</th><th>K rad/ct</th><th class="l">result</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="muted" style="font-size:11px;font-family:var(--mono)">
+          Each slide: stand against a stop, START, push the trailing post along the track at the ghost's pace, stop at the other stop.
+          5+ slides each way per axis, at H 100 and H 150. Runs are judged by tools/flow-cal.py's rules and logged to
+          logs/flowcal_*.log for <span style="color:var(--ink)">tools/flow-cal.py</span>.
+          <button onclick="if(confirm('Clear all runs from the panel? (the log files stay)')) fcPost({action:'clear'})" style="padding:2px 8px;font-size:11px;margin-left:6px">clear runs</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D estimated state (hoisted to the top row: visible on load) -->
+  <div class="card c6" style="order:-2">
+    <h2>3D — estimated state <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· drag orbit · scroll zoom · R reset</span></h2>
+    <canvas id="scene" width="1000" height="560" style="width:100%;height:auto;cursor:grab"></canvas>
     <div class="rows" style="margin-top:8px;flex-direction:row;gap:26px;flex-wrap:wrap">
       <div class="row" style="gap:8px"><span class="k">pos&nbsp;x,y,z</span><span class="v" id="pos3">-- , -- , --</span></div>
       <div class="row" style="gap:8px"><span class="k">speed</span><span class="v" id="vel3">-- m/s</span></div>
@@ -102,9 +285,9 @@
   </div>
 
   <!-- attitude -->
-  <div class="card c5">
-    <h2>Attitude</h2>
-    <canvas id="ah" width="440" height="300"></canvas>
+  <div class="card c3" style="order:-1">
+    <h2>Attitude / horizon</h2>
+    <canvas id="ah" width="440" height="360"></canvas>
     <div class="rows" style="margin-top:10px">
       <div class="row"><span class="k">roll</span><span class="v" id="roll">--°</span></div>
       <div class="row"><span class="k">pitch</span><span class="v" id="pitch">--°</span></div>
@@ -112,27 +295,20 @@
     </div>
   </div>
 
-  <!-- drift / velocity -->
-  <div class="card c4">
-    <h2>Horizontal drift &amp; velocity</h2>
-    <canvas id="drift" width="340" height="300"></canvas>
+  <!-- flow velocity (optical) + altitude ladder (hoisted into the top instrument row) -->
+  <div class="card c3" style="order:-1">
+    <h2>Altitude &amp; flow <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· ToF ladder · optical-flow vx/vy</span></h2>
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <canvas id="altgauge" width="104" height="280" style="width:64px;flex:none"></canvas>
+      <canvas id="drift" width="300" height="280" style="flex:1;min-width:0"></canvas>
+    </div>
     <div class="rows" style="margin-top:10px">
+      <div class="row"><span class="k">alt est</span><span class="v"><span id="zbig">--</span> <span class="unit">m</span></span></div>
+      <div class="row"><span class="k">raw ToF</span><span class="v"><span id="tofh">--</span> m · <span id="tofv">--</span></span></div>
       <div class="row"><span class="k">vx / vy</span><span class="v" id="vxy">-- , --</span></div>
-      <div class="row"><span class="k">speed</span><span class="v" id="spd">-- m/s</span></div>
-      <div class="row"><span class="k">vz (climb)</span><span class="v" id="vz">-- m/s</span></div>
+      <div class="row"><span class="k">speed · vz</span><span class="v"><span id="spd">--</span> · <span id="vz">--</span> m/s</span></div>
     </div>
-  </div>
-
-  <!-- altitude -->
-  <div class="card c3">
-    <h2>Altitude</h2>
-    <div><span class="big" id="zbig">--</span> <span class="unit">m est</span></div>
-    <div class="bar"><i id="zbar" style="background:var(--accent)"></i></div>
-    <div class="rows" style="margin-top:12px">
-      <div class="row"><span class="k">target zsp</span><span class="v" id="zsp">-- m</span></div>
-      <div class="row"><span class="k">raw ToF</span><span class="v" id="tofh">-- m</span></div>
-      <div class="row"><span class="k">ToF valid</span><span class="v" id="tofv">--</span></div>
-    </div>
+    <div style="display:none"><i id="zbar"></i><span id="zsp"></span></div>
   </div>
 
   <!-- motors -->
@@ -162,24 +338,6 @@
     <canvas id="trend" width="340" height="150"></canvas>
     <div class="rows" style="margin-top:8px">
       <div class="row"><span class="k" style="color:var(--accent)">— vx</span><span class="k" style="color:var(--ok)">— vy</span><span class="k" style="color:var(--warn)">— z</span></div>
-    </div>
-  </div>
-
-  <!-- commands -->
-  <div class="card c12">
-    <h2>Commands &nbsp;<span class="muted" style="text-transform:none;letter-spacing:0">→ udp :14551</span></h2>
-    <div id="cmds">
-      <button class="estop" onclick="cmd('ESTOP')">⭘ ESTOP</button>
-      <button onclick="cmd('DISARM')">DISARM</button>
-      <button class="reset" onclick="cmd('RESET')" title="RESET / ARM-ENABLE: clears ESTOP, re-runs gyro cal, and ENABLES arming — the drone will NOT arm on power-up until you press this (no chip reset)">↺ RESET / ENABLE</button>
-      <span class="hz">
-        <button class="warn" onclick="hoverStep(-50)">− 50mm</button>
-        <span id="hz" style="font-family:var(--mono);min-width:70px;text-align:center">HOVER 300</span>
-        <button class="warn" onclick="hoverStep(50)">+ 50mm</button>
-        <button onclick="sendHover()">SET</button>
-      </span>
-      <button onclick="cmd('PING')">PING</button>
-      <span id="ack">ready</span>
     </div>
   </div>
 
@@ -213,8 +371,17 @@
         </label>
         <span id="cam_status" class="muted" style="font-family:var(--mono)">no snapshot yet</span>
         <a id="cam_dl" class="muted" style="font-family:var(--mono);display:none" download="snapshot.png">⤓ save PNG</a>
+        <hr style="border:none;border-top:1px solid var(--line);margin:6px 0">
+        <label>record <input id="rec_frames" type="number" min="1" max="16" step="1" value="8"
+               style="width:56px;margin-left:6px"> frames</label>
+        <button class="reset" onclick="record()" style="font-size:15px">🎬 RECORD CLIP</button>
+        <span id="rec_status" class="muted" style="font-family:var(--mono)">—</span>
+        <a id="rec_dl" class="muted" style="font-family:var(--mono);display:none" download>⤓ save raw clip</a>
       </div>
       <img id="cam_img" alt="(no snapshot)"
+           style="max-width:min(100%,480px);image-rendering:pixelated;background:#000;
+                  border:1px solid var(--line);border-radius:6px;display:none">
+      <img id="clip_img" alt="(no clip)"
            style="max-width:min(100%,480px);image-rendering:pixelated;background:#000;
                   border:1px solid var(--line);border-radius:6px;display:none">
     </div>
@@ -240,7 +407,7 @@ const fmt = (x,n=2)=> (x==null? '--' : (x>=0?'':'') + x.toFixed(n));
 
 // ---- command uplink ----
 let hoverMM = 300;
-function setHzLabel(){ $('hz').textContent = 'HOVER ' + hoverMM; }
+function setHzLabel(){ const e=$('hz'); if(e) e.textContent = 'HOVER ' + hoverMM; }   /* #hz now lives only in the profile card */
 function hoverStep(d){ hoverMM = Math.max(0, Math.min(600, hoverMM + d)); setHzLabel(); }
 async function cmd(text){
   $('ack').textContent = '→ ' + text + ' ...';
@@ -287,6 +454,31 @@ function onSnapStatus(s){
     const dt = snapT0 ? ' in ' + ((performance.now()-snapT0)/1000).toFixed(1) + ' s' : '';
     $('cam_status').textContent = 'frame #' + s.seq + '  ' + s.w + '×' + s.h + dt;
   }
+}
+
+// ---- camera clip recorder (WiFi UDP: 'REC <n>' -> :14551, IMG chunks back on :14550) ----
+async function record(){
+  const nf = Math.max(1, Math.min(16, Math.round(+$('rec_frames').value || 8)));
+  $('rec_status').textContent = 'recording ' + nf + ' frames …';
+  try{
+    const r = await fetch('/record', {method:'POST', body:String(nf)});
+    const j = await r.json();
+    if(j.error){ $('rec_status').textContent = 'error: ' + j.error; return; }
+    pollRecord();
+  }catch(e){ $('rec_status').textContent = 'start failed: ' + e; }
+}
+let recLastSeq = 0;
+async function pollRecord(){
+  try{
+    const s = await (await fetch('/record.json')).json();
+    $('rec_status').textContent = s.state + (s.msg ? ' — ' + s.msg : '');
+    if(s.state === 'recording'){ setTimeout(pollRecord, 400); return; }
+    if(s.state === 'done' && s.seq !== recLastSeq){
+      recLastSeq = s.seq;
+      if(s.have_gif){ const img = $('clip_img'); img.src = '/clip.gif?' + s.seq; img.style.display = 'block'; }
+      const dl = $('rec_dl'); dl.href = '/clip.raw?' + s.seq; dl.style.display = 'inline';
+    }
+  }catch(e){ $('rec_status').textContent = 'poll failed: ' + e; }
 }
 
 // ---- trend ring buffers ----
@@ -343,11 +535,37 @@ function drawDrift(vx,vy){
   ctx.fillStyle='#6a7683'; ctx.fillText('+x fwd', cx, cy-R-1); ctx.fillText('+y', cx+R-10, cy-4);
   if(vx==null||vy==null){ return; }
   // body frame: +x forward (up on screen), +y right (right on screen)
-  const px=cx + vy*sc, py=cy - vx*sc;
   const spd=Math.hypot(vx,vy);
+  let dx=vy*sc, dy=-vx*sc; const dm=Math.hypot(dx,dy);
+  if(dm>R){ dx=dx/dm*R; dy=dy/dm*R; }       // clamp flow spikes to the outer ring
+  const px=cx+dx, py=cy+dy;
   const col = spd<0.15? '#3fb950' : spd<0.4? '#d29922' : '#f85149';
   ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(px,py); ctx.stroke();
   ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px,py,5,0,7); ctx.fill();
+  ctx.fillStyle='#e6edf3'; ctx.font='bold 11px monospace'; ctx.textAlign='center';
+  ctx.fillText(spd.toFixed(2)+' m/s', cx, cy+R-1);
+}
+
+// ---- altitude / ToF ladder (vertical gauge) ----
+function drawAltGauge(z, tofh, tofv){
+  const c=$('altgauge'); if(!c) return; const ctx=c.getContext('2d');
+  const W=c.width, Hh=c.height, top=12, bot=Hh-12, MAX=1.5;   // metres full-scale
+  const yOf=v=>bot-(Math.max(0,Math.min(MAX,v))/MAX)*(bot-top);
+  ctx.clearRect(0,0,W,Hh);
+  const bx=W*0.46, bw=W*0.30;
+  ctx.fillStyle='#0a0e14'; ctx.fillRect(bx,top,bw,bot-top);
+  ctx.strokeStyle='#2a3038'; ctx.lineWidth=1; ctx.strokeRect(bx,top,bw,bot-top);
+  ctx.font='9px monospace'; ctx.textAlign='right';
+  for(let m=0;m<=MAX+1e-3;m+=0.5){ const yy=yOf(m);
+    ctx.strokeStyle='#232b36'; ctx.beginPath(); ctx.moveTo(bx-3,yy); ctx.lineTo(bx,yy); ctx.stroke();
+    ctx.fillStyle='#6a7683'; ctx.fillText(m.toFixed(1), bx-4, yy+3); }
+  if(z!=null){ const yz=yOf(z); const col=z<0.05?'#3fb950':z<1.0?'#58a6ff':'#d29922';
+    ctx.fillStyle=col; ctx.fillRect(bx,yz,bw,bot-yz);
+    ctx.fillStyle='#e6edf3'; ctx.font='bold 11px monospace'; ctx.textAlign='left';
+    ctx.fillText(z.toFixed(2), bx+bw+4, Math.max(top+8,Math.min(bot,yz+3))); }
+  if(tofv && tofh!=null){ const yt=yOf(tofh);   // raw ToF tick (gold), only when ranging
+    ctx.strokeStyle='#ffcc33'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(bx-2,yt); ctx.lineTo(bx+bw+2,yt); ctx.stroke(); }
 }
 
 // ---- trend ----
@@ -371,8 +589,113 @@ function stateClass(t){
   if(!t.caldone) return ['s-cal','CALIBRATING'];
   return ['s-ready','READY — disarmed'];
 }
+// ---- FLOW CAL ----
+let fcAx='x', fcRunsKey=null;
+function fcAxis(a){ fcAx=a; $('fc_ax_x').classList.toggle('on',a==='x'); $('fc_ax_y').classList.toggle('on',a==='y'); }
+function fcSync(src){
+  if(src==='d') $('fc_dn').value=(+$('fc_d').value).toFixed(3);
+  if(src==='dn') $('fc_d').value=$('fc_dn').value;
+  if(src==='t') $('fc_tn').value=$('fc_t').value;
+  if(src==='tn') $('fc_t').value=$('fc_tn').value;
+  const D=+$('fc_dn').value, T=+$('fc_tn').value;
+  $('fc_speed').textContent = T>0 ? `· ${(D/T).toFixed(2)} m/s` : '';
+}
+function fcH(h){ $('fc_h').value=h.toFixed(4); }
+async function fcPost(body){
+  try{
+    const r=await fetch('/flowcal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json(); $('fc_msg').textContent = j.ok ? (body.action+' ok') : ('⚠ '+j.error);
+    if(j.state) renderFlowCal(j.state);
+  }catch(e){ $('fc_msg').textContent='⚠ '+e.message; }
+}
+function fcStart(){
+  fcPost({action:'start',axis:fcAx,distance:+$('fc_dn').value,seconds:+$('fc_tn').value,
+          height:+$('fc_h').value,auto:$('fc_auto').checked});
+}
+function fcStat(s){ return s? `${s.median.toFixed(6)}` : '--'; }
+function drawPace(lv){
+  const c=$('fc_pace'), g=c.getContext('2d'), W=c.width, H=c.height, x0=40, x1=W-40;
+  g.clearRect(0,0,W,H);
+  g.fillStyle='#0a0e14'; g.fillRect(0,0,W,H);
+  g.strokeStyle='#2a3038'; g.lineWidth=10; g.beginPath(); g.moveTo(x0,70); g.lineTo(x1,70); g.stroke();
+  g.fillStyle='#8b949e'; g.font='13px monospace'; g.textAlign='center';
+  g.fillText('start stop',x0,100); g.fillText('end stop',x1,100);
+  for(let i=1;i<10;i++){ const x=x0+(x1-x0)*i/10; g.fillRect(x-1,62,2,16); }
+  if(!lv){ g.fillText('START a slide — the ghost paces it, the bar is what the flow sensor measured',W/2,30); return; }
+  const D=lv.D, T=lv.T;
+  const gf = lv.moving ? Math.min(1, lv.elapsed/T) : 0;          // ghost: where the stand should be
+  const mf = Math.min(1.15, lv.est_m/D);                        // measured (firmware's current K)
+  g.fillStyle='rgba(88,166,255,.35)'; g.beginPath(); g.arc(x0+(x1-x0)*gf,70,16,0,7); g.fill();
+  g.fillStyle='#3fb950'; g.fillRect(x0,64,(x1-x0)*Math.min(1,mf),12);
+  if(mf>1){ g.fillStyle='#d29922'; g.fillRect(x1,64,(x1-x0)*(mf-1),12); }
+  g.fillStyle='#e6edf3'; g.textAlign='left';
+  const pace = !lv.moving ? 'waiting for motion — push now' :
+     (lv.elapsed<T ? (mf-gf>0.08?'ahead — slow down':(gf-mf>0.08?'behind — speed up':'on pace')) : 'time up — finish at the stop');
+  g.fillText(`${lv.moving?lv.elapsed.toFixed(1):'0.0'} / ${T.toFixed(1)} s   ·   ${(lv.est_m).toFixed(3)} m est (K ${0.00205})   ·   ${pace}`,x0,30);
+}
+let fiLast=null, fiSeq=null, fiLiveTimer=null;
+async function fiGrab(){
+  try{ const r=await fetch('/cmd',{method:'POST',body:'FLOWIMG'}); const j=await r.json();
+       $('fi_stats').textContent=`${j.ack} — waiting for rows…`; }catch(e){ $('fi_stats').textContent='grab failed: '+e; return; }
+  for(let i=0;i<100;i++){ await new Promise(r=>setTimeout(r,250));
+    try{ const j=await (await fetch('/flowimg.json')).json();
+         if(j.last && j.last.seq!==fiSeq){ fiSeq=j.last.seq; fiLast=j.last; fiDraw(); return; } }catch(e){} }
+  $('fi_stats').textContent='no frame came back (old firmware, or rows lost) — try again';
+}
+function fiLiveTick(){
+  clearTimeout(fiLiveTimer);
+  if(!$('fi_live').checked) return;
+  fiGrab().finally(()=>{ if($('fi_live').checked) fiLiveTimer=setTimeout(fiLiveTick,600); });
+}
+function fiDraw(){
+  const f=fiLast; if(!f) return;
+  const cv=$('fi_cv'), g=cv.getContext('2d'), im=g.createImageData(35,35);
+  const st=f.stats, lo=$('fi_stretch').checked?st.min:0, hi=$('fi_stretch').checked?Math.max(st.max,st.min+1):255;
+  for(let i=0;i<f.px.length;i++){ const v=Math.max(0,Math.min(255,Math.round(255*(f.px[i]-lo)/(hi-lo))));
+    im.data[4*i]=im.data[4*i+1]=im.data[4*i+2]=v; im.data[4*i+3]=255; }
+  g.putImageData(im,0,0);
+  $('fi_stats').innerHTML=`frame <b>#${f.seq}</b>${f.rc?` <span style="color:var(--warn)">rc ${f.rc}</span>`:''} · ${new Date(f.t*1000).toLocaleTimeString()}<br>`+
+    `mean <b>${st.mean}</b> · std <b>${st.std}</b> · min/max <b>${st.min}/${st.max}</b><br>`+
+    `saturated <b>${(100*st.sat).toFixed(1)}%</b> · dark <b>${(100*st.dark).toFixed(1)}%</b><br>`+
+    `grad <b>${st.grad}</b> · lapvar <b>${st.lapvar}</b>${f.file?`<br><span class="muted">logs/${f.file}</span>`:''}`;
+}
+function renderFlowCal(f){
+  if(!f) return;
+  $('fc_tof').textContent = f.tofh!=null ? `· ToF ${(+f.tofh).toFixed(3)}${f.tofv?'':' (invalid)'} ≈ h + 0.0008` : '';
+  const lv=f.live;
+  $('fc_go').classList.toggle('on', !!lv);
+  if(!f.have_counts && !lv) $('fc_live').innerHTML='<span style="color:var(--warn)">no flow counts in telemetry — needs the flow-cal firmware (fcx=/fcy= fields)</span>';
+  else if(lv) $('fc_live').innerHTML=`<span>run <b>#${lv.id}</b> axis <b>${lv.axis}</b></span><span>counts <b>${lv.counts}</b></span>`+
+     `<span>cross <b>${lv.other}</b> (${lv.counts? Math.round(100*Math.abs(lv.other)/Math.abs(lv.counts)):0}%)</span>`+
+     `<span>SQUAL <b>${lv.sq}</b></span><span>low-SQUAL reads <b style="color:${lv.nbad?'var(--warn)':'inherit'}">${lv.nbad}</b></span>`;
+  else $('fc_live').innerHTML=`<span>ready · SQUAL <b>${f.sq??'--'}</b> · shutter <b>${f.sh??'--'}</b>`+
+     (f.raw&&f.raw[0]!=null?` · pixels sum/max/min <b>${f.raw[0]}/${f.raw[1]}/${f.raw[2]}</b>`:'')+`</span>`;
+  drawPace(lv);
+  const tb=$('fc_tbl').tBodies[0]; const rows=(f.runs||[]).slice().reverse();
+  const key=rows.map(r=>r.id).join(',');            // rebuild only when the runs change (keeps buttons clickable)
+  if(key===fcRunsKey) return; fcRunsKey=key;
+  tb.innerHTML = rows.map(r=>`<tr class="${r.ok?'':'rej'}"><td>${r.id}</td><td class="l">${r.axis}</td><td>${r.dir}</td>`+
+    `<td>${r.D.toFixed(3)}</td><td>${r.h.toFixed(4)}</td><td>${r.counts}</td><td>${r.leak==null?'--':(100*r.leak).toFixed(0)+'%'}</td>`+
+    `<td>${r.ms}</td><td>${r.sq_mean}</td><td>${r.K==null?'--':r.K.toFixed(6)}</td>`+
+    `<td class="l why">${r.ok?'<span style="color:var(--ok)">✓ used</span>':(r.why||'no counts')}</td>`+
+    `<td><button onclick="fcPost({action:'drop',id:${r.id}})">drop</button></td></tr>`).join('');
+  $('fc_sum').innerHTML = ['x','y'].map(ax=>{
+    const s=f.summary[ax], a=s.all;
+    if(!a) return `<div class="fcs"><div class="muted">axis ${ax}</div><div class="kbig">--</div><div class="muted">no usable runs</div></div>`;
+    const d=(100*(a.median-f.k_fw)/f.k_fw);
+    const warn = a.n<5 ? '<div style="color:var(--warn)">need ≥5 usable runs</div>' :
+                 (a.spread_pct>10 ? '<div style="color:var(--warn)">runs disagree >10%: redo the batch</div>' : '');
+    return `<div class="fcs"><div class="muted">axis ${ax} · ${a.n} runs · spread ${a.spread_pct.toFixed(1)}%</div>`+
+      `<div class="kbig">K = ${a.median.toFixed(6)}</div>`+
+      `<div class="muted">+dir ${fcStat(s['+'])} (${s['+']?s['+'].n:0}) · −dir ${fcStat(s['−'])} (${s['−']?s['−'].n:0})</div>`+
+      `<div class="muted">vs firmware ${f.k_fw}: ${d>=0?'+':''}${d.toFixed(1)}% · -DFLOW_RAD_PER_COUNT=${a.median.toFixed(6)}f</div>${warn}</div>`;
+  }).join('');
+}
+fcSync('t');
+
 function render(p){
   const L=p.link, t=p.t;
+  try{ renderFlowCal(p.flowcal); }catch(err){}
   onSnapStatus(p.snap);   // refresh the camera image whenever a new snapshot completes
   $('dot').className='dot'+(L.connected?' on':'');
   $('linktxt').textContent = L.connected? 'linked' : (L.age_ms==null?'no link':'stale');
@@ -381,11 +704,42 @@ function render(p){
   $('pkts').textContent = L.count+' pkts';
   const [cls,txt]=stateClass(t);
   const sb=$('state'); sb.className=''; sb.classList.add(cls); $('statetxt').textContent=txt;
+  { const wb=$('whybadge'); const pl=p.pilot||{}; let why,wc;
+    if(!t){ why='no telemetry'; wc='var(--dim)'; }
+    else if(t.estop){
+      // v1.2 firmware names the cause: show it instead of a generic "latched"
+      const U={impact:'m/s²','free-fall':'m/s²','accel-tilt':'°',tilt:'°',rate:'rad/s','yaw-spin':'rad/s',
+               velocity:'m/s',height:'m',battery:'V','imu-lost':'misses'};
+      const r=t.why&&t.why!=='-'?t.why:null;
+      const m=(r&&t.why_meas!=null&&r!=='cmd')?` ${(+t.why_meas).toFixed(1)}${U[r]?' '+U[r]:''}`:'';
+      why = r ? `ESTOP: ${r==='cmd'?'commanded (B / panel)':r}${m} — press ARM/ENABLE to clear`
+              : 'ESTOP latched — press ARM/ENABLE to clear';
+      wc='var(--bad)'; }
+    else if(!L.connected||(L.age_ms!=null&&L.age_ms>500)){ why='LINK STALE — check WiFi/tunnel'; wc='var(--warn)'; }
+    else if(!t.caldone){ why='calibrating gyro…'; wc='var(--accent)'; }
+    else if(!pl.engaged){ why='PILOT OFF — press A (engage) + hold RB'; wc='var(--dim)'; }
+    else if(t.tofv===0){   // altitude mode will not take off (and winds down in flight) without height
+      const d=(t.tof_fails!=null)?` (fails ${t.tof_fails}, rc ${t.tof_rc}, recov ${t.tof_recov})`:'';
+      why='NO HEIGHT — ToF invalid: alt mode won\'t take off / winds down'+d; wc='var(--warn)'; }
+    else if(pl.age_ms!=null&&pl.age_ms>400){
+      // stale stick commands: the drone is in its link-loss failsafe (alt mode: LANDING). After a Deck
+      // sleep / bridge restart the bridge comes back with engage OFF, so say so.
+      why = pl.age_ms>3000
+        ? `NO STICK COMMANDS for ${Math.round(pl.age_ms/1000)} s — Deck asleep / link down? press A to re-engage`
+        : 'stick commands stale — link-loss failsafe (landing)';
+      wc='var(--warn)'; }
+    else { why='pilot live'; wc='var(--ok)'; }
+    if(wb){ wb.textContent=why; wb.title=why; wb.style.color=wc; wb.style.borderColor=wc; } }
   last3=t; try{ draw3d(t); }catch(err){}
   if(!t){ return; }
   $('calbadge').textContent = t.caldone?'cal ✓':'cal…';
   $('itbadge').textContent = 'it '+t.it;
   $('loopbadge').textContent = (t.dt_ms>0?Math.round(1000/t.dt_ms):0)+' Hz loop';
+  { const vb=$('vibbadge');   // vibration: peak |a| in g. >3 g is what used to trip the old impact guard
+    if(vb){ if(t.apk!=null){ const g=t.apk/9.80665;
+        vb.textContent='vib '+g.toFixed(1)+' g pk';
+        vb.style.color = g>=3?'var(--bad)':g>=2?'var(--warn)':'var(--ok)'; }
+      else { vb.textContent='vib --'; vb.style.color='var(--dim)'; } } }
   $('roll').textContent=(t.roll*DEG).toFixed(1)+'°';
   $('pitch').textContent=(t.pitch*DEG).toFixed(1)+'°';
   $('yaw').textContent=(t.yaw*DEG).toFixed(1)+'°';
@@ -397,8 +751,9 @@ function render(p){
   $('zbig').textContent=t.z.toFixed(2);
   $('zbar').style.width=Math.max(0,Math.min(100,t.z/0.6*100))+'%';
   $('zsp').textContent=(t.zsp==null?'--':t.zsp.toFixed(2))+' m';
-  $('tofh').textContent=t.tofh.toFixed(2)+' m';
-  $('tofv').innerHTML = t.tofv? '<span style="color:var(--ok)">yes</span>':'<span style="color:var(--bad)">no</span>';
+  $('tofh').textContent=t.tofh.toFixed(2);
+  $('tofv').innerHTML = t.tofv? '<span style="color:var(--ok)">ranging</span>':'<span style="color:var(--bad)">no ToF</span>';
+  drawAltGauge(t.z, t.tofh, t.tofv);
   if(t.walls){ const wf=v=>(v==null||v<0)?'--':v+' mm';
     $('w_front').textContent=wf(t.walls.front); $('w_back').textContent=wf(t.walls.back);
     $('w_left').textContent=wf(t.walls.left);   $('w_right').textContent=wf(t.walls.right);
@@ -506,11 +861,151 @@ scene.addEventListener('wheel',e=>{e.preventDefault(); cam.dist=Math.max(1.2,Mat
 window.addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R'){ Object.assign(cam,CAM0); draw3d(last3);} });
 draw3d(null);
 
+// ================= manual pilot (Steam Deck / gamepad) =================
+// Left stick  -> horizontal body velocity  (up/down = vx fwd/back, left/right = vy)
+// Right stick -> altitude (up/down) + yaw rate (left/right)
+// Setpoints go to riskybird_panel.py POST /pilot (-> UDP :14551 'PILOT vx vy yawrate alt') only while
+// ENGAGED (+ deadman). Release -> a single engaged:false packet, after which the FC watchdog hovers.
+// SIGN CONVENTIONS below are best-guesses from the controller's FLU body frame; VERIFY ON THE BENCH.
+const PCFG = { vmax:0.5, yawmax:0.6, altmax:1.8, altrate:0.4, deadzone:0.10, yawDeadzone:0.35, expo:0.35, dryrun:false,
+  axLX:0, axLY:1, axRX:2, axRY:3,          // standard gamepad axis layout
+  signVx:-1, signVy:-1, signYaw:-1,        // stick-up->+vx fwd; stick-right->+vy right (FLU +y=left); stick-right->yaw RIGHT
+                                           // (FLU: +yaw = CCW from above, so right/CW needs -1; was +1 = stick-right turned LEFT)
+  btnEngage:0, btnEstop:1, btnDisarm:2, btnArm:3, btnDeadman:5, btnTrace:9 };  // A B X Y RB Start
+let pilotEngaged=false, pilotTrace=false, altTarget=0.30, wasActive=false, pilotTx=0, pilotInflight=false;
+const prevBtn={};
+
+fetch('/config').then(r=>r.json()).then(c=>{
+  if(c.pilot_vmax!=null){ PCFG.vmax=+c.pilot_vmax; $('opt_vmax').value=c.pilot_vmax; $('vmax_v').textContent=(+c.pilot_vmax).toFixed(2); }
+  if(c.pilot_yawmax!=null) PCFG.yawmax=+c.pilot_yawmax;
+  if(c.pilot_altmax!=null) PCFG.altmax=+c.pilot_altmax;
+  PCFG.dryrun=!!c.pilot_dry_run;
+  $('dryrun_note').textContent = PCFG.dryrun ? 'DRY-RUN: setpoints logged + echoed, NOT transmitted' : '';
+}).catch(()=>{});
+
+$('opt_vmax').addEventListener('input',e=>{ PCFG.vmax=+e.target.value; $('vmax_v').textContent=PCFG.vmax.toFixed(2); });
+$('opt_expo').addEventListener('input',e=>{ PCFG.expo=+e.target.value; $('expo_v').textContent=PCFG.expo.toFixed(2); });
+
+function toggleEngage(){ pilotEngaged=!pilotEngaged;
+  const b=$('engageBtn'); b.textContent='PILOT: '+(pilotEngaged?'ON':'OFF'); b.classList.toggle('on',pilotEngaged);
+  /* throttle mode: nothing to seed — thrust follows the up-stick, 0 at neutral */ }
+function toggleTrace(){ pilotTrace=!pilotTrace;
+  const b=$('traceBtn'); b.textContent='⦿ TRACE: '+(pilotTrace?'ON':'OFF'); b.classList.toggle('on',pilotTrace); }
+
+function dz(v,dd){ const d=(dd!=null)?dd:PCFG.deadzone; if(Math.abs(v)<d) return 0;
+  const s=Math.sign(v); let m=(Math.abs(v)-d)/(1-d);   // rescale past the deadzone to [0,1]
+  const e=PCFG.expo; m=(1-e)*m + e*m*m*m;               // expo: softer near center, full at the edge
+  return s*m; }
+
+function drawPad(id,x,y){
+  const c=$(id); if(!c) return; const ctx=c.getContext('2d');
+  const W=c.width,H=c.height,cx=W/2,cy=H/2,R=W/2-14;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#1b2230'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy); ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R); ctx.stroke();
+  ctx.strokeStyle='#2a3340'; ctx.beginPath(); ctx.arc(cx,cy,R*PCFG.deadzone,0,7); ctx.stroke();
+  const px=cx+x*R, py=cy+y*R;   // axis +y is down, matching screen down
+  ctx.strokeStyle='#2d3a52'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(px,py); ctx.stroke();
+  const mag=Math.hypot(x,y); const col=mag<0.02?'#6a7683':mag<0.6?'#58a6ff':'#d29922';
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px,py,8,0,7); ctx.fill();
+}
+
+function sendPilot(vx,vy,yawrate,alt,engaged){
+  if(pilotInflight) return;   // never queue: drop this frame rather than back up the uplink
+  pilotInflight=true;
+  fetch('/pilot',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({vx,vy,yawrate,alt,engaged,trace:pilotTrace,armed:!!(last3&&last3.armed)})})
+    .then(r=>r.json()).then(j=>{ pilotInflight=false;
+      if(j && (j.tx||j.dry_run)){ pilotTx++; $('txpill').textContent='tx '+pilotTx+(j.dry_run?' (dry)':''); } })
+    .catch(()=>{ pilotInflight=false; });
+}
+
+let lastPoll=performance.now();
+let thrKillLatched=false;   // throttle-down ESTOP edge latch
+function pollPad(){
+  const now=performance.now(); const dt=Math.min(0.1,(now-lastPoll)/1000); lastPoll=now;
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  let gp=null; for(const p of pads){ if(p){ gp=p; break; } }
+  const pill=$('gp_pill');
+  if(!gp){ pill.textContent='no gamepad — press a button'; pill.className='pill';
+    const dbg=$('gp_dbg'); if(dbg){ dbg.textContent=`pollPad running · navigator.getGamepads()=${pads.length} slot(s), none active · press a PHYSICAL controller button (A/B/X/Y or L3/R3), NOT the touchscreen`; }
+    drawPad('pad_l',0,0); drawPad('pad_r',0,0);
+    // pad lost -> go SILENT so the FC link-loss failsafe winds the collective down from the last real
+    // command (controlled descent), rather than us injecting a stale/fixed throttle. Resumes on reconnect.
+    wasActive=false;
+    return; }
+  pill.textContent=gp.id.slice(0,30); pill.className='pill ok';
+  { const dbg=$('gp_dbg'); if(dbg){ const a=gp.axes||[];
+      dbg.textContent=`map=${gp.mapping||'(empty)'} | axes[${a.length}]=[${Array.from(a).map(v=>(+v).toFixed(2)).join(', ')}] | idx=${gp.index} id="${(gp.id||'').slice(0,36)}"`; } }
+
+  const btn=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);
+  const edge=i=>{ const n=btn(i); const was=prevBtn[i]||false; prevBtn[i]=n; return n&&!was; };
+  if(edge(PCFG.btnEstop)) cmd('ESTOP');
+  if(edge(PCFG.btnDisarm)) cmd('DISARM');
+  if(edge(PCFG.btnArm)) cmd('RESET');
+  if(edge(PCFG.btnEngage)) toggleEngage();
+  if(edge(PCFG.btnTrace)) toggleTrace();
+
+  const deadmanReq=$('opt_deadman').checked;
+  const deadman=!deadmanReq || btn(PCFG.btnDeadman);
+  const dp=$('dead_pill');
+  dp.className='pill'+(deadman?' ok':(deadmanReq?' warn':'')); dp.textContent=deadmanReq?(deadman?'deadman OK':'hold RB'):'deadman off';
+
+  const ax=gp.axes||[];
+  const lx=dz(ax[PCFG.axLX]||0), ly=dz(ax[PCFG.axLY]||0);
+  // Yaw shares the right stick with throttle: a 10% deadzone let a slightly diagonal throttle push command a
+  // steady ~20 deg/s yaw (flight 2026-11-21 13:25). Its own wide deadzone keeps throttle from leaking into yaw.
+  const rx=dz(ax[PCFG.axRX]||0, PCFG.yawDeadzone), ry=dz(ax[PCFG.axRY]||0);
+  const vx=PCFG.signVx*ly*PCFG.vmax;      // stick up -> forward
+  const vy=PCFG.signVy*lx*PCFG.vmax;      // stick right -> body-right
+  const yawrate=PCFG.signYaw*rx*PCFG.yawmax;
+  const thr=Math.max(0, -ry);             // THROTTLE: up (-ry>0) -> thrust; neutral/down -> 0 (no auto-hover)
+  // THROTTLE-DOWN KILL: right stick pushed DOWN past 50% = ESTOP (same as B), once per push. Raw axis
+  // (not dz) so the threshold is the physical 50%; re-arms only after the stick comes back above 30%.
+  const ryRaw=+(ax[PCFG.axRY]||0);
+  if(ryRaw>0.5 && !thrKillLatched){ thrKillLatched=true; cmd('ESTOP'); }
+  else if(ryRaw<0.3) thrKillLatched=false;
+  const active=pilotEngaged && deadman;
+
+  drawPad('pad_l', lx, ly); drawPad('pad_r', rx, ry);
+  $('padl_val').textContent=`vx ${vx.toFixed(2)} · vy ${vy.toFixed(2)} m/s`;
+  $('padr_val').textContent=`throttle ${(thr*100).toFixed(0)}% · yaw ${(yawrate*DEG).toFixed(0)}°/s`;
+  $('pz').textContent=(thr*100).toFixed(0)+'%';
+  $('pyaw').textContent=(yawrate*DEG).toFixed(0);
+  $('engageBtn').classList.toggle('on', active);
+
+  if(active){ sendPilot(vx,vy,yawrate,thr,true); wasActive=true; }
+  else if(wasActive){ sendPilot(0,0,0,0,false); wasActive=false; }   // disengage/deadman release -> throttle 0 (motors idle)
+}
+setInterval(pollPad, 33);   // ~30 Hz uplink
+// Deck/Chromium gotcha: the Gamepad API stays empty until the page gets a button press; the event
+// just wakes polling. Also map keyboard F = FAILSAFE as a no-pad fallback.
+window.addEventListener('gamepadconnected', ()=>{});
+window.addEventListener('keydown', e=>{ if(e.key==='f'||e.key==='F') cmd('ESTOP'); });
+
 const es = new EventSource('/stream');
 es.onmessage = e => { try{ render(JSON.parse(e.data)); }catch(err){} };
 es.onerror = () => { $('dot').className='dot'; $('linktxt').textContent='reconnecting…'; };
 // keyboard: E = estop
 window.addEventListener('keydown', e=>{ if(e.key==='e'||e.key==='E') cmd('ESTOP'); });
+</script>
+<script>
+// Standalone gamepad probe (independent of the pilot script; survives any error above). v5
+(function(){
+  function fmt(){
+    try{
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      var act=[];
+      for(var i=0;i<pads.length;i++){ var p=pads[i]; if(p){
+        act.push('#'+i+' "'+(p.id||'').slice(0,22)+'" map='+(p.mapping||'(empty)')+' ax['+p.axes.length+']=['+Array.prototype.map.call(p.axes,function(v){return (+v).toFixed(2);}).join(',')+']');
+      } }
+      return 'PROBEv5 · getGamepads='+pads.length+' · active='+act.length+(act.length? ' · '+act.join(' | ') : ' · press a PHYSICAL controller button (A/B/X/Y)');
+    }catch(e){ return 'PROBEv5 ERROR: '+e.message; }
+  }
+  setInterval(function(){ var el=document.getElementById('gp_dbg'); if(el) el.textContent=fmt(); }, 200);
+  window.addEventListener('gamepadconnected', function(ev){ var el=document.getElementById('gp_dbg'); if(el) el.textContent='PROBEv5 gamepadconnected: '+ev.gamepad.id; });
+})();
 </script>
 </body>
 </html>
